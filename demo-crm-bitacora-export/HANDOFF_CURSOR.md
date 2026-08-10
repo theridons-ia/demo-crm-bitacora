@@ -1,35 +1,26 @@
-# Handoff para nuevo Cloud Agent (demo-crm-bitacora)
+# Handoff — Bitácora Campo (demo web)
 
 ## Objetivo
-Continuar este proyecto como repositorio independiente para una demo comercial móvil de CRM de vendedores.
+Demo comercial web que reproduce la UX de Bitácora Campo para validación con clientes, con modelo Visita / Cliente / Orden de venta.
 
-## Estado actual del demo
-Proyecto frontend estático, mobile-first, sin backend:
+## Estado actual
+Frontend estático mobile-first:
 
-- `index.html`: layout principal con
-  - KPIs
-  - formulario "Registrar visita"
-  - lista de últimas visitas
-  - panel gerencial rápido
-- `styles.css`: estilos responsive y tarjetas
-- `app.js`: lógica de demo con `localStorage`
-  - guarda visitas
-  - calcula KPIs (visitas, ventas, efectividad)
-  - leaderboard simple por vendedor
-  - botón para limpiar demo
-- `README.md`: instrucciones de ejecución
+- **Clientes** (`@bitacora-campo/clients`): RIF, nombre, dirección, estado. Seed de 6 + alta desde formularios.
+- **Visitas** (`@bitacora-campo/visits`): siempre con `clientId`. Estados Programada · En curso · Completada. `startAt` / `endAt` automáticos. Motivos (rutina, productos nuevos, negociar, cobranza, seguimiento, otro). Outcome al cerrar: con_venta / sin_venta.
+- **Órdenes** (`@bitacora-campo/orders`): cliente obligatorio, visita opcional. Estados Borrador · Confirmada · Parcial. Líneas desde inventario (precio lista / mayor).
+- **Inventario**: 8 productos (código, lista, mayor, caducidad) en tab Inventario.
+- Sheet de visita en curso: cerrar o crear orden.
+- Supervisor: KPIs + programar visita + asignar orden a vendedores.
+- Manifest PWA básico (`manifest.webmanifest` + `icon.svg`).
 
 ## Cómo ejecutar
 ```bash
-python3 -m http.server 8080
+python3 -m http.server 8090
 ```
 
-Abrir la app desde el puerto 8080 (preview/forwarded port en Cursor).
-
 ## Próximos pasos sugeridos
-1. Subir estos archivos al repo remoto `theridons-ia/demo-crm-bitacora`.
-2. Crear versión v2 con:
-   - pantalla detalle por vendedor/ruta
-   - filtros por fecha/estado
-   - dashboard de supervisor separado
-3. (Opcional) Migrar a backend real (Django/FastAPI + PostgreSQL) tras validación de negocio.
+1. Service worker para offline real.
+2. Conectar backend real tras validación comercial.
+3. Autenticación por rol vendedor/supervisor.
+4. Descuento / control de stock real.

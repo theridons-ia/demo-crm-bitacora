@@ -1,28 +1,29 @@
-# demo-crm-bitacora
+# Bitácora Campo (demo web)
 
-Demo web mobile-first para presentar una app de control comercial:
+Demo web mobile-first alineada a la interfaz de **Bitácora Campo**, lista para evolucionar a PWA:
 
-- bitácora de visitas de vendedores
-- registro de ventas por visita
-- KPIs diarios rápidos
-- panel gerencial simple
+- navegación: Inicio · Visitas · Inventario · Resumen
+- clientes con RIF, nombre y dirección (seed + alta)
+- visitas ligadas a cliente (ahora / programar) con inicio/fin automáticos
+- órdenes de venta independientes (cliente obligatorio, visita opcional)
+- inventario / lista de precios (8 productos demo)
+- panel de supervisor con asignación de visitas y órdenes
+- persistencia local (`localStorage`) offline-first
 
-## Ejecutar local
-
-No requiere dependencias. Puedes abrir `index.html` directamente en el navegador.
-
-Si quieres servirlo por HTTP:
+## Ejecutar
 
 ```bash
-python3 -m http.server 8080
+python3 -m http.server 8090
 ```
 
-Luego abre:
+Abrir:
 
-- `http://localhost:8080`
+- Vendedor: `http://localhost:8090/index.html`
+- Supervisor: `http://localhost:8090/supervisor.html`
 
 ## Notas
 
-- Es una demo visual (no backend real).
-- Los datos se guardan en `localStorage` del navegador para simular uso.
-- Ideal para reuniones de descubrimiento y validación funcional.
+- No requiere backend.
+- Al vaciar/cargar demo se siembran 6 clientes, visitas y órdenes de ejemplo.
+- Incluye `manifest.webmanifest` (PWA ligera; service worker pendiente).
+- Iconos con **Lucide** (`unpkg.com/lucide`) en formularios y navegación.

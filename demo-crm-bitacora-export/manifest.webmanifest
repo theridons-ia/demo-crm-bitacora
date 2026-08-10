@@ -1,0 +1,18 @@
+{
+  "name": "Bitácora Campo",
+  "short_name": "Bitácora",
+  "description": "Demo comercial de visitas, clientes y órdenes de venta para fuerza de campo.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F7F3ED",
+  "theme_color": "#F7F3ED",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

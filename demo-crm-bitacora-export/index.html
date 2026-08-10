@@ -2,81 +2,613 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Demo CRM Bitácora</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bitácora Campo</title>
+  <meta name="theme-color" content="#F7F3ED">
+  <meta name="description" content="Demo comercial Bitácora Campo — visitas, clientes y órdenes de venta">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <p class="eyebrow">Demo comercial</p>
-      <h1>CRM de Campo · Bitácora</h1>
-      <p class="sub">Vendedores, visitas, ventas y métricas gerenciales.</p>
-    </header>
-
-    <section class="kpis" aria-label="Indicadores">
-      <article class="card kpi">
-        <p>Vendedores activos</p>
-        <strong id="kpi-vendedores">14</strong>
-      </article>
-      <article class="card kpi">
-        <p>Visitas hoy</p>
-        <strong id="kpi-visitas">0</strong>
-      </article>
-      <article class="card kpi">
-        <p>Ventas hoy (USD)</p>
-        <strong id="kpi-ventas">$ 0</strong>
-      </article>
-      <article class="card kpi">
-        <p>Efectividad</p>
-        <strong id="kpi-efectividad">0%</strong>
-      </article>
-    </section>
-
-    <section class="card">
-      <h2>Registrar visita</h2>
-      <form id="visit-form" class="form">
-        <input id="cliente" name="cliente" type="text" placeholder="Cliente visitado" required>
-        <div class="grid-2">
-          <select id="estado" name="estado" required>
-            <option value="">Estado</option>
-            <option>Lara</option>
-            <option>Carabobo</option>
-            <option>Yaracuy</option>
-            <option>Aragua</option>
-            <option>Distrito Capital</option>
-          </select>
-          <select id="resultado" name="resultado" required>
-            <option value="">Resultado</option>
-            <option>Venta cerrada</option>
-            <option>Venta parcial</option>
-            <option>Pedido para mañana</option>
-            <option>Sin venta</option>
-          </select>
+  <div class="app-shell">
+    <main id="screen-home" class="screen active" data-screen="home">
+      <div class="greeting-row">
+        <div>
+          <p class="eyebrow" id="home-date">LUNES, 10 DE AGOSTO</p>
+          <h1 id="home-greeting">Hola, Marina</h1>
+          <p class="sub">Lista para mover la ruta.</p>
         </div>
-        <input id="monto" name="monto" type="number" min="0" step="0.01" placeholder="Monto venta USD (0 si no vendió)" required>
-        <textarea id="nota" name="nota" rows="2" placeholder="Observaciones de la visita"></textarea>
-        <button type="submit">Guardar visita</button>
+        <button class="avatar" id="home-avatar" type="button" aria-label="Cambiar vendedor">MG</button>
+      </div>
+
+      <section class="route-card" aria-label="Tu ruta de hoy">
+        <div class="route-card-top">
+          <p class="label">TU RUTA DE HOY</p>
+          <span class="route-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 17 17 7"/>
+              <path d="M9 7h8v8"/>
+            </svg>
+          </span>
+        </div>
+        <h2 id="route-title">Tu ruta comienza aquí</h2>
+        <div class="progress-track">
+          <div class="progress-fill" id="route-progress"></div>
+        </div>
+        <div class="route-meta">
+          <span id="route-count">0 de 5 visitas registradas</span>
+          <strong id="route-percent">0%</strong>
+        </div>
+      </section>
+
+      <div class="section-head">
+        <h2>Resumen del día</h2>
+      </div>
+      <section class="metrics" aria-label="Métricas del día">
+        <article class="metric-card">
+          <div class="metric-icon rose" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2M6 7l1.2 12h9.6L18 7"/></svg>
+          </div>
+          <p>Visitas hoy</p>
+          <strong id="metric-visits">0</strong>
+        </article>
+        <article class="metric-card">
+          <div class="metric-icon gray" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <p>Órdenes hoy</p>
+          <strong id="metric-sales">$0</strong>
+        </article>
+        <article class="metric-card">
+          <div class="metric-icon sand" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+          </div>
+          <p>Efectividad</p>
+          <strong id="metric-effectiveness">0%</strong>
+        </article>
+        <article class="metric-card">
+          <div class="metric-icon purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <p>En curso</p>
+          <strong id="metric-open">0</strong>
+        </article>
+      </section>
+
+      <button class="cta-register" id="cta-register" type="button">
+        <span class="cta-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+            <path d="M12 5v14"/>
+            <path d="M5 12h14"/>
+          </svg>
+        </span>
+        <span class="cta-copy">
+          <strong>Registrar actividad</strong>
+          <span>Visita, cerrar o crear orden de venta</span>
+        </span>
+        <span class="cta-arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/>
+            <path d="M13 5l7 7-7 7"/>
+          </svg>
+        </span>
+      </button>
+
+      <div class="section-head">
+        <h2>Actividad reciente</h2>
+        <button class="link" id="see-all-btn" type="button">Ver todo</button>
+      </div>
+      <div id="recent-list" class="visits-stack"></div>
+      <a class="supervisor-link" href="./supervisor.html">Abrir panel de supervisor</a>
+    </main>
+
+    <main id="screen-visits" class="screen" data-screen="visits">
+      <div class="title-row">
+        <div>
+          <p class="eyebrow">BITÁCORA</p>
+          <h1 class="screen-title">Tus visitas</h1>
+          <p class="sub" id="visits-count">0 registros guardados en el dispositivo</p>
+        </div>
+        <button class="icon-btn" id="visits-add-btn" type="button" aria-label="Registrar visita">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search-input" type="search" placeholder="Buscar cliente, RIF o nota" autocomplete="off">
+      </div>
+
+      <div class="chips" role="tablist" aria-label="Filtros de bitácora">
+        <button class="chip" type="button" data-filter="all">Hechas</button>
+        <button class="chip active" type="button" data-filter="open">Abiertas</button>
+        <button class="chip" type="button" data-filter="scheduled">Agenda</button>
+        <button class="chip" type="button" data-filter="sale">Con venta</button>
+        <button class="chip" type="button" data-filter="none">Sin venta</button>
+      </div>
+
+      <section id="calendar-panel" class="calendar-panel hidden">
+        <div class="section-head" style="margin-top:0">
+          <h2>Agenda</h2>
+          <button class="link" id="schedule-from-visits-btn" type="button">Programar</button>
+        </div>
+        <div id="week-strip" class="week-strip" aria-label="Calendario semanal"></div>
+        <p class="sub" id="calendar-day-label">Visitas del día</p>
+      </section>
+
+      <div class="toolbar">
+        <button class="danger-link" id="clear-btn" type="button">Vaciar demo</button>
+      </div>
+      <div id="visits-list" class="visits-stack"></div>
+    </main>
+
+    <main id="screen-sales" class="screen" data-screen="sales">
+      <div class="title-row">
+        <div>
+          <p class="eyebrow">COMERCIAL</p>
+          <h1 class="screen-title">Ventas</h1>
+          <p class="sub" id="sales-count">0 órdenes de venta</p>
+        </div>
+        <button class="icon-btn" id="sales-add-btn" type="button" aria-label="Nueva orden">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+
+      <section class="sales-summary" aria-label="Resumen de ventas">
+        <article>
+          <span>Órdenes</span>
+          <strong id="sales-kpi-count">0</strong>
+        </article>
+        <article>
+          <span>Total</span>
+          <strong id="sales-kpi-total">$0</strong>
+        </article>
+        <article>
+          <span>Hoy</span>
+          <strong id="sales-kpi-today">$0</strong>
+        </article>
+      </section>
+
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="sales-search-input" type="search" placeholder="Buscar código, cliente o producto" autocomplete="off">
+      </div>
+
+      <div class="chips" role="tablist" aria-label="Filtros de ventas" id="sales-chips">
+        <button class="chip active" type="button" data-sales-filter="all">Todas</button>
+        <button class="chip" type="button" data-sales-filter="Confirmada">Confirmadas</button>
+        <button class="chip" type="button" data-sales-filter="Parcial">Parciales</button>
+        <button class="chip" type="button" data-sales-filter="Borrador">Borradores</button>
+        <button class="chip" type="button" data-sales-filter="today">Hoy</button>
+      </div>
+
+      <div id="sales-list" class="visits-stack"></div>
+    </main>
+
+    <main id="screen-inventory" class="screen" data-screen="inventory">
+      <p class="eyebrow">CATÁLOGO</p>
+      <h1 class="screen-title">Inventario</h1>
+      <p class="sub">Lista de precios demo · colas, refrescos y lácteos.</p>
+
+      <div class="chips" role="tablist" aria-label="Filtro de categoría" id="inventory-chips">
+        <button class="chip active" type="button" data-category="all">Todos</button>
+        <button class="chip" type="button" data-category="Refrescos">Refrescos</button>
+        <button class="chip" type="button" data-category="Lácteos">Lácteos</button>
+      </div>
+
+      <div id="inventory-list" class="inventory-list"></div>
+    </main>
+
+    <main id="screen-insights" class="screen" data-screen="insights">
+      <p class="eyebrow">RESUMEN</p>
+      <h1 class="screen-title">Cómo va tu ruta</h1>
+      <p class="sub">Visitas, motivos y órdenes de venta.</p>
+
+      <section class="achievement-card" aria-label="Órdenes acumuladas">
+        <div class="soft-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div>
+          <p class="label">ÓRDENES ACUMULADAS</p>
+          <strong id="insight-sales">$0</strong>
+          <p id="insight-sales-sub">en 0 visitas · 0 órdenes</p>
+        </div>
+      </section>
+
+      <div class="section-head"><h2>Resultados de visitas</h2></div>
+      <section class="card">
+        <div class="result-row">
+          <div class="result-row-top"><span>Con venta</span><span id="count-closed">0</span></div>
+          <div class="bar-track"><div class="bar-fill" id="bar-closed"></div></div>
+        </div>
+        <div class="result-row">
+          <div class="result-row-top"><span>Sin venta</span><span id="count-none">0</span></div>
+          <div class="bar-track"><div class="bar-fill dark" id="bar-none"></div></div>
+        </div>
+      </section>
+
+      <div class="section-head"><h2>Órdenes recientes</h2></div>
+      <div id="insight-orders" class="visits-stack"></div>
+
+      <div class="section-head"><h2>Objetivo diario</h2></div>
+      <section class="goal-card">
+        <div class="goal-top">
+          <div>
+            <p>Visitas completadas</p>
+            <strong id="goal-count">0 / 5</strong>
+          </div>
+          <div class="ring" id="goal-ring" style="--p: 0%">0%</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="goal-progress"></div>
+        </div>
+        <p class="goal-tip" id="goal-tip">Te faltan 5 visitas para completar el objetivo.</p>
+      </section>
+    </main>
+
+    <section id="screen-form" class="screen-form hidden" aria-label="Formulario">
+      <div class="form-header">
+        <button class="back-btn" id="form-back-btn" type="button" aria-label="Volver">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div>
+          <p class="eyebrow" id="form-eyebrow">VISITA</p>
+          <h1 class="screen-title" id="form-title" style="font-size:24px">Crear visita</h1>
+        </div>
+      </div>
+
+      <form id="create-form" class="form form-mode" data-mode="create">
+        <div class="field">
+          <label>¿Cuándo?</label>
+          <div class="segmented" id="when-group">
+            <button class="segment active" type="button" data-value="now">Ahora</button>
+            <button class="segment" type="button" data-value="later">Programar</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="create-client-id">Cliente</label>
+          <div class="client-pick-row">
+            <div class="input-with-icon">
+              <i data-lucide="store" class="field-icon"></i>
+              <select id="create-client-id" required></select>
+            </div>
+            <button class="secondary-btn" id="create-new-client-btn" type="button">Nuevo</button>
+          </div>
+          <p class="error hidden" id="create-client-error">Selecciona o crea un cliente.</p>
+          <p class="hint" id="create-client-meta"></p>
+        </div>
+        <div class="field hidden" id="create-date-field">
+          <label for="create-date">Fecha programada</label>
+          <div class="input-with-icon">
+            <i data-lucide="calendar" class="field-icon"></i>
+            <input id="create-date" type="date">
+          </div>
+        </div>
+        <div class="field">
+          <label for="create-location">Ubicación</label>
+          <div class="gps-row">
+            <div class="input-with-icon">
+              <i data-lucide="map-pin" class="field-icon"></i>
+              <input id="create-location" type="text" placeholder="Dirección o referencia">
+            </div>
+            <button class="secondary-btn" id="create-gps-btn" type="button">GPS</button>
+          </div>
+          <p class="hint" id="create-gps-status">Se prellena con la dirección del cliente.</p>
+          <input type="hidden" id="create-lat" value="">
+          <input type="hidden" id="create-lng" value="">
+        </div>
+        <div class="field">
+          <label for="create-notes">Nota</label>
+          <div class="input-with-icon textarea-icon">
+            <i data-lucide="notebook-pen" class="field-icon"></i>
+            <textarea id="create-notes" placeholder="Qué hacer en esta parada…"></textarea>
+          </div>
+        </div>
+        <button class="primary-btn" type="submit" id="create-submit-btn">Iniciar visita ahora</button>
+      </form>
+
+      <form id="close-form" class="form form-mode hidden" data-mode="close">
+        <div class="field">
+          <label for="close-visit-id">Visita a cerrar</label>
+          <div class="input-with-icon">
+            <i data-lucide="route" class="field-icon"></i>
+            <select id="close-visit-id" required></select>
+          </div>
+          <p class="hint">En curso o programadas de hoy. Cierre con hora automática.</p>
+        </div>
+
+        <div class="form-section">
+          <p class="form-section-label">Detalle comercial</p>
+          <div class="field">
+            <label for="close-motive">Motivo de la visita</label>
+            <div class="input-with-icon">
+              <i data-lucide="target" class="field-icon"></i>
+              <select id="close-motive" required></select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Resultado</label>
+            <div class="segmented" id="close-outcome-group">
+              <button class="segment" type="button" data-value="sin_venta">Sin venta</button>
+              <button class="segment active" type="button" data-value="con_venta">Con venta</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section hidden" id="close-orders-section">
+          <div class="section-head" style="margin-top:0">
+            <h2 style="font-size:15px">Órdenes de esta visita</h2>
+            <button class="link" id="close-open-order-btn" type="button">+ Agregar orden</button>
+          </div>
+          <div id="close-orders-list" class="linked-orders-list"></div>
+          <p class="hint" id="close-order-hint">Sin órdenes aún. Puedes agregar una ahora o después.</p>
+        </div>
+
+        <div class="form-section">
+          <p class="form-section-label">Cierre</p>
+          <div class="field">
+            <label>Seguimiento</label>
+            <div class="segmented segmented-wrap" id="close-follow-group">
+              <button class="segment active" type="button" data-value="none">Ninguno</button>
+              <button class="segment" type="button" data-value="call">Llamar</button>
+              <button class="segment" type="button" data-value="schedule">Agendar</button>
+            </div>
+          </div>
+          <div class="field hidden" id="close-follow-date-field">
+            <label for="close-follow-date">Fecha del seguimiento</label>
+            <div class="input-with-icon">
+              <i data-lucide="calendar-clock" class="field-icon"></i>
+              <input id="close-follow-date" type="date">
+            </div>
+          </div>
+          <div class="field">
+            <label for="close-photo">Foto (opcional)</label>
+            <div class="input-with-icon">
+              <i data-lucide="camera" class="field-icon"></i>
+              <input id="close-photo" type="file" accept="image/*" capture="environment">
+            </div>
+            <div id="close-photo-preview" class="foto-preview hidden"></div>
+          </div>
+          <div class="field">
+            <label for="close-notes">Observaciones</label>
+            <div class="input-with-icon textarea-icon">
+              <i data-lucide="message-square-text" class="field-icon"></i>
+              <textarea id="close-notes" placeholder="Qué pasó en la visita…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <button class="primary-btn" type="submit">Cerrar visita</button>
+      </form>
+
+      <form id="order-form" class="form form-mode hidden" data-mode="order">
+        <div class="field">
+          <label for="order-client-id">Cliente</label>
+          <div class="client-pick-row">
+            <div class="input-with-icon">
+              <i data-lucide="store" class="field-icon"></i>
+              <select id="order-client-id" required></select>
+            </div>
+            <button class="secondary-btn" id="order-new-client-btn" type="button">Nuevo</button>
+          </div>
+          <p class="error hidden" id="order-client-error">El cliente es obligatorio.</p>
+          <p class="hint" id="order-client-meta"></p>
+        </div>
+        <p class="hint" id="order-code-preview">El código se genera al guardar (OV-fecha-hora-xxxx).</p>
+        <div class="field">
+          <label for="order-visit-id">Visita relacionada (opcional)</label>
+          <div class="input-with-icon">
+            <i data-lucide="map-pinned" class="field-icon"></i>
+            <select id="order-visit-id">
+              <option value="">Sin visita</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Estado de la orden</label>
+          <div class="segmented" id="order-status-group">
+            <button class="segment active" type="button" data-value="Confirmada">Confirmada</button>
+            <button class="segment" type="button" data-value="Parcial">Parcial</button>
+            <button class="segment" type="button" data-value="Borrador">Borrador</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Cobro</label>
+          <div class="segmented" id="order-payment-group">
+            <button class="segment active" type="button" data-value="pagada">Contado</button>
+            <button class="segment" type="button" data-value="credito">Crédito</button>
+            <button class="segment" type="button" data-value="parcial">Abono</button>
+          </div>
+        </div>
+        <div class="field hidden" id="order-due-field">
+          <label for="order-due-date">Vence</label>
+          <div class="input-with-icon">
+            <i data-lucide="calendar-clock" class="field-icon"></i>
+            <input id="order-due-date" type="date">
+          </div>
+        </div>
+        <div class="field">
+          <label>Lista de precios</label>
+          <div class="segmented" id="order-price-group">
+            <button class="segment active" type="button" data-value="list">Precio lista</button>
+            <button class="segment" type="button" data-value="wholesale">Mayor</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Productos</label>
+          <div id="order-products" class="product-list"></div>
+          <div class="sale-total-row">
+            <span>Total orden</span>
+            <strong id="order-total">$0</strong>
+          </div>
+        </div>
+        <div class="field">
+          <label for="order-notes">Observaciones</label>
+          <div class="input-with-icon textarea-icon">
+            <i data-lucide="file-text" class="field-icon"></i>
+            <textarea id="order-notes" placeholder="Condiciones, entrega, cobranza…"></textarea>
+          </div>
+        </div>
+        <button class="primary-btn" type="submit">Guardar orden de venta</button>
+      </form>
+
+      <form id="client-form" class="form form-mode hidden" data-mode="client">
+        <div class="field">
+          <label for="client-rif">RIF</label>
+          <div class="input-with-icon">
+            <i data-lucide="badge-check" class="field-icon"></i>
+            <input id="client-rif" type="text" placeholder="J-12345678-9" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="client-name">Nombre / razón social</label>
+          <div class="input-with-icon">
+            <i data-lucide="building-2" class="field-icon"></i>
+            <input id="client-name" type="text" placeholder="Ej. Bodega La Esquina" required>
+          </div>
+          <p class="error hidden" id="client-name-error">El nombre es obligatorio.</p>
+        </div>
+        <div class="field">
+          <label for="client-address">Dirección</label>
+          <div class="input-with-icon">
+            <i data-lucide="map-pin" class="field-icon"></i>
+            <input id="client-address" type="text" placeholder="Calle, ciudad…" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="client-estado">Estado / zona</label>
+          <div class="input-with-icon">
+            <i data-lucide="map" class="field-icon"></i>
+            <select id="client-estado" required></select>
+          </div>
+        </div>
+        <button class="primary-btn" type="submit">Guardar cliente</button>
       </form>
     </section>
 
-    <section class="card">
-      <div class="title-row">
-        <h2>Últimas visitas</h2>
-        <button id="clear-btn" class="ghost" type="button">Limpiar demo</button>
+    <div id="action-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="action-sheet-title">
+      <button class="sheet-backdrop" id="action-sheet-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <h2 id="action-sheet-title">¿Qué quieres hacer?</h2>
+        <p class="sub">La visita es la parada. La orden es el pedido.</p>
+        <div class="action-options">
+          <button class="action-option" type="button" data-action="create">
+            <span class="action-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            </span>
+            <span>
+              <strong>Crear visita</strong>
+              <span>Ahora o programarla · cliente obligatorio</span>
+            </span>
+          </button>
+          <button class="action-option" type="button" data-action="close">
+            <span class="action-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <span>
+              <strong>Cerrar visita</strong>
+              <span>Motivo + con/sin venta</span>
+            </span>
+          </button>
+          <button class="action-option" type="button" data-action="order">
+            <span class="action-icon accent">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M6 6 5 3H2"/></svg>
+            </span>
+            <span>
+              <strong>Orden de venta</strong>
+              <span>Cliente obligatorio · visita opcional</span>
+            </span>
+          </button>
+        </div>
       </div>
-      <ul id="visits-list" class="list"></ul>
-    </section>
+    </div>
 
-    <section class="card">
-      <div class="title-row">
-        <h2>Panel gerencial rápido</h2>
-        <p class="small" id="pendiente-cobro">Cobranza pendiente: $ 0</p>
+    <div id="visit-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="visit-sheet-title">
+      <button class="sheet-backdrop" id="visit-sheet-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <h2 id="visit-sheet-title">Visita en curso</h2>
+        <p class="sub" id="visit-sheet-sub">Acciones para esta parada.</p>
+        <div class="action-options">
+          <button class="action-option" type="button" id="visit-sheet-close">
+            <span class="action-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <span>
+              <strong>Cerrar visita</strong>
+              <span>Registrar motivo y resultado</span>
+            </span>
+          </button>
+          <button class="action-option" type="button" id="visit-sheet-order">
+            <span class="action-icon accent">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M6 6 5 3H2"/></svg>
+            </span>
+            <span>
+              <strong>Crear orden de venta</strong>
+              <span>Pedido ligado a este cliente y visita</span>
+            </span>
+          </button>
+          <button class="action-option" type="button" id="visit-sheet-start" hidden>
+            <span class="action-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>
+            <span>
+              <strong>Iniciar ahora</strong>
+              <span>Pasar de programada a en curso</span>
+            </span>
+          </button>
+        </div>
       </div>
-      <ul id="leaderboard" class="list"></ul>
-    </section>
+    </div>
+
+    <div id="seller-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="seller-sheet-title">
+      <button class="sheet-backdrop" id="seller-sheet-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <h2 id="seller-sheet-title">Elegir vendedor</h2>
+        <p class="sub">Toca un perfil para cambiar de ruta demo.</p>
+        <div id="seller-options" class="seller-options"></div>
+      </div>
+    </div>
+
+    <div id="order-detail-sheet" class="sheet order-detail-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
+      <button class="sheet-backdrop" id="order-detail-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div id="order-detail-content"></div>
+        <button class="ghost" id="close-order-detail-btn" type="button" style="width:100%; margin-top:8px">Cerrar orden</button>
+      </div>
+    </div>
+
+    <nav class="tabbar" aria-label="Navegación principal">
+      <button class="tab active" type="button" data-tab="home">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-10.5z"/></svg>
+        Inicio
+      </button>
+      <button class="tab" type="button" data-tab="visits">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg>
+        Visitas
+      </button>
+      <button class="tab" type="button" data-tab="sales">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M6 6 5 3H2"/></svg>
+        Ventas
+      </button>
+      <button class="tab" type="button" data-tab="inventory">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2"/><path d="M3 8h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/><path d="M10 12h4"/></svg>
+        Inventario
+      </button>
+      <button class="tab" type="button" data-tab="insights">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg>
+        Resumen
+      </button>
+    </nav>
   </div>
 
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="./shared.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
