@@ -6,7 +6,9 @@ const screens = {
 
 const formScreen = document.getElementById("screen-form");
 const tabButtons = [...document.querySelectorAll(".tab")];
-const sellerSelect = document.getElementById("seller-select");
+const sellerSheet = document.getElementById("seller-sheet");
+const sellerOptions = document.getElementById("seller-options");
+const homeAvatar = document.getElementById("home-avatar");
 const searchInput = document.getElementById("search-input");
 const form = document.getElementById("visit-form");
 const gpsBtn = document.getElementById("gps-btn");
@@ -198,11 +200,31 @@ function clearPhotoPreview() {
   photoInput.value = "";
 }
 
-function initSellerSelect() {
-  sellerSelect.innerHTML = SELLERS.map(
-    (seller) => `<option value="${seller.id}">${escapeHtml(seller.name)} · ${escapeHtml(seller.ruta)}</option>`
-  ).join("");
-  sellerSelect.value = loadSellerId();
+function openSellerSheet() {
+  const current = getSeller();
+  sellerOptions.innerHTML = SELLERS.map((seller) => `
+    <button class="seller-option ${seller.id === current.id ? "active" : ""}" type="button" data-seller="${seller.id}">
+      <span class="avatar">${escapeHtml(seller.initials)}</span>
+      <span>
+        <strong>${escapeHtml(seller.name)}</strong>
+        <span>${escapeHtml(seller.ruta)}</span>
+      </span>
+    </button>
+  `).join("");
+
+  sellerOptions.querySelectorAll("[data-seller]").forEach((button) => {
+    button.addEventListener("click", () => {
+      saveSellerId(button.dataset.seller);
+      closeSellerSheet();
+      render();
+    });
+  });
+
+  sellerSheet.classList.remove("hidden");
+}
+
+function closeSellerSheet() {
+  sellerSheet.classList.add("hidden");
 }
 
 function initEstadoSelect() {
@@ -211,7 +233,6 @@ function initEstadoSelect() {
     ESTADOS.map((estado) => `<option value="${escapeHtml(estado)}">${escapeHtml(estado)}</option>`).join("");
 }
 
-initSellerSelect();
 initEstadoSelect();
 
 if (!loadVisits().length) {
@@ -226,11 +247,8 @@ document.getElementById("cta-register").addEventListener("click", openForm);
 document.getElementById("visits-add-btn").addEventListener("click", openForm);
 document.getElementById("see-all-btn").addEventListener("click", () => switchTab("visits"));
 document.getElementById("form-back-btn").addEventListener("click", closeForm);
-
-sellerSelect.addEventListener("change", () => {
-  saveSellerId(sellerSelect.value);
-  render();
-});
+homeAvatar.addEventListener("click", openSellerSheet);
+document.getElementById("seller-sheet-backdrop").addEventListener("click", closeSellerSheet);
 
 searchInput.addEventListener("input", () => renderVisits(getSellerVisits()));
 

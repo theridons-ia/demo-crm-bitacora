@@ -16,16 +16,19 @@
           <h1 id="home-greeting">Hola, Marina</h1>
           <p class="sub">Lista para mover la ruta.</p>
         </div>
-        <div class="avatar" id="home-avatar">MG</div>
+        <button class="avatar" id="home-avatar" type="button" aria-label="Cambiar vendedor">MG</button>
       </div>
 
-      <label class="seller-select">
-        <span class="visually-hidden">Vendedor demo</span>
-        <select id="seller-select" aria-label="Seleccionar vendedor"></select>
-      </label>
-
       <section class="route-card" aria-label="Tu ruta de hoy">
-        <p class="label">TU RUTA DE HOY</p>
+        <div class="route-card-top">
+          <p class="label">TU RUTA DE HOY</p>
+          <span class="route-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 17L17 7"/>
+              <path d="M8 7h9v9"/>
+            </svg>
+          </span>
+        </div>
         <h2 id="route-title">Tu ruta comienza aquí</h2>
         <div class="progress-track">
           <div class="progress-fill" id="route-progress"></div>
@@ -72,14 +75,20 @@
 
       <button class="cta-register" id="cta-register" type="button">
         <span class="cta-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+            <path d="M12 5v14"/>
+            <path d="M5 12h14"/>
+          </svg>
         </span>
-        <span>
+        <span class="cta-copy">
           <strong>Registrar visita</strong>
           <span>Toma nota de tu próximo cliente</span>
         </span>
         <span class="cta-arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/>
+            <path d="M13 5l7 7-7 7"/>
+          </svg>
         </span>
       </button>
 
@@ -247,6 +256,16 @@
         <button class="primary-btn" type="submit">Guardar visita</button>
       </form>
     </section>
+
+    <div id="seller-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="seller-sheet-title">
+      <button class="sheet-backdrop" id="seller-sheet-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <h2 id="seller-sheet-title">Elegir vendedor</h2>
+        <p class="sub">Cambia el perfil demo desde el icono de usuario.</p>
+        <div id="seller-options" class="seller-options"></div>
+      </div>
+    </div>
 
     <nav class="tabbar" aria-label="Navegación principal">
       <button class="tab active" type="button" data-tab="home">
