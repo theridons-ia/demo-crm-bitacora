@@ -1,34 +1,27 @@
-# demo-crm-bitacora
+# Bitácora Campo (demo web)
 
-Demo web mobile-first para presentar una app de control comercial:
+Demo web mobile-first alineada a la interfaz de **Bitácora Campo**:
 
-- bitácora de visitas de vendedores
-- registro de ventas por visita
-- captura de ubicación GPS (dirección + coordenadas)
-- foto opcional del establecimiento como evidencia
-- filtros por fecha, estado y resultado
-- detalle por vendedor/ruta
-- dashboard de supervisor separado
-- KPIs diarios rápidos
+- navegación inferior: Inicio · Visitas · Resumen
+- registro rápido de visita (GPS + foto opcional)
+- búsqueda y filtros de historial
+- métricas, progreso de ruta y objetivo diario
+- panel de supervisor separado
+- persistencia local (`localStorage`) offline-first
 
-## Ejecutar local
-
-No requiere dependencias. Puedes abrir `index.html` directamente en el navegador.
-
-Si quieres servirlo por HTTP:
+## Ejecutar
 
 ```bash
 python3 -m http.server 8080
 ```
 
-Luego abre:
+Abrir:
 
 - Vendedor: `http://localhost:8080/index.html`
 - Supervisor: `http://localhost:8080/supervisor.html`
 
 ## Notas
 
-- Es una demo visual (no backend real).
-- Los datos se guardan en `localStorage` del navegador para simular uso.
-- Usa **Datos demo** / **Cargar datos demo** para poblar visitas de ejemplo.
-- Ideal para reuniones de descubrimiento y validación funcional.
+- No requiere backend.
+- La demos siembra 2 visitas de ejemplo al abrir por primera vez.
+- Visualmente sigue la guía Bitácora Campo (marfil, verde bosque, coral, Inter).
