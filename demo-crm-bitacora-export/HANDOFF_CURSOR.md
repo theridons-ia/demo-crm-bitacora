@@ -14,6 +14,8 @@ Proyecto frontend estático, mobile-first, sin backend:
 - `styles.css`: estilos responsive y tarjetas
 - `app.js`: lógica de demo con `localStorage`
   - guarda visitas
+  - captura GPS (Geolocation + reverse geocode)
+  - foto opcional del establecimiento (comprimida)
   - calcula KPIs (visitas, ventas, efectividad)
   - leaderboard simple por vendedor
   - botón para limpiar demo

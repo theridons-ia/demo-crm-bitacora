@@ -4,6 +4,8 @@ Demo web mobile-first para presentar una app de control comercial:
 
 - bitácora de visitas de vendedores
 - registro de ventas por visita
+- captura de ubicación GPS (dirección + coordenadas)
+- foto opcional del establecimiento como evidencia
 - KPIs diarios rápidos
 - panel gerencial simple
 

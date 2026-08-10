@@ -55,6 +55,25 @@
           </select>
         </div>
         <input id="monto" name="monto" type="number" min="0" step="0.01" placeholder="Monto venta USD (0 si no vendió)" required>
+
+        <div class="field-block">
+          <label for="direccion">Ubicación GPS</label>
+          <div class="gps-row">
+            <input id="direccion" name="direccion" type="text" placeholder="Captura o escribe la dirección" required>
+            <button id="gps-btn" class="secondary" type="button">GPS</button>
+          </div>
+          <p class="hint" id="gps-status">Usa el GPS del teléfono para registrar dónde estás.</p>
+          <input type="hidden" id="lat" name="lat" value="">
+          <input type="hidden" id="lng" name="lng" value="">
+        </div>
+
+        <div class="field-block">
+          <label for="foto">Foto del establecimiento <span class="optional">(opcional)</span></label>
+          <input id="foto" name="foto" type="file" accept="image/*" capture="environment">
+          <div id="foto-preview" class="foto-preview hidden" aria-live="polite"></div>
+          <p class="hint">Sirve como evidencia de la visita. Puedes omitirla si no hace falta.</p>
+        </div>
+
         <textarea id="nota" name="nota" rows="2" placeholder="Observaciones de la visita"></textarea>
         <button type="submit">Guardar visita</button>
       </form>
