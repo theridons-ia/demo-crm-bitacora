@@ -5,77 +5,74 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Bitácora Campo · Supervisor</title>
   <meta name="theme-color" content="#F7F3ED">
+  <meta name="description" content="Panel supervisor Bitácora Campo">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div class="app-shell" style="max-width:720px; padding-bottom:28px">
-    <main class="screen active" style="display:block">
-      <div class="title-row">
+  <div class="app-shell">
+    <main id="sup-screen-team" class="screen active" data-screen="team">
+      <div class="greeting-row">
         <div>
           <p class="eyebrow">SUPERVISOR</p>
-          <h1 class="screen-title">Panel del equipo</h1>
-          <p class="sub">Monitorea rutas, efectividad y cobranza.</p>
+          <h1 class="screen-title" style="font-size:28px; margin:0">Equipo</h1>
+          <p class="sub" id="pendiente-cobro">Cobranza pendiente: $0</p>
         </div>
-        <a class="icon-btn" href="./index.html" aria-label="Volver al vendedor" style="text-decoration:none">
+        <a class="avatar" href="./index.html" aria-label="Volver al vendedor" style="text-decoration:none; display:grid; place-items:center">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
         </a>
       </div>
 
-      <section class="card">
-        <div class="section-head" style="margin-top:0"><h2>Filtros</h2></div>
-        <div class="form" style="gap:10px">
-          <div class="field">
-            <label for="filter-fecha">Fecha</label>
-            <input id="filter-fecha" type="date">
-          </div>
-          <div class="field">
-            <label for="filter-resultado">Resultado</label>
-            <select id="filter-resultado">
-              <option value="">Todos</option>
-              <option>Venta cerrada</option>
-              <option>Venta parcial</option>
-              <option>Sin venta</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px">
-          <button class="ghost" id="reset-filters-btn" type="button">Limpiar filtros</button>
-          <button class="ghost" id="seed-btn" type="button">Cargar datos demo</button>
-          <button class="danger-link" id="clear-btn" type="button">Vaciar demo</button>
-        </div>
-      </section>
-
       <section class="metrics" aria-label="Indicadores del equipo">
         <article class="metric-card">
-          <p>Vendedores activos</p>
+          <div class="metric-icon purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <p>Vendedores</p>
           <strong id="kpi-vendedores">0</strong>
         </article>
         <article class="metric-card">
+          <div class="metric-icon rose" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2M6 7l1.2 12h9.6L18 7"/></svg>
+          </div>
           <p>Visitas</p>
           <strong id="kpi-visitas">0</strong>
         </article>
         <article class="metric-card">
-          <p>Ventas</p>
+          <div class="metric-icon gray" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <p>Órdenes</p>
           <strong id="kpi-ventas">$0</strong>
         </article>
         <article class="metric-card">
+          <div class="metric-icon sand" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+          </div>
           <p>Efectividad</p>
           <strong id="kpi-efectividad">0%</strong>
         </article>
       </section>
 
       <div class="section-head">
-        <h2>Ranking del equipo</h2>
-        <p class="sub" id="pendiente-cobro" style="margin:0">Cobranza pendiente: $0</p>
+        <h2>Filtro del día</h2>
+        <button class="link" id="reset-filters-btn" type="button">Hoy</button>
       </div>
+      <div class="filter-row">
+        <input id="filter-fecha" type="date" aria-label="Fecha">
+        <select id="filter-resultado" aria-label="Resultado">
+          <option value="">Todos</option>
+          <option value="con_venta">Con venta</option>
+          <option value="sin_venta">Sin venta</option>
+        </select>
+      </div>
+
+      <div class="section-head"><h2>Ranking</h2></div>
       <div id="leaderboard" class="visits-stack"></div>
 
-      <div class="section-head" style="margin-top:22px">
-        <h2>Actividad reciente</h2>
-      </div>
-      <div id="team-visits" class="visits-stack"></div>
-
-      <section id="seller-detail" class="card hidden" style="margin-top:22px">
+      <section id="seller-detail" class="card hidden">
         <div class="section-head" style="margin-top:0">
           <h2 id="seller-title">Vendedor</h2>
           <button class="link" id="close-seller-btn" type="button">Cerrar</button>
@@ -83,13 +80,167 @@
         <p class="sub" id="seller-ruta">Ruta</p>
         <div class="metrics" style="margin-top:14px">
           <article class="metric-card"><p>Visitas</p><strong id="seller-visitas">0</strong></article>
-          <article class="metric-card"><p>Ventas</p><strong id="seller-ventas">$0</strong></article>
+          <article class="metric-card"><p>Órdenes</p><strong id="seller-ventas">$0</strong></article>
           <article class="metric-card"><p>Efectividad</p><strong id="seller-efectividad">0%</strong></article>
           <article class="metric-card"><p>Pendiente</p><strong id="seller-pendiente">$0</strong></article>
         </div>
-        <div id="seller-visits" class="visits-stack"></div>
+        <div id="seller-visits" class="visits-stack" style="margin-top:12px"></div>
+      </section>
+
+      <div class="section-head" style="margin-top:18px"><h2>Actividad reciente</h2></div>
+      <div class="chips" role="tablist" id="activity-chips">
+        <button class="chip active" type="button" data-activity="visits">Visitas</button>
+        <button class="chip" type="button" data-activity="orders">Órdenes</button>
+      </div>
+      <div id="team-visits" class="visits-stack"></div>
+      <div id="team-orders" class="visits-stack hidden"></div>
+
+      <div class="toolbar" style="margin-top:18px">
+        <button class="ghost" id="seed-btn" type="button">Cargar demo</button>
+        <button class="danger-link" id="clear-btn" type="button">Vaciar</button>
+      </div>
+    </main>
+
+    <main id="sup-screen-sellers" class="screen" data-screen="sellers">
+      <p class="eyebrow">EQUIPO</p>
+      <h1 class="screen-title">Vendedores</h1>
+      <p class="sub" id="sellers-count">4 vendedores activos</p>
+      <div id="sellers-list" class="visits-stack"></div>
+    </main>
+
+    <main id="sup-screen-clients" class="screen" data-screen="clients">
+      <p class="eyebrow">CARTERA</p>
+      <h1 class="screen-title">Clientes</h1>
+      <p class="sub" id="clients-count">0 clientes</p>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="clients-search" type="search" placeholder="Buscar RIF, nombre o zona" autocomplete="off">
+      </div>
+      <div id="clients-list" class="visits-stack"></div>
+    </main>
+
+    <main id="sup-screen-charts" class="screen" data-screen="charts">
+      <p class="eyebrow">ANALÍTICA</p>
+      <h1 class="screen-title">Gráficos</h1>
+      <p class="sub">Métricas clave de la fuerza de campo.</p>
+
+      <section class="sales-summary" aria-label="KPIs gráficos">
+        <article>
+          <span>Ticket promedio</span>
+          <strong id="chart-ticket">$0</strong>
+        </article>
+        <article>
+          <span>Conversión</span>
+          <strong id="chart-conversion">0%</strong>
+        </article>
+        <article>
+          <span>Cobranza</span>
+          <strong id="chart-cobranza">$0</strong>
+        </article>
+      </section>
+
+      <section class="card chart-card">
+        <h2>Ventas por vendedor</h2>
+        <div id="chart-sales-sellers" class="bar-list"></div>
+      </section>
+
+      <section class="card chart-card">
+        <h2>Resultado de visitas</h2>
+        <div id="chart-visit-outcomes" class="bar-list"></div>
+      </section>
+
+      <section class="card chart-card">
+        <h2>Órdenes por estado</h2>
+        <div id="chart-order-status" class="bar-list"></div>
+      </section>
+
+      <section class="card chart-card">
+        <h2>Top productos</h2>
+        <div id="chart-top-products" class="bar-list"></div>
       </section>
     </main>
+
+    <main id="sup-screen-assign" class="screen" data-screen="assign">
+      <p class="eyebrow">ASIGNAR</p>
+      <h1 class="screen-title">Delegar trabajo</h1>
+      <p class="sub">Programa visitas u órdenes para tus vendedores.</p>
+
+      <div class="field">
+        <label>¿Qué quieres asignar?</label>
+        <div class="segmented" id="assign-type-group">
+          <button class="segment active" type="button" data-value="visit">Visita</button>
+          <button class="segment" type="button" data-value="order">Orden</button>
+        </div>
+      </div>
+
+      <form id="assign-visit-form" class="form assign-panel">
+        <div class="field">
+          <label for="assign-visit-seller">Vendedor</label>
+          <select id="assign-visit-seller" required></select>
+        </div>
+        <div class="field">
+          <label for="assign-visit-client">Cliente</label>
+          <select id="assign-visit-client" required></select>
+        </div>
+        <div class="field">
+          <label for="assign-visit-date">Fecha</label>
+          <input id="assign-visit-date" type="date" required>
+        </div>
+        <div class="field">
+          <label for="assign-visit-notes">Nota</label>
+          <textarea id="assign-visit-notes" placeholder="Indicaciones para el vendedor…"></textarea>
+        </div>
+        <button class="primary-btn" type="submit">Programar visita</button>
+      </form>
+
+      <form id="assign-order-form" class="form assign-panel hidden">
+        <div class="field">
+          <label for="assign-order-seller">Vendedor</label>
+          <select id="assign-order-seller" required></select>
+        </div>
+        <div class="field">
+          <label for="assign-order-client">Cliente</label>
+          <select id="assign-order-client" required></select>
+        </div>
+        <div class="field">
+          <label>Productos</label>
+          <div id="assign-order-products" class="product-list"></div>
+          <div class="sale-total-row">
+            <span>Total</span>
+            <strong id="assign-order-total">$0</strong>
+          </div>
+          <p class="hint">Sin productos = borrador vacío para el vendedor.</p>
+        </div>
+        <div class="field">
+          <label for="assign-order-notes">Nota</label>
+          <textarea id="assign-order-notes" placeholder="Pedido sugerido…"></textarea>
+        </div>
+        <button class="primary-btn" type="submit">Asignar orden</button>
+      </form>
+    </main>
+
+    <nav class="tabbar tabbar-sup" aria-label="Navegación supervisor">
+      <button class="tab active" type="button" data-sup-tab="team">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-10.5z"/></svg>
+        Equipo
+      </button>
+      <button class="tab" type="button" data-sup-tab="sellers">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Vendedores
+      </button>
+      <button class="tab" type="button" data-sup-tab="clients">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2M6 7l1.2 12h9.6L18 7"/></svg>
+        Clientes
+      </button>
+      <button class="tab" type="button" data-sup-tab="charts">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 17V10M12 17V7M16 17v-4"/></svg>
+        Gráficos
+      </button>
+      <button class="tab" type="button" data-sup-tab="assign">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Asignar
+      </button>
+    </nav>
   </div>
 
   <script src="./shared.js"></script>

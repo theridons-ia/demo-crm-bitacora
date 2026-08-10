@@ -1,11 +1,14 @@
 const screens = {
   home: document.getElementById("screen-home"),
   visits: document.getElementById("screen-visits"),
+  sales: document.getElementById("screen-sales"),
+  inventory: document.getElementById("screen-inventory"),
   insights: document.getElementById("screen-insights"),
 };
 
 const formScreen = document.getElementById("screen-form");
 const actionSheet = document.getElementById("action-sheet");
+const visitSheet = document.getElementById("visit-sheet");
 const sellerSheet = document.getElementById("seller-sheet");
 const sellerOptions = document.getElementById("seller-options");
 const homeAvatar = document.getElementById("home-avatar");
@@ -15,19 +18,25 @@ const weekStrip = document.getElementById("week-strip");
 
 const createForm = document.getElementById("create-form");
 const closeVisitForm = document.getElementById("close-form");
-const saleForm = document.getElementById("sale-form");
+const orderForm = document.getElementById("order-form");
+const clientForm = document.getElementById("client-form");
 
 let currentTab = "home";
 let resultFilter = "all";
+let salesFilter = "all";
+let inventoryCategory = "all";
 let calendarDay = todayISO();
 let createWhen = "now";
-let closeResult = "Venta cerrada";
+let closeOutcome = "con_venta";
 let closeFollowUp = "none";
-let saleLink = "visit";
-let saleResult = "Venta cerrada";
+let orderStatus = "Confirmada";
+let orderPriceList = "list";
 let pendingPhoto = "";
-let closeQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
-let saleQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
+let orderQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
+let activeVisitId = "";
+let clientReturnMode = "create";
+let pendingCloseVisitId = "";
+const salesSearchInput = document.getElementById("sales-search-input");
 
 function firstName(fullName) {
   return String(fullName || "").split(" ")[0] || "vendedor";
@@ -39,23 +48,59 @@ function setSegmentGroup(groupId, value) {
   });
 }
 
-function fillEstadoSelect(select) {
+function fillEstadoSelect(select, selected = "") {
   select.innerHTML =
     `<option value="">Selecciona un estado</option>` +
     ESTADOS.map((estado) => `<option value="${escapeHtml(estado)}">${escapeHtml(estado)}</option>`).join("");
+  if (selected) select.value = selected;
 }
 
-function qtyMapTotal(qtyMap) {
-  return PRODUCTS.reduce((sum, product) => sum + product.price * Number(qtyMap[product.id] || 0), 0);
+function fillMotiveSelect(selected = "rutina") {
+  const select = document.getElementById("close-motive");
+  select.innerHTML = VISIT_MOTIVES.map((motive) =>
+    `<option value="${escapeHtml(motive.id)}">${escapeHtml(motive.label)}</option>`
+  ).join("");
+  select.value = selected;
 }
 
-function qtyMapToLines(qtyMap) {
+function fillClientSelect(selectId, selectedId = "", metaId = "") {
+  const select = document.getElementById(selectId);
+  const clients = loadClients().slice().sort((a, b) => a.name.localeCompare(b.name, "es"));
+  select.innerHTML = `<option value="">Selecciona un cliente</option>` + clients.map((client) => `
+    <option value="${escapeHtml(client.id)}">
+      ${escapeHtml(client.name)} · ${escapeHtml(client.rif)}
+    </option>
+  `).join("");
+  if (selectedId && clients.some((client) => client.id === selectedId)) {
+    select.value = selectedId;
+  }
+  updateClientMeta(selectId, metaId);
+}
+
+function updateClientMeta(selectId, metaId) {
+  if (!metaId) return;
+  const meta = document.getElementById(metaId);
+  const client = getClient(document.getElementById(selectId).value);
+  meta.textContent = client
+    ? `${client.rif} · ${client.address}${client.estado ? ` · ${client.estado}` : ""}`
+    : "";
+}
+
+function qtyMapTotal(qtyMap, priceList = orderPriceList) {
+  return PRODUCTS.reduce((sum, product) => {
+    const qty = Number(qtyMap[product.id] || 0);
+    return sum + productPrice(product, priceList) * qty;
+  }, 0);
+}
+
+function qtyMapToLines(qtyMap, priceList = orderPriceList) {
   return PRODUCTS
     .filter((product) => Number(qtyMap[product.id] || 0) > 0)
     .map((product) => ({
       productId: product.id,
+      code: product.code,
       name: product.name,
-      unitPrice: product.price,
+      unitPrice: productPrice(product, priceList),
       qty: Number(qtyMap[product.id]),
     }));
 }
@@ -66,13 +111,14 @@ function resetQty(qtyMap) {
   });
 }
 
-function renderProductList(containerId, qtyMap, totalId) {
+function renderProductList(containerId, qtyMap, totalId, priceList = orderPriceList) {
   const container = document.getElementById(containerId);
   container.innerHTML = PRODUCTS.map((product) => `
     <div class="product-row" data-product="${product.id}">
-      <div>
+      <img class="product-thumb" src="${escapeHtml(product.image)}" alt="" width="44" height="44">
+      <div class="product-copy">
         <strong>${escapeHtml(product.name)}</strong>
-        <p>$${formatCurrency(product.price)} / ${escapeHtml(product.unit)}</p>
+        <p>${escapeHtml(product.code)} · $${formatCurrency(productPrice(product, priceList))} / ${escapeHtml(product.unit)}</p>
       </div>
       <div class="stepper">
         <button type="button" data-step="-1" aria-label="Menos">−</button>
@@ -87,12 +133,12 @@ function renderProductList(containerId, qtyMap, totalId) {
     row.querySelectorAll("[data-step]").forEach((button) => {
       button.addEventListener("click", () => {
         qtyMap[productId] = Math.max(0, Number(qtyMap[productId] || 0) + Number(button.dataset.step));
-        renderProductList(containerId, qtyMap, totalId);
+        renderProductList(containerId, qtyMap, totalId, priceList);
       });
     });
   });
 
-  document.getElementById(totalId).textContent = `$${formatCurrency(qtyMapTotal(qtyMap))}`;
+  document.getElementById(totalId).textContent = `$${formatCurrency(qtyMapTotal(qtyMap, priceList))}`;
 }
 
 function closableVisits(visits) {
@@ -113,24 +159,67 @@ function syncCreateWhen() {
   }
 }
 
-function syncCloseResult() {
-  const showProducts = isSale(closeResult);
-  document.getElementById("close-products-field").classList.toggle("hidden", !showProducts);
-  if (showProducts) renderProductList("close-products", closeQty, "close-sale-total");
+function syncCloseOutcome() {
+  const showOrders = closeOutcome === "con_venta";
+  document.getElementById("close-orders-section").classList.toggle("hidden", !showOrders);
   document.getElementById("close-follow-date-field").classList.toggle(
     "hidden",
     closeFollowUp !== "schedule"
   );
+
+  const visitId = document.getElementById("close-visit-id").value;
+  const list = document.getElementById("close-orders-list");
+  const hint = document.getElementById("close-order-hint");
+  const linked = visitId ? ordersForVisit(visitId) : [];
+
+  if (!showOrders) return;
+
+  if (!linked.length) {
+    list.innerHTML = "";
+    hint.textContent = "Sin órdenes aún. Usa “+ Agregar orden” para crear una.";
+    return;
+  }
+
+  list.innerHTML = linked.map((order) => renderLinkedOrderRow(order)).join("");
+  const total = linked.reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  hint.textContent = `${linked.length} orden(es) · total $${formatCurrency(total)}`;
 }
 
-function syncSaleLink() {
-  const linked = saleLink === "visit";
-  document.getElementById("sale-visit-field").classList.toggle("hidden", !linked);
-  document.getElementById("sale-client-field").classList.toggle("hidden", linked);
-  document.getElementById("sale-estado-field").classList.toggle("hidden", linked);
+function openActionSheet() {
+  closeSellerSheet();
+  closeVisitSheet();
+  actionSheet.classList.remove("hidden");
 }
 
-function fillCloseVisitSelect() {
+function closeActionSheet() {
+  actionSheet.classList.add("hidden");
+}
+
+function closeVisitSheet() {
+  visitSheet.classList.add("hidden");
+  activeVisitId = "";
+}
+
+function openVisitSheet(visitId) {
+  const visit = loadVisits().find((item) => item.id === visitId);
+  if (!visit) return;
+  activeVisitId = visitId;
+  closeActionSheet();
+  closeSellerSheet();
+  const client = getClient(visit.clientId);
+  document.getElementById("visit-sheet-title").textContent =
+    visit.status === "En curso" ? "Visita en curso" : visit.status === "Programada" ? "Visita programada" : "Visita";
+  document.getElementById("visit-sheet-sub").textContent =
+    `${client?.name || visit.clientName}${visit.hora ? ` · desde ${visit.hora}` : ""}`;
+  document.getElementById("visit-sheet-start").hidden = visit.status !== "Programada";
+  visitSheet.classList.remove("hidden");
+}
+
+function hideAllFormModes() {
+  document.querySelectorAll(".form-mode").forEach((form) => form.classList.add("hidden"));
+}
+
+function fillCloseVisitSelect(selectedId = "") {
   const select = document.getElementById("close-visit-id");
   const options = closableVisits(getSellerVisits());
   if (!options.length) {
@@ -139,52 +228,33 @@ function fillCloseVisitSelect() {
   }
   select.innerHTML = options.map((visit) => `
     <option value="${escapeHtml(visit.id)}">
-      ${escapeHtml(visit.client)} · ${escapeHtml(visit.status)}
+      ${escapeHtml(visit.clientName)} · ${escapeHtml(visit.status)}${visit.hora ? ` · ${escapeHtml(visit.hora)}` : ""}
     </option>
   `).join("");
-}
-
-function fillSaleVisitSelect() {
-  const select = document.getElementById("sale-visit-id");
-  const options = closableVisits(getSellerVisits()).concat(
-    completedVisits(getSellerVisits()).filter((visit) => visit.fecha === todayISO() && !visit.saleOnly)
-  );
-  const unique = [];
-  const seen = new Set();
-  options.forEach((visit) => {
-    if (!seen.has(visit.id)) {
-      seen.add(visit.id);
-      unique.push(visit);
-    }
-  });
-
-  if (!unique.length) {
-    select.innerHTML = `<option value="">No hay visitas de hoy</option>`;
-    return;
+  if (selectedId && options.some((visit) => visit.id === selectedId)) {
+    select.value = selectedId;
   }
+}
 
-  select.innerHTML = unique.map((visit) => `
+function fillOrderVisitSelect(selectedId = "", clientId = "") {
+  const select = document.getElementById("order-visit-id");
+  let options = getSellerVisits().filter((visit) =>
+    visit.status === "En curso" ||
+    (visit.status === "Programada" && visit.fecha === todayISO()) ||
+    (visit.status === "Completada" && visit.fecha === todayISO())
+  );
+  if (clientId) options = options.filter((visit) => visit.clientId === clientId);
+  select.innerHTML = `<option value="">Sin visita</option>` + options.map((visit) => `
     <option value="${escapeHtml(visit.id)}">
-      ${escapeHtml(visit.client)} · ${escapeHtml(visit.status)}${visit.result ? ` · ${escapeHtml(visit.result)}` : ""}
+      ${escapeHtml(visit.clientName)} · ${escapeHtml(visit.status)}
     </option>
   `).join("");
+  if (selectedId) select.value = selectedId;
 }
 
-function openActionSheet() {
-  closeSellerSheet();
-  actionSheet.classList.remove("hidden");
-}
-
-function closeActionSheet() {
-  actionSheet.classList.add("hidden");
-}
-
-function hideAllFormModes() {
-  document.querySelectorAll(".form-mode").forEach((form) => form.classList.add("hidden"));
-}
-
-function openForm(mode = "create") {
+function openForm(mode = "create", options = {}) {
   closeActionSheet();
+  closeVisitSheet();
   hideAllFormModes();
   formScreen.classList.remove("hidden");
   document.querySelector(".tabbar").style.display = "none";
@@ -192,9 +262,10 @@ function openForm(mode = "create") {
   const titles = {
     create: ["CREAR VISITA", "Nueva visita"],
     close: ["CERRAR VISITA", "Completar visita abierta"],
-    sale: ["VENTA", "Registrar venta"],
+    order: ["ORDEN DE VENTA", "Nueva orden de venta"],
+    client: ["CLIENTE", "Nuevo cliente"],
   };
-  const [eyebrow, title] = titles[mode];
+  const [eyebrow, title] = titles[mode] || titles.create;
   document.getElementById("form-eyebrow").textContent = eyebrow;
   document.getElementById("form-title").textContent = title;
 
@@ -203,26 +274,44 @@ function openForm(mode = "create") {
     createWhen = "now";
     setSegmentGroup("when-group", createWhen);
     syncCreateWhen();
+    fillClientSelect("create-client-id", options.clientId || "", "create-client-meta");
+    const client = getClient(document.getElementById("create-client-id").value);
+    if (client && !document.getElementById("create-location").value) {
+      document.getElementById("create-location").value = client.address;
+    }
   } else if (mode === "close") {
     closeVisitForm.classList.remove("hidden");
-    closeResult = "Venta cerrada";
+    closeOutcome = "con_venta";
     closeFollowUp = "none";
-    setSegmentGroup("close-result-group", closeResult);
+    setSegmentGroup("close-outcome-group", closeOutcome);
     setSegmentGroup("close-follow-group", closeFollowUp);
-    resetQty(closeQty);
-    fillCloseVisitSelect();
-    syncCloseResult();
+    fillMotiveSelect("rutina");
+    fillCloseVisitSelect(options.visitId || pendingCloseVisitId || "");
+    syncCloseOutcome();
     document.getElementById("close-follow-date").value = addDaysISO(todayISO(), 1);
-  } else if (mode === "sale") {
-    saleForm.classList.remove("hidden");
-    saleLink = "visit";
-    saleResult = "Venta cerrada";
-    setSegmentGroup("sale-link-group", saleLink);
-    setSegmentGroup("sale-result-group", saleResult);
-    resetQty(saleQty);
-    fillSaleVisitSelect();
-    syncSaleLink();
-    renderProductList("sale-products", saleQty, "sale-total");
+  } else if (mode === "order") {
+    orderForm.classList.remove("hidden");
+    orderStatus = "Confirmada";
+    orderPriceList = "list";
+    setSegmentGroup("order-status-group", orderStatus);
+    setSegmentGroup("order-price-group", orderPriceList);
+    resetQty(orderQty);
+    fillClientSelect("order-client-id", options.clientId || "", "order-client-meta");
+    fillOrderVisitSelect(options.visitId || "", options.clientId || document.getElementById("order-client-id").value);
+    if (options.visitId) {
+      const visit = loadVisits().find((item) => item.id === options.visitId);
+      if (visit) {
+        fillClientSelect("order-client-id", visit.clientId, "order-client-meta");
+        fillOrderVisitSelect(visit.id, visit.clientId);
+      }
+    }
+    renderProductList("order-products", orderQty, "order-total", orderPriceList);
+  } else if (mode === "client") {
+    clientForm.classList.remove("hidden");
+    clientReturnMode = options.returnMode || "create";
+    fillEstadoSelect(document.getElementById("client-estado"));
+    clientForm.reset();
+    fillEstadoSelect(document.getElementById("client-estado"));
   }
 
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -233,12 +322,14 @@ function closeForm() {
   document.querySelector(".tabbar").style.display = "";
   hideAllFormModes();
   clearClosePhoto();
+  pendingCloseVisitId = "";
 }
 
 function switchTab(tab) {
   currentTab = tab;
   closeForm();
   closeActionSheet();
+  closeVisitSheet();
   Object.entries(screens).forEach(([key, node]) => {
     node.classList.toggle("active", key === tab);
   });
@@ -255,6 +346,13 @@ function getSellerVisits() {
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
+function getSellerOrders() {
+  const seller = getSeller();
+  return loadOrders()
+    .filter((order) => order.vendedorId === seller.id)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
 function filteredVisits(visits) {
   const query = searchInput.value.trim().toLowerCase();
   return visits.filter((visit) => {
@@ -264,10 +362,11 @@ function filteredVisits(visits) {
       if (visit.status !== "Programada") return false;
       if (visit.fecha !== calendarDay) return false;
     }
-    if (resultFilter === "sale" && !isSale(visit.result)) return false;
-    if (resultFilter === "none" && visit.result !== "Sin venta") return false;
+    if (resultFilter === "sale" && visit.outcome !== "con_venta") return false;
+    if (resultFilter === "none" && visit.outcome !== "sin_venta") return false;
     if (!query) return true;
-    const haystack = `${visit.client} ${visit.location} ${visit.estado} ${visit.notes}`.toLowerCase();
+    const client = getClient(visit.clientId);
+    const haystack = `${visit.clientName} ${client?.rif || ""} ${visit.location} ${visit.estado} ${visit.notes}`.toLowerCase();
     return haystack.includes(query);
   });
 }
@@ -291,6 +390,19 @@ function renderEmpty(message, actionLabel) {
 function bindEmptyActions(container) {
   container.querySelectorAll("[data-empty-action='register']").forEach((button) => {
     button.addEventListener("click", openActionSheet);
+  });
+}
+
+function bindVisitCards(container) {
+  container.querySelectorAll(".visit-card[data-id]").forEach((node) => {
+    const visit = loadVisits().find((item) => item.id === node.dataset.id);
+    if (!visit || !isOpenVisit(visit)) return;
+    if (node.tagName === "BUTTON") {
+      node.addEventListener("click", () => openVisitSheet(visit.id));
+      return;
+    }
+    node.style.cursor = "pointer";
+    node.addEventListener("click", () => openVisitSheet(visit.id));
   });
 }
 
@@ -321,35 +433,42 @@ function renderWeekStrip(visits) {
     `Agenda · ${formatDateShort(calendarDay)}`;
 }
 
-function renderHome(visits) {
+function renderHome(visits, orders) {
   const seller = getSeller();
-  const today = visitsToday(visits);
-  const summary = summarizeVisits(today);
-  const recentSource = completedVisits(visits);
+  const today = todayISO();
+  const todayCompleted = visitsToday(visits, today);
+  const todayOrders = orders.filter((order) => order.fecha === today);
+  const summary = summarizeVisits(todayCompleted, todayOrders);
+  const openCount = visits.filter((visit) => visit.status === "En curso").length;
+  const recentSource = [...visits].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
   document.getElementById("home-date").textContent = formatDateLong();
   document.getElementById("home-greeting").textContent = `Hola, ${firstName(seller.name)}`;
   homeAvatar.textContent = seller.initials;
   document.getElementById("route-title").textContent =
-    summary.visits ? seller.ruta : "Tu ruta comienza aquí";
+    summary.visits || openCount ? seller.ruta : "Tu ruta comienza aquí";
   document.getElementById("route-progress").style.width = `${summary.goalProgress}%`;
   document.getElementById("route-count").textContent =
     `${summary.visits} de ${DAILY_GOAL} visitas registradas`;
   document.getElementById("route-percent").textContent = `${summary.goalProgress}%`;
   document.getElementById("metric-visits").textContent = summary.visits;
-  document.getElementById("metric-sales").textContent = `$${formatCurrency(summary.sales)}`;
+  document.getElementById("metric-sales").textContent = `$${formatCurrency(todayOrders.reduce((sum, order) => sum + order.amount, 0))}`;
   document.getElementById("metric-effectiveness").textContent = `${summary.effectiveness}%`;
+  document.getElementById("metric-open").textContent = openCount;
 
   const recent = document.getElementById("recent-list");
   if (!recentSource.length) {
     recent.innerHTML = renderEmpty(
-      "Crea una visita o registra una venta para empezar.",
+      "Crea una visita u orden de venta para empezar.",
       "Registrar actividad"
     );
     bindEmptyActions(recent);
     return;
   }
-  recent.innerHTML = recentSource.slice(0, 3).map((visit) => renderVisitCard(visit)).join("");
+  recent.innerHTML = recentSource.slice(0, 3).map((visit) =>
+    renderVisitCard(visit, isOpenVisit(visit))
+  ).join("");
+  bindVisitCards(recent);
 }
 
 function renderVisits(visits) {
@@ -359,7 +478,7 @@ function renderVisits(visits) {
   if (showCalendar) renderWeekStrip(visits);
 
   const filtered = filteredVisits(visits);
-  const summary = summarizeVisits(visits);
+  const summary = summarizeVisits(visits, getSellerOrders());
   document.getElementById("visits-count").textContent =
     `${summary.visits} hechas · ${summary.inProgress} en curso · ${summary.scheduled} en agenda`;
 
@@ -379,23 +498,50 @@ function renderVisits(visits) {
     return;
   }
 
-  list.innerHTML = filtered.map((visit) => renderVisitCard(visit)).join("");
+  list.innerHTML = filtered.map((visit) => renderVisitCard(visit, isOpenVisit(visit))).join("");
+  bindVisitCards(list);
 }
 
-function renderInsights(visits) {
+function renderInventory() {
+  const list = document.getElementById("inventory-list");
+  const products = PRODUCTS.filter((product) =>
+    inventoryCategory === "all" || product.category === inventoryCategory
+  );
+  list.innerHTML = products.map((product) => `
+    <article class="inventory-card">
+      <div class="inventory-card-top">
+        <img class="product-thumb lg" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" width="56" height="56">
+        <span class="badge badge-muted">${escapeHtml(product.category)}</span>
+      </div>
+      <p class="inventory-code">${escapeHtml(product.code)}</p>
+      <h3>${escapeHtml(product.name)}</h3>
+      <p class="meta">${escapeHtml(product.unit)} · caduca ${escapeHtml(formatDateShort(product.expiresAt))}</p>
+      <div class="inventory-prices">
+        <div>
+          <span>Lista</span>
+          <strong>$${formatCurrency(product.listPrice)}</strong>
+        </div>
+        <div>
+          <span>Mayor</span>
+          <strong>$${formatCurrency(product.wholesalePrice)}</strong>
+        </div>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderInsights(visits, orders) {
   const today = visitsToday(visits);
-  const all = summarizeVisits(visits);
-  const day = summarizeVisits(today);
-  const max = Math.max(all.closed, all.partial, all.none, 1);
+  const all = summarizeVisits(visits, orders);
+  const day = summarizeVisits(today, orders.filter((order) => order.fecha === todayISO()));
+  const max = Math.max(all.withSale, all.none, 1);
 
   document.getElementById("insight-sales").textContent = `$${formatCurrency(all.sales)}`;
   document.getElementById("insight-sales-sub").textContent =
-    `en ${all.visits} completadas · ${all.scheduled} en agenda`;
-  document.getElementById("count-closed").textContent = all.closed;
-  document.getElementById("count-partial").textContent = all.partial;
+    `en ${all.visits} completadas · ${orders.length} órdenes`;
+  document.getElementById("count-closed").textContent = all.withSale;
   document.getElementById("count-none").textContent = all.none;
-  document.getElementById("bar-closed").style.width = `${(all.closed / max) * 100}%`;
-  document.getElementById("bar-partial").style.width = `${(all.partial / max) * 100}%`;
+  document.getElementById("bar-closed").style.width = `${(all.withSale / max) * 100}%`;
   document.getElementById("bar-none").style.width = `${(all.none / max) * 100}%`;
   document.getElementById("goal-count").textContent = `${day.visits} / ${DAILY_GOAL}`;
   document.getElementById("goal-ring").style.setProperty("--p", `${day.goalProgress}%`);
@@ -404,13 +550,72 @@ function renderInsights(visits) {
   document.getElementById("goal-tip").textContent = day.remaining
     ? `Te faltan ${day.remaining} visita${day.remaining === 1 ? "" : "s"} para completar el objetivo.`
     : "¡Objetivo diario completado!";
+
+  const ordersBox = document.getElementById("insight-orders");
+  ordersBox.innerHTML = orders.length
+    ? orders.slice(0, 4).map((order) => renderOrderCard(order)).join("")
+    : `<div class="empty"><h3>Sin órdenes</h3><p>Crea una orden de venta desde una visita o el menú.</p></div>`;
+}
+
+function filteredOrders(orders) {
+  const query = (salesSearchInput?.value || "").trim().toLowerCase();
+  return orders.filter((order) => {
+    if (salesFilter === "today" && order.fecha !== todayISO()) return false;
+    if (["Confirmada", "Parcial", "Borrador"].includes(salesFilter) && order.status !== salesFilter) {
+      return false;
+    }
+    if (!query) return true;
+    const client = getClient(order.clientId);
+    const lines = (order.lines || []).map((line) => line.name).join(" ");
+    const haystack = `${order.code} ${order.clientName} ${client?.rif || ""} ${order.notes} ${lines}`.toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function renderSales(orders) {
+  const list = document.getElementById("sales-list");
+  const today = todayISO();
+  const todayTotal = orders
+    .filter((order) => order.fecha === today)
+    .reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  const total = orders.reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  const filtered = filteredOrders(orders);
+
+  document.getElementById("sales-count").textContent =
+    `${orders.length} orden${orders.length === 1 ? "" : "es"} · $${formatCurrency(total)}`;
+  document.getElementById("sales-kpi-count").textContent = String(orders.length);
+  document.getElementById("sales-kpi-total").textContent = `$${formatCurrency(total)}`;
+  document.getElementById("sales-kpi-today").textContent = `$${formatCurrency(todayTotal)}`;
+
+  if (!orders.length) {
+    list.innerHTML = renderEmpty("Aún no hay órdenes de venta en este dispositivo.", "Crear orden");
+    list.querySelectorAll("[data-empty-action='register']").forEach((button) => {
+      button.addEventListener("click", () => openForm("order"));
+    });
+    return;
+  }
+
+  if (!filtered.length) {
+    list.innerHTML = `
+      <div class="empty">
+        <h3>Sin coincidencias</h3>
+        <p>Prueba otro filtro o crea una nueva orden.</p>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = filtered.map((order) => renderOrderCard(order)).join("");
 }
 
 function render() {
   const visits = getSellerVisits();
-  renderHome(visits);
+  const orders = getSellerOrders();
+  renderHome(visits, orders);
   renderVisits(visits);
-  renderInsights(visits);
+  renderSales(orders);
+  renderInventory();
+  renderInsights(visits, orders);
 }
 
 function clearClosePhoto() {
@@ -423,6 +628,7 @@ function clearClosePhoto() {
 
 function openSellerSheet() {
   closeActionSheet();
+  closeVisitSheet();
   const current = getSeller();
   sellerOptions.innerHTML = SELLERS.map((seller) => `
     <button class="seller-option ${seller.id === current.id ? "active" : ""}" type="button" data-seller="${seller.id}">
@@ -484,18 +690,7 @@ function captureGps(locationId, latId, lngId, statusId, button) {
   );
 }
 
-function upsertVisit(visit) {
-  const visits = loadVisits();
-  const index = visits.findIndex((item) => item.id === visit.id);
-  if (index >= 0) visits[index] = normalizeVisit(visit);
-  else visits.push(normalizeVisit(visit));
-  saveVisits(visits);
-}
-
-fillEstadoSelect(document.getElementById("create-estado"));
-fillEstadoSelect(document.getElementById("sale-estado"));
-
-if (!loadVisits().length) seedDemoVisits();
+if (!loadVisits().length && !loadOrders().length) seedDemoData();
 
 document.querySelectorAll(".tab").forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
@@ -503,26 +698,78 @@ document.querySelectorAll(".tab").forEach((button) => {
 
 document.getElementById("cta-register").addEventListener("click", openActionSheet);
 document.getElementById("visits-add-btn").addEventListener("click", openActionSheet);
+document.getElementById("sales-add-btn").addEventListener("click", () => openForm("order"));
 document.getElementById("see-all-btn").addEventListener("click", () => switchTab("visits"));
 document.getElementById("form-back-btn").addEventListener("click", closeForm);
 document.getElementById("schedule-from-visits-btn").addEventListener("click", () => openForm("create"));
 homeAvatar.addEventListener("click", openSellerSheet);
 document.getElementById("seller-sheet-backdrop").addEventListener("click", closeSellerSheet);
 document.getElementById("action-sheet-backdrop").addEventListener("click", closeActionSheet);
+document.getElementById("visit-sheet-backdrop").addEventListener("click", closeVisitSheet);
 
 document.querySelectorAll("#action-sheet [data-action]").forEach((button) => {
   button.addEventListener("click", () => openForm(button.dataset.action));
 });
 
-searchInput.addEventListener("input", () => renderVisits(getSellerVisits()));
+document.getElementById("visit-sheet-close").addEventListener("click", () => {
+  const visitId = activeVisitId;
+  closeVisitSheet();
+  openForm("close", { visitId });
+});
 
-document.querySelectorAll(".chip").forEach((chip) => {
+document.getElementById("visit-sheet-order").addEventListener("click", () => {
+  const visit = loadVisits().find((item) => item.id === activeVisitId);
+  closeVisitSheet();
+  if (!visit) return openForm("order");
+  openForm("order", { visitId: visit.id, clientId: visit.clientId });
+});
+
+document.getElementById("visit-sheet-start").addEventListener("click", () => {
+  const visit = loadVisits().find((item) => item.id === activeVisitId);
+  if (!visit) return;
+  const now = new Date();
+  const updated = upsertVisit({
+    ...visit,
+    status: "En curso",
+    startAt: now.toISOString(),
+    fecha: todayISO(),
+    hora: formatTime(now),
+  });
+  closeVisitSheet();
+  openVisitSheet(updated.id);
+  render();
+});
+
+searchInput.addEventListener("input", () => renderVisits(getSellerVisits()));
+salesSearchInput.addEventListener("input", () => renderSales(getSellerOrders()));
+
+document.querySelectorAll(".chip[data-filter]").forEach((chip) => {
   chip.addEventListener("click", () => {
     resultFilter = chip.dataset.filter;
-    document.querySelectorAll(".chip").forEach((node) => {
+    document.querySelectorAll(".chip[data-filter]").forEach((node) => {
       node.classList.toggle("active", node === chip);
     });
     renderVisits(getSellerVisits());
+  });
+});
+
+document.querySelectorAll("#sales-chips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    salesFilter = chip.dataset.salesFilter;
+    document.querySelectorAll("#sales-chips .chip").forEach((node) => {
+      node.classList.toggle("active", node === chip);
+    });
+    renderSales(getSellerOrders());
+  });
+});
+
+document.querySelectorAll("#inventory-chips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    inventoryCategory = chip.dataset.category;
+    document.querySelectorAll("#inventory-chips .chip").forEach((node) => {
+      node.classList.toggle("active", node === chip);
+    });
+    renderInventory();
   });
 });
 
@@ -534,12 +781,11 @@ document.querySelectorAll("#when-group .segment").forEach((button) => {
   });
 });
 
-document.querySelectorAll("#close-result-group .segment").forEach((button) => {
+document.querySelectorAll("#close-outcome-group .segment").forEach((button) => {
   button.addEventListener("click", () => {
-    closeResult = button.dataset.value;
-    setSegmentGroup("close-result-group", closeResult);
-    if (!isSale(closeResult)) resetQty(closeQty);
-    syncCloseResult();
+    closeOutcome = button.dataset.value;
+    setSegmentGroup("close-outcome-group", closeOutcome);
+    syncCloseOutcome();
   });
 });
 
@@ -547,27 +793,57 @@ document.querySelectorAll("#close-follow-group .segment").forEach((button) => {
   button.addEventListener("click", () => {
     closeFollowUp = button.dataset.value;
     setSegmentGroup("close-follow-group", closeFollowUp);
-    syncCloseResult();
+    syncCloseOutcome();
   });
 });
 
-document.querySelectorAll("#sale-link-group .segment").forEach((button) => {
+document.querySelectorAll("#order-status-group .segment").forEach((button) => {
   button.addEventListener("click", () => {
-    saleLink = button.dataset.value;
-    setSegmentGroup("sale-link-group", saleLink);
-    syncSaleLink();
+    orderStatus = button.dataset.value;
+    setSegmentGroup("order-status-group", orderStatus);
   });
 });
 
-document.querySelectorAll("#sale-result-group .segment").forEach((button) => {
+document.querySelectorAll("#order-price-group .segment").forEach((button) => {
   button.addEventListener("click", () => {
-    saleResult = button.dataset.value;
-    setSegmentGroup("sale-result-group", saleResult);
+    orderPriceList = button.dataset.value;
+    setSegmentGroup("order-price-group", orderPriceList);
+    renderProductList("order-products", orderQty, "order-total", orderPriceList);
   });
+});
+
+document.getElementById("create-client-id").addEventListener("change", () => {
+  updateClientMeta("create-client-id", "create-client-meta");
+  const client = getClient(document.getElementById("create-client-id").value);
+  if (client) document.getElementById("create-location").value = client.address;
+});
+
+document.getElementById("order-client-id").addEventListener("change", () => {
+  updateClientMeta("order-client-id", "order-client-meta");
+  fillOrderVisitSelect(document.getElementById("order-visit-id").value, document.getElementById("order-client-id").value);
+});
+
+document.getElementById("close-visit-id").addEventListener("change", syncCloseOutcome);
+
+document.getElementById("create-new-client-btn").addEventListener("click", () => {
+  openForm("client", { returnMode: "create" });
+});
+
+document.getElementById("order-new-client-btn").addEventListener("click", () => {
+  openForm("client", { returnMode: "order" });
+});
+
+document.getElementById("close-open-order-btn").addEventListener("click", () => {
+  const visitId = document.getElementById("close-visit-id").value;
+  const visit = loadVisits().find((item) => item.id === visitId);
+  pendingCloseVisitId = visitId;
+  if (!visit) return openForm("order");
+  openForm("order", { visitId: visit.id, clientId: visit.clientId });
 });
 
 document.getElementById("clear-btn").addEventListener("click", () => {
-  clearVisits();
+  clearDemoData();
+  seedDemoData();
   render();
 });
 
@@ -598,14 +874,15 @@ document.getElementById("close-photo").addEventListener("change", async () => {
 
 createForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const client = document.getElementById("create-client").value.trim();
+  const clientId = document.getElementById("create-client-id").value;
   const error = document.getElementById("create-client-error");
-  if (!client) {
+  if (!clientId) {
     error.classList.remove("hidden");
     return;
   }
   error.classList.add("hidden");
 
+  const client = getClient(clientId);
   const seller = getSeller();
   const now = new Date();
   const later = createWhen === "later";
@@ -613,11 +890,11 @@ createForm.addEventListener("submit", (event) => {
     ? (document.getElementById("create-date").value || addDaysISO(todayISO(), 1))
     : todayISO();
 
-  upsertVisit({
+  const created = upsertVisit({
     status: later ? "Programada" : "En curso",
-    client,
-    estado: document.getElementById("create-estado").value,
-    location: document.getElementById("create-location").value.trim(),
+    clientId,
+    estado: client?.estado || "",
+    location: document.getElementById("create-location").value.trim() || client?.address || "",
     latitude: document.getElementById("create-lat").value
       ? Number(document.getElementById("create-lat").value)
       : null,
@@ -628,6 +905,7 @@ createForm.addEventListener("submit", (event) => {
     createdAt: now.toISOString(),
     fecha: date,
     scheduledDate: later ? date : "",
+    startAt: later ? "" : now.toISOString(),
     hora: later ? "" : formatTime(now),
     vendedorId: seller.id,
     vendedor: seller.name,
@@ -635,17 +913,25 @@ createForm.addEventListener("submit", (event) => {
   });
 
   createForm.reset();
-  fillEstadoSelect(document.getElementById("create-estado"));
   createWhen = "now";
   setSegmentGroup("when-group", createWhen);
   syncCreateWhen();
-  closeForm();
+  fillClientSelect("create-client-id", "", "create-client-meta");
   resultFilter = later ? "scheduled" : "open";
   if (later) calendarDay = date;
-  document.querySelectorAll(".chip").forEach((node) => {
+  document.querySelectorAll(".chip[data-filter]").forEach((node) => {
     node.classList.toggle("active", node.dataset.filter === resultFilter);
   });
-  switchTab("visits");
+
+  if (later) {
+    closeForm();
+    switchTab("visits");
+    return;
+  }
+
+  closeForm();
+  openVisitSheet(created.id);
+  render();
 });
 
 closeVisitForm.addEventListener("submit", (event) => {
@@ -656,31 +942,27 @@ closeVisitForm.addEventListener("submit", (event) => {
     return;
   }
 
-  if (isSale(closeResult) && qtyMapTotal(closeQty) <= 0) {
-    alert("Agrega productos para una venta parcial o cerrada.");
-    return;
-  }
-
   const visits = loadVisits();
   const current = visits.find((visit) => visit.id === visitId);
   if (!current) return;
 
   const now = new Date();
-  const lines = isSale(closeResult) ? qtyMapToLines(closeQty) : [];
   const notes = document.getElementById("close-notes").value.trim() || current.notes;
+  const motive = document.getElementById("close-motive").value;
 
   upsertVisit({
     ...current,
     status: "Completada",
-    result: closeResult,
-    lines,
-    amount: linesTotal(lines),
+    outcome: closeOutcome,
+    motive,
     followUp: closeFollowUp,
     notes,
     photoUri: pendingPhoto || current.photoUri || "",
-    hora: formatTime(now),
+    endAt: now.toISOString(),
+    startAt: current.startAt || current.createdAt || now.toISOString(),
+    hora: current.hora || formatTime(current.startAt || now),
+    horaFin: formatTime(now),
     fecha: todayISO(),
-    createdAt: now.toISOString(),
   });
 
   if (closeFollowUp === "schedule") {
@@ -688,7 +970,7 @@ closeVisitForm.addEventListener("submit", (event) => {
     const followDate = document.getElementById("close-follow-date").value || addDaysISO(todayISO(), 1);
     upsertVisit({
       status: "Programada",
-      client: current.client,
+      clientId: current.clientId,
       estado: current.estado,
       location: current.location,
       notes: `Seguimiento de visita anterior. ${notes}`.trim(),
@@ -701,88 +983,104 @@ closeVisitForm.addEventListener("submit", (event) => {
     });
   }
 
+  const shouldOpenOrder = closeOutcome === "con_venta" && !ordersForVisit(visitId).length;
+  const clientId = current.clientId;
+
   closeVisitForm.reset();
-  resetQty(closeQty);
   clearClosePhoto();
   closeForm();
   resultFilter = "all";
-  document.querySelectorAll(".chip").forEach((node) => {
+  document.querySelectorAll(".chip[data-filter]").forEach((node) => {
     node.classList.toggle("active", node.dataset.filter === "all");
   });
+
+  if (shouldOpenOrder) {
+    openForm("order", { visitId, clientId });
+    return;
+  }
+
   switchTab("visits");
 });
 
-saleForm.addEventListener("submit", (event) => {
+orderForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const lines = qtyMapToLines(saleQty);
-  if (!lines.length) {
-    alert("Selecciona al menos un producto.");
+  const clientId = document.getElementById("order-client-id").value;
+  const error = document.getElementById("order-client-error");
+  if (!clientId) {
+    error.classList.remove("hidden");
+    return;
+  }
+  error.classList.add("hidden");
+
+  const lines = qtyMapToLines(orderQty, orderPriceList);
+  if (orderStatus !== "Borrador" && !lines.length) {
+    alert("Selecciona al menos un producto, o guarda como borrador.");
     return;
   }
 
   const seller = getSeller();
   const now = new Date();
-  const notes = document.getElementById("sale-notes").value.trim();
+  const visitId = document.getElementById("order-visit-id").value;
 
-  if (saleLink === "visit") {
-    const visitId = document.getElementById("sale-visit-id").value;
-    if (!visitId) {
-      alert("No hay visita para relacionar. Cambia a venta suelta o crea una visita.");
-      return;
+  const created = upsertOrder({
+    clientId,
+    visitId,
+    vendedorId: seller.id,
+    vendedor: seller.name,
+    ruta: seller.ruta,
+    status: orderStatus,
+    priceList: orderPriceList,
+    lines,
+    notes: document.getElementById("order-notes").value.trim(),
+    createdAt: now.toISOString(),
+    fecha: todayISO(),
+  });
+
+  if (visitId) {
+    const visit = loadVisits().find((item) => item.id === visitId);
+    if (visit && visit.status === "Completada" && visit.outcome !== "con_venta") {
+      upsertVisit({ ...visit, outcome: "con_venta" });
     }
-    const current = loadVisits().find((visit) => visit.id === visitId);
-    if (!current) return;
-
-    upsertVisit({
-      ...current,
-      status: "Completada",
-      result: saleResult,
-      lines,
-      amount: linesTotal(lines),
-      notes: notes || current.notes,
-      hora: formatTime(now),
-      fecha: todayISO(),
-      createdAt: now.toISOString(),
-      saleOnly: false,
-      relatedVisitId: "",
-    });
-  } else {
-    const client = document.getElementById("sale-client").value.trim();
-    const error = document.getElementById("sale-client-error");
-    if (!client) {
-      error.classList.remove("hidden");
-      return;
-    }
-    error.classList.add("hidden");
-
-    upsertVisit({
-      status: "Completada",
-      result: saleResult,
-      saleOnly: true,
-      client,
-      lines,
-      amount: linesTotal(lines),
-      estado: document.getElementById("sale-estado").value,
-      location: document.getElementById("sale-estado").value,
-      notes: notes || "Venta sin visita presencial.",
-      createdAt: now.toISOString(),
-      hora: formatTime(now),
-      fecha: todayISO(),
-      vendedorId: seller.id,
-      vendedor: seller.name,
-      ruta: seller.ruta,
-    });
   }
 
-  saleForm.reset();
-  resetQty(saleQty);
-  fillEstadoSelect(document.getElementById("sale-estado"));
+  orderForm.reset();
+  resetQty(orderQty);
+  const returnCloseId = pendingCloseVisitId || visitId;
+  const returnVisit = returnCloseId ? loadVisits().find((item) => item.id === returnCloseId) : null;
+  pendingCloseVisitId = "";
   closeForm();
-  resultFilter = "sale";
-  document.querySelectorAll(".chip").forEach((node) => {
-    node.classList.toggle("active", node.dataset.filter === "sale");
+
+  if (returnVisit && isOpenVisit(returnVisit)) {
+    openForm("close", { visitId: returnVisit.id });
+    return;
+  }
+
+  alert(`Orden ${created.code} guardada.`);
+  salesFilter = "all";
+  document.querySelectorAll("#sales-chips .chip").forEach((node) => {
+    node.classList.toggle("active", node.dataset.salesFilter === "all");
   });
-  switchTab("visits");
+  switchTab("sales");
+});
+
+clientForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = document.getElementById("client-name").value.trim();
+  const error = document.getElementById("client-name-error");
+  if (!name) {
+    error.classList.remove("hidden");
+    return;
+  }
+  error.classList.add("hidden");
+
+  const created = upsertClient({
+    rif: document.getElementById("client-rif").value.trim(),
+    name,
+    address: document.getElementById("client-address").value.trim(),
+    estado: document.getElementById("client-estado").value,
+  });
+
+  openForm(clientReturnMode, { clientId: created.id });
 });
 
 render();
