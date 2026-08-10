@@ -273,6 +273,25 @@ function normalizeOrder(order) {
   const client = getClient(clientId);
   const status = order.status || "Confirmada";
   const createdDate = new Date(createdAt);
+  const fecha = order.fecha || createdAt.slice(0, 10);
+  const amount = linesTotal(lines) || Number(order.amount || 0);
+
+  let paymentStatus = order.paymentStatus || "";
+  if (!paymentStatus) {
+    if (status === "Borrador") paymentStatus = "pendiente";
+    else if (status === "Parcial") paymentStatus = "credito";
+    else paymentStatus = "pagada";
+  }
+
+  const paidAmount = paymentStatus === "pagada"
+    ? amount
+    : Number(order.paidAmount ?? (paymentStatus === "parcial" ? amount * 0.5 : 0));
+  const balance = Math.max(0, amount - paidAmount);
+  const dueDate = order.dueDate
+    || (paymentStatus === "credito" || paymentStatus === "parcial"
+      ? addDaysISO(fecha, 7)
+      : "");
+  const paidAt = order.paidAt || (paymentStatus === "pagada" ? createdAt : "");
 
   return {
     id: order.id || uid("ord"),
@@ -284,13 +303,25 @@ function normalizeOrder(order) {
     ruta: order.ruta || getSeller(order.vendedorId).ruta,
     visitId: order.visitId || "",
     status,
+    paymentStatus,
+    paidAmount,
+    balance,
+    dueDate,
+    paidAt,
     lines,
-    amount: linesTotal(lines) || Number(order.amount || 0),
+    amount,
     priceList: order.priceList || "list",
     notes: order.notes || "",
     createdAt,
-    fecha: order.fecha || createdAt.slice(0, 10),
+    fecha,
   };
+}
+
+function paymentLabel(status) {
+  if (status === "credito") return "Crédito";
+  if (status === "parcial") return "Pago parcial";
+  if (status === "pendiente") return "Pendiente";
+  return "Pagada";
 }
 
 function loadVisits() {
@@ -457,9 +488,13 @@ function badgeForVisit(visit) {
 }
 
 function badgeForOrder(order) {
-  if (order.status === "Borrador") return { text: "Borrador", className: "badge badge-muted" };
+  if (order.paymentStatus === "credito") return { text: "Crédito", className: "badge badge-partial" };
+  if (order.paymentStatus === "parcial") return { text: "Pago parcial", className: "badge badge-accent" };
+  if (order.paymentStatus === "pendiente" || order.status === "Borrador") {
+    return { text: "Pendiente", className: "badge badge-muted" };
+  }
   if (order.status === "Parcial") return { text: "Parcial", className: "badge badge-partial" };
-  return { text: "Confirmada", className: "badge badge-success" };
+  return { text: "Pagada", className: "badge badge-success" };
 }
 
 function renderVisitCard(visit, interactive = false) {
@@ -506,15 +541,24 @@ function renderVisitCard(visit, interactive = false) {
   `;
 }
 
+function orderLinesSummary(order, maxShown = 1) {
+  const lines = order.lines || [];
+  if (!lines.length) return "Sin ítems";
+  const units = lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
+  const shown = lines.slice(0, maxShown).map((line) => `${line.qty}× ${line.name}`);
+  const rest = lines.length - shown.length;
+  const preview = shown.join(" · ");
+  if (rest > 0) return `${preview} +${rest} más · ${units} uds`;
+  return lines.length === 1 ? preview : `${preview} · ${units} uds`;
+}
+
 function renderOrderCard(order) {
   const badge = badgeForOrder(order);
   const client = getClient(order.clientId);
-  const linesLabel = order.lines?.length
-    ? order.lines.map((line) => `${line.qty}× ${line.name}`).join(" · ")
-    : "Sin ítems";
+  const linesLabel = orderLinesSummary(order, 1);
   const visitNote = order.visitId ? "Con visita" : "Sin visita";
   return `
-    <article class="visit-card sales-card" data-order-id="${escapeHtml(order.id)}">
+    <button class="visit-card visit-card-btn sales-card" type="button" data-order-id="${escapeHtml(order.id)}">
       <div class="visit-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M6 6 5 3H2"/>
@@ -529,11 +573,11 @@ function renderOrderCard(order) {
         <p class="meta products-line">${escapeHtml(linesLabel)}</p>
         <p class="meta">${escapeHtml(formatDateShort(order.fecha))} · ${escapeHtml(formatTime(order.createdAt))} · ${visitNote}</p>
         <div class="visit-footer">
-          <p class="notes">${escapeHtml(order.notes || "Orden de venta")}</p>
+          <p class="notes">${escapeHtml(order.notes || "Orden de venta")}${order.balance > 0 ? ` · Saldo $${formatCurrency(order.balance)}` : ""}</p>
           <strong class="visit-amount">$${formatCurrency(order.amount)}</strong>
         </div>
       </div>
-    </article>
+    </button>
   `;
 }
 
@@ -541,7 +585,7 @@ function renderLinkedOrderRow(order) {
   const badge = badgeForOrder(order);
   const items = order.lines?.length || 0;
   return `
-    <div class="linked-order-row">
+    <button class="linked-order-row" type="button" data-order-id="${escapeHtml(order.id)}">
       <div>
         <strong>${escapeHtml(order.code || "Orden")}</strong>
         <p>${items} ítem${items === 1 ? "" : "s"} · ${escapeHtml(order.status)}</p>
@@ -549,8 +593,181 @@ function renderLinkedOrderRow(order) {
       <div class="linked-order-right">
         <span class="${badge.className}">$${formatCurrency(order.amount)}</span>
       </div>
-    </div>
+    </button>
   `;
+}
+
+function renderOrderDetailHtml(order) {
+  const badge = badgeForOrder(order);
+  const client = getClient(order.clientId);
+  const visit = order.visitId ? loadVisits().find((item) => item.id === order.visitId) : null;
+  const seller = getSeller(order.vendedorId);
+  const lines = order.lines || [];
+  const units = lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
+  const priceListLabel = order.priceList === "wholesale" ? "Mayorista" : "Precio lista";
+  const dueNote = order.dueDate
+    ? (order.dueDate < todayISO() ? `Vencido ${formatDateShort(order.dueDate)}` : `Vence ${formatDateShort(order.dueDate)}`)
+    : "Sin fecha de vencimiento";
+
+  const lineRows = lines.length
+    ? lines.map((line) => {
+      const product = getProduct(line.productId);
+      const image = product?.image || "";
+      const lineTotal = Number(line.qty || 0) * Number(line.unitPrice || 0);
+      return `
+        <article class="order-line-row">
+          ${image
+            ? `<img class="product-thumb" src="${escapeHtml(image)}" alt="" width="44" height="44">`
+            : `<div class="order-line-fallback"><i data-lucide="package"></i></div>`}
+          <div class="order-line-body">
+            <strong>${escapeHtml(line.name || product?.name || "Producto")}</strong>
+            <p>${escapeHtml(product?.code || line.productId || "—")} · ${escapeHtml(product?.unit || "und")}</p>
+          </div>
+          <div class="order-line-qty">
+            <em>${Number(line.qty || 0)} × $${formatCurrency(line.unitPrice || 0)}</em>
+            <strong>$${formatCurrency(lineTotal)}</strong>
+          </div>
+        </article>
+      `;
+    }).join("")
+    : `<div class="empty"><h3>Sin ítems</h3><p>Esta orden no tiene productos cargados.</p></div>`;
+
+  return `
+    <div class="order-hero">
+      <div class="order-hero-top">
+        <div>
+          <p class="eyebrow" style="color:rgba(255,253,252,.7); margin:0 0 4px">ORDEN DE VENTA</p>
+          <h2 id="order-detail-title">${escapeHtml(order.code || "Orden")}</h2>
+          <p>${escapeHtml(order.clientName || clientLabel(order.clientId))}</p>
+        </div>
+        <span class="${badge.className}">${escapeHtml(badge.text)}</span>
+      </div>
+      <div class="seller-hero-meta">
+        <span class="seller-chip"><i data-lucide="store"></i> ${escapeHtml(client?.rif || "Sin RIF")}</span>
+        <span class="seller-chip"><i data-lucide="calendar"></i> ${escapeHtml(formatDateShort(order.fecha))}</span>
+        <span class="seller-chip"><i data-lucide="user"></i> ${escapeHtml(order.vendedor || seller?.name || "—")}</span>
+      </div>
+    </div>
+
+    <div class="profile-metrics">
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="banknote"></i> Total</div>
+        <strong>$${formatCurrency(order.amount)}</strong>
+        <em>${lines.length} producto${lines.length === 1 ? "" : "s"} · ${units} uds</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="wallet"></i> Cobrado</div>
+        <strong>$${formatCurrency(order.paidAmount || 0)}</strong>
+        <em>${escapeHtml(paymentLabel(order.paymentStatus))}</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="circle-dollar-sign"></i> Saldo</div>
+        <strong>$${formatCurrency(order.balance || 0)}</strong>
+        <em>${escapeHtml(dueNote)}</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="tags"></i> Lista</div>
+        <strong>${escapeHtml(priceListLabel)}</strong>
+        <em>${escapeHtml(order.status || "—")}</em>
+      </article>
+    </div>
+
+    <section class="card chart-card order-detail-section">
+      <h2>Cliente</h2>
+      <div class="order-info-grid">
+        <div>
+          <span>Nombre</span>
+          <strong>${escapeHtml(client?.name || order.clientName || "—")}</strong>
+        </div>
+        <div>
+          <span>RIF</span>
+          <strong>${escapeHtml(client?.rif || "—")}</strong>
+        </div>
+        <div>
+          <span>Dirección</span>
+          <strong>${escapeHtml(client?.address || "Sin dirección")}</strong>
+        </div>
+        <div>
+          <span>Estado</span>
+          <strong>${escapeHtml(client?.estado || "—")}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="card chart-card order-detail-section">
+      <h2>Productos</h2>
+      <div class="order-lines-list">${lineRows}</div>
+      <div class="order-total-row">
+        <span>Total orden</span>
+        <strong>$${formatCurrency(order.amount)}</strong>
+      </div>
+    </section>
+
+    <section class="card chart-card order-detail-section">
+      <h2>Cobro y seguimiento</h2>
+      <div class="order-info-grid">
+        <div>
+          <span>Estado cobro</span>
+          <strong>${escapeHtml(paymentLabel(order.paymentStatus))}</strong>
+        </div>
+        <div>
+          <span>Pagado el</span>
+          <strong>${order.paidAt ? escapeHtml(formatDateShort(String(order.paidAt).slice(0, 10))) : "—"}</strong>
+        </div>
+        <div>
+          <span>Vencimiento</span>
+          <strong>${order.dueDate ? escapeHtml(formatDateShort(order.dueDate)) : "—"}</strong>
+        </div>
+        <div>
+          <span>Visita</span>
+          <strong>${visit
+            ? escapeHtml(`${formatDateShort(visit.fecha)} · ${visit.status}`)
+            : "Sin visita vinculada"}</strong>
+        </div>
+        <div>
+          <span>Ruta</span>
+          <strong>${escapeHtml(order.ruta || seller?.ruta || "—")}</strong>
+        </div>
+        <div>
+          <span>Creada</span>
+          <strong>${escapeHtml(formatDateShort(order.fecha))} · ${escapeHtml(formatTime(order.createdAt))}</strong>
+        </div>
+      </div>
+      ${order.notes
+        ? `<p class="order-notes-box">${escapeHtml(order.notes)}</p>`
+        : `<p class="meta" style="margin:12px 0 0">Sin observaciones</p>`}
+    </section>
+  `;
+}
+
+function openOrderDetail(orderId) {
+  const sheet = document.getElementById("order-detail-sheet");
+  const content = document.getElementById("order-detail-content");
+  if (!sheet || !content || !orderId) return;
+  const order = loadOrders().find((item) => item.id === orderId);
+  if (!order) return;
+  content.innerHTML = renderOrderDetailHtml(order);
+  sheet.classList.remove("hidden");
+  refreshIcons(sheet);
+}
+
+function closeOrderDetail() {
+  document.getElementById("order-detail-sheet")?.classList.add("hidden");
+}
+
+function initOrderDetailSheet() {
+  const sheet = document.getElementById("order-detail-sheet");
+  if (!sheet || sheet.dataset.ready === "1") return;
+  sheet.dataset.ready = "1";
+  document.getElementById("order-detail-backdrop")?.addEventListener("click", closeOrderDetail);
+  document.getElementById("close-order-detail-btn")?.addEventListener("click", closeOrderDetail);
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-order-id]");
+    if (!target || target.closest("#order-detail-sheet")) return;
+    if (!target.classList.contains("sales-card") && !target.classList.contains("linked-order-row")) return;
+    event.preventDefault();
+    openOrderDetail(target.dataset.orderId);
+  });
 }
 
 function compressImage(file, maxWidth = 900, quality = 0.72) {
@@ -730,7 +947,10 @@ function seedDemoData() {
       ruta: marina.ruta,
       lines: [{ productId: "cola1", qty: 5 }, { productId: "leche1", qty: 8 }],
       status: "Parcial",
-      notes: "Pedido parcial de la visita.",
+      paymentStatus: "credito",
+      paidAmount: 40,
+      dueDate: addDaysISO(todayISO(), 3),
+      notes: "Crédito a 3 días · saldo pendiente.",
       createdAt: visits[0].endAt,
     }),
     normalizeOrder({
@@ -741,7 +961,8 @@ function seedDemoData() {
       ruta: luis.ruta,
       lines: [{ productId: "cola2", qty: 20 }, { productId: "cola1", qty: 10 }],
       status: "Confirmada",
-      notes: "Pedido completo.",
+      paymentStatus: "pagada",
+      notes: "Pedido completo · cobrado de contado.",
       createdAt: visits[3].endAt,
     }),
     normalizeOrder({
@@ -751,8 +972,11 @@ function seedDemoData() {
       ruta: carlos.ruta,
       lines: [{ productId: "leche2", qty: 40 }, { productId: "cola2", qty: 18 }],
       status: "Confirmada",
-      notes: "Orden sin visita presencial.",
+      paymentStatus: "pagada",
+      notes: "Orden sin visita presencial · pagada.",
       createdAt: new Date(now.getTime() - 70 * 60000).toISOString(),
+      fecha: addDaysISO(todayISO(), -1),
+      paidAt: new Date(now.getTime() - 70 * 60000).toISOString(),
     }),
     normalizeOrder({
       clientId: clients[3].id,
@@ -761,8 +985,36 @@ function seedDemoData() {
       ruta: ana.ruta,
       lines: [{ productId: "agua", qty: 24 }, { productId: "yogurt", qty: 6 }],
       status: "Confirmada",
-      notes: "Pedido de prueba ruta sur.",
+      paymentStatus: "credito",
+      paidAmount: 0,
+      dueDate: todayISO(),
+      notes: "Crédito vence hoy · ruta sur.",
       createdAt: new Date(now.getTime() - 40 * 60000).toISOString(),
+    }),
+    normalizeOrder({
+      clientId: clients[0].id,
+      vendedorId: marina.id,
+      vendedor: marina.name,
+      ruta: marina.ruta,
+      lines: [{ productId: "naranja", qty: 12 }, { productId: "cola1", qty: 8 }],
+      status: "Confirmada",
+      paymentStatus: "parcial",
+      paidAmount: 100,
+      dueDate: addDaysISO(todayISO(), 5),
+      notes: "Abonó parcial · resto a crédito.",
+      createdAt: new Date(now.getTime() - 15 * 60000).toISOString(),
+    }),
+    normalizeOrder({
+      clientId: clients[2].id,
+      vendedorId: luis.id,
+      vendedor: luis.name,
+      ruta: luis.ruta,
+      lines: [{ productId: "lima", qty: 15 }],
+      status: "Confirmada",
+      paymentStatus: "pagada",
+      notes: "Contado · agenda mañana cobrada hoy.",
+      createdAt: new Date(now.getTime() - 5 * 60000).toISOString(),
+      fecha: todayISO(),
     }),
   ];
 

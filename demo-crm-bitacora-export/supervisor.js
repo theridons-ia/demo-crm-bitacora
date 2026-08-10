@@ -4,6 +4,7 @@ const screens = {
   clients: document.getElementById("sup-screen-clients"),
   charts: document.getElementById("sup-screen-charts"),
   assign: document.getElementById("sup-screen-assign"),
+  orders: document.getElementById("sup-screen-orders"),
 };
 
 const filterFecha = document.getElementById("filter-fecha");
@@ -11,11 +12,16 @@ const filterResultado = document.getElementById("filter-resultado");
 const leaderboard = document.getElementById("leaderboard");
 const teamVisits = document.getElementById("team-visits");
 const teamOrders = document.getElementById("team-orders");
+const ordersBiList = document.getElementById("orders-bi-list");
 const sellerDetail = document.getElementById("seller-detail");
 const clientsSearch = document.getElementById("clients-search");
 
 let selectedSellerId = "";
 let activityView = "visits";
+let ordersPanel = "resumen";
+let ordersCalDay = todayISO();
+let creditDayFilter = "";
+let paidDayFilter = "";
 let assignType = "visit";
 let assignQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
 
@@ -24,14 +30,24 @@ function switchSupTab(tab) {
     node.classList.toggle("active", key === tab);
   });
   document.querySelectorAll(".tab[data-sup-tab]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.supTab === tab);
+    // Orders BI is opened from KPI; keep Equipo tab highlighted when viewing it
+    const activeTab = tab === "orders" ? "team" : tab;
+    button.classList.toggle("active", button.dataset.supTab === activeTab);
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (tab === "charts") renderCharts();
   if (tab === "sellers") renderSellers();
   if (tab === "clients") renderClients();
   if (tab === "assign") refreshIcons();
+  if (tab === "orders") {
+    syncOrdersPanel();
+    renderOrdersDashboard();
+  }
   refreshIcons();
+}
+
+function openOrdersBI() {
+  switchSupTab("orders");
 }
 
 function syncAssignType() {
@@ -47,6 +63,183 @@ function syncActivityView() {
   teamOrders.classList.toggle("hidden", activityView !== "orders");
   document.querySelectorAll("#activity-chips .chip").forEach((chip) => {
     chip.classList.toggle("active", chip.dataset.activity === activityView);
+  });
+}
+
+function syncOrdersPanel() {
+  document.querySelectorAll("#orders-panel-chips .chip").forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.ordersPanel === ordersPanel);
+  });
+  ["resumen", "credito", "pagadas", "calendario", "listado"].forEach((panel) => {
+    document.getElementById(`orders-panel-${panel}`).classList.toggle("hidden", panel !== ordersPanel);
+  });
+}
+
+function creditOrders(orders) {
+  return orders.filter((order) =>
+    (order.paymentStatus === "credito" || order.paymentStatus === "parcial") && order.balance > 0
+  );
+}
+
+function paidOrders(orders) {
+  return orders.filter((order) => order.paymentStatus === "pagada" || Number(order.paidAmount) > 0);
+}
+
+function agingBucket(dueDate) {
+  if (!dueDate) return "sin_fecha";
+  const today = todayISO();
+  if (dueDate < today) return "vencido";
+  if (dueDate === today) return "hoy";
+  const in3 = addDaysISO(today, 3);
+  if (dueDate <= in3) return "3d";
+  return "luego";
+}
+
+function renderOrdersDashboard() {
+  const orders = loadOrders().slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const credits = creditOrders(orders);
+  const paid = paidOrders(orders);
+  const total = orders.reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  const collected = orders.reduce((sum, order) => sum + Number(order.paidAmount || 0), 0);
+  const openCredit = credits.reduce((sum, order) => sum + Number(order.balance || 0), 0);
+
+  document.getElementById("ord-kpi-total").textContent = `$${formatCurrency(total)}`;
+  document.getElementById("ord-kpi-paid").textContent = `$${formatCurrency(collected)}`;
+  document.getElementById("ord-kpi-credit").textContent = `$${formatCurrency(openCredit)}`;
+
+  // Resumen
+  renderBarList("ord-mix-bars", [
+    { label: "Pagadas", value: orders.filter((o) => o.paymentStatus === "pagada").length, display: String(orders.filter((o) => o.paymentStatus === "pagada").length) },
+    { label: "Crédito", value: orders.filter((o) => o.paymentStatus === "credito").length, display: String(orders.filter((o) => o.paymentStatus === "credito").length) },
+    { label: "Pago parcial", value: orders.filter((o) => o.paymentStatus === "parcial").length, display: String(orders.filter((o) => o.paymentStatus === "parcial").length) },
+    { label: "Cobrado $", value: collected, display: `$${formatCurrency(collected)}` },
+    { label: "Por cobrar $", value: openCredit, display: `$${formatCurrency(openCredit)}`, dark: true },
+  ]);
+
+  const aging = { vencido: 0, hoy: 0, "3d": 0, luego: 0, sin_fecha: 0 };
+  credits.forEach((order) => {
+    aging[agingBucket(order.dueDate)] += Number(order.balance || 0);
+  });
+  renderBarList("ord-aging-bars", [
+    { label: "Vencido", value: aging.vencido, display: `$${formatCurrency(aging.vencido)}`, dark: true },
+    { label: "Vence hoy", value: aging.hoy, display: `$${formatCurrency(aging.hoy)}` },
+    { label: "Próx. 3 días", value: aging["3d"], display: `$${formatCurrency(aging["3d"])}` },
+    { label: "Más adelante", value: aging.luego, display: `$${formatCurrency(aging.luego)}` },
+  ]);
+
+  const debtorMap = new Map();
+  credits.forEach((order) => {
+    const key = order.clientId;
+    const current = debtorMap.get(key) || { name: order.clientName, balance: 0 };
+    current.balance += Number(order.balance || 0);
+    debtorMap.set(key, current);
+  });
+  const debtors = [...debtorMap.values()]
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, 5)
+    .map((item) => ({ label: item.name, value: item.balance, display: `$${formatCurrency(item.balance)}` }));
+  renderBarList("ord-debtors", debtors);
+
+  // Crédito panel
+  const creditFiltered = creditDayFilter
+    ? credits.filter((order) => order.dueDate === creditDayFilter)
+    : credits;
+  const creditBalance = creditFiltered.reduce((sum, order) => sum + Number(order.balance || 0), 0);
+  document.getElementById("ord-credit-sub").textContent = creditDayFilter
+    ? `Vence ${formatDateShort(creditDayFilter)} · $${formatCurrency(creditBalance)}`
+    : `${creditFiltered.length} créditos · $${formatCurrency(creditBalance)}`;
+  document.getElementById("ord-credit-kpis").innerHTML = `
+    <article><span>Órdenes</span><strong>${creditFiltered.length}</strong></article>
+    <article><span>Saldo</span><strong>$${formatCurrency(creditBalance)}</strong></article>
+    <article><span>Vencidas</span><strong>${creditFiltered.filter((o) => o.dueDate && o.dueDate < todayISO()).length}</strong></article>
+  `;
+  document.getElementById("ord-credit-list").innerHTML = creditFiltered.length
+    ? creditFiltered
+      .slice()
+      .sort((a, b) => String(a.dueDate || "9999").localeCompare(String(b.dueDate || "9999")))
+      .map((order) => renderOrderCard(order))
+      .join("")
+    : `<div class="empty"><h3>Sin créditos</h3><p>No hay saldos abiertos para este filtro.</p></div>`;
+
+  // Pagadas panel
+  const paidFiltered = paidDayFilter
+    ? paid.filter((order) => (order.paidAt || order.fecha || "").slice(0, 10) === paidDayFilter)
+    : paid.filter((order) => order.paymentStatus === "pagada");
+  const paidTotal = paidFiltered.reduce((sum, order) => sum + Number(order.paidAmount || order.amount || 0), 0);
+  document.getElementById("ord-paid-sub").textContent = paidDayFilter
+    ? `Pagadas ${formatDateShort(paidDayFilter)} · $${formatCurrency(paidTotal)}`
+    : `${paidFiltered.length} órdenes · $${formatCurrency(paidTotal)}`;
+  document.getElementById("ord-paid-kpis").innerHTML = `
+    <article><span>Órdenes</span><strong>${paidFiltered.length}</strong></article>
+    <article><span>Cobrado</span><strong>$${formatCurrency(paidTotal)}</strong></article>
+    <article><span>Ticket</span><strong>$${formatCurrency(paidFiltered.length ? Math.round(paidTotal / paidFiltered.length) : 0)}</strong></article>
+  `;
+  document.getElementById("ord-paid-list").innerHTML = paidFiltered.length
+    ? paidFiltered.map((order) => renderOrderCard(order)).join("")
+    : `<div class="empty"><h3>Sin cobros</h3><p>No hay órdenes pagadas para este filtro.</p></div>`;
+
+  // Calendario
+  renderOrdersWeekStrip(orders);
+  const dayPaid = paid
+    .filter((order) => (order.paidAt || order.fecha || "").slice(0, 10) === ordersCalDay)
+    .reduce((sum, order) => sum + Number(order.paidAmount || order.amount || 0), 0);
+  const dayDue = credits
+    .filter((order) => order.dueDate === ordersCalDay)
+    .reduce((sum, order) => sum + Number(order.balance || 0), 0);
+  document.getElementById("ord-cal-label").textContent = formatDateShort(ordersCalDay);
+  document.getElementById("ord-cal-paid").textContent = `$${formatCurrency(dayPaid)}`;
+  document.getElementById("ord-cal-due").textContent = `$${formatCurrency(dayDue)}`;
+  document.getElementById("ord-cal-net").textContent = `$${formatCurrency(dayPaid - dayDue)}`;
+  const dayOrders = orders.filter((order) =>
+    order.fecha === ordersCalDay
+    || order.dueDate === ordersCalDay
+    || (order.paidAt || "").slice(0, 10) === ordersCalDay
+  );
+  document.getElementById("ord-cal-list").innerHTML = dayOrders.length
+    ? dayOrders.map((order) => renderOrderCard(order)).join("")
+    : `<div class="empty"><h3>Sin movimiento</h3><p>No hay órdenes, pagos ni vencimientos este día.</p></div>`;
+
+  // Listado BI
+  if (ordersBiList) {
+    ordersBiList.innerHTML = orders.length
+      ? orders.slice(0, 40).map((order) => renderOrderCard(order)).join("")
+      : `<div class="empty"><h3>Sin órdenes</h3><p>Asigna una orden o espera actividad del equipo.</p></div>`;
+  }
+
+  refreshIcons();
+}
+
+function renderOrdersWeekStrip(orders) {
+  const strip = document.getElementById("ord-week-strip");
+  const start = addDaysISO(todayISO(), -1);
+  const days = Array.from({ length: 7 }, (_, index) => addDaysISO(start, index));
+  const credits = creditOrders(orders);
+  const paid = paidOrders(orders);
+
+  strip.innerHTML = days.map((day) => {
+    const paidSum = paid
+      .filter((order) => (order.paidAt || order.fecha || "").slice(0, 10) === day)
+      .reduce((sum, order) => sum + Number(order.paidAmount || order.amount || 0), 0);
+    const dueSum = credits
+      .filter((order) => order.dueDate === day)
+      .reduce((sum, order) => sum + Number(order.balance || 0), 0);
+    const [y, m, d] = day.split("-").map(Number);
+    const label = new Date(y, m - 1, d).toLocaleDateString("es-VE", { weekday: "short" });
+    return `
+      <button class="day-chip ${day === ordersCalDay ? "active" : ""}" type="button" data-ord-day="${day}">
+        <span>${escapeHtml(label)}</span>
+        <strong>${d}</strong>
+        <em class="day-paid">$${formatCurrency(paidSum)}</em>
+        <em class="day-due">$${formatCurrency(dueSum)}</em>
+      </button>
+    `;
+  }).join("");
+
+  strip.querySelectorAll("[data-ord-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ordersCalDay = button.dataset.ordDay;
+      renderOrdersDashboard();
+    });
   });
 }
 
@@ -470,13 +663,14 @@ function renderTeam() {
   const summary = summarizeVisits(visits, orders);
   const sellers = groupBySeller(visits, orders).filter((seller) => seller.visits.length || seller.orders.length);
   const salesTotal = orders.reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  const openCredit = creditOrders(loadOrders()).reduce((sum, order) => sum + Number(order.balance || 0), 0);
 
   document.getElementById("kpi-vendedores").textContent = SELLERS.length;
   document.getElementById("kpi-visitas").textContent = summary.visits + summary.inProgress + summary.scheduled;
   document.getElementById("kpi-ventas").textContent = `$${formatCurrency(salesTotal)}`;
   document.getElementById("kpi-efectividad").textContent = `${summary.effectiveness}%`;
   document.getElementById("pendiente-cobro").textContent =
-    `Cobranza pendiente: $${formatCurrency(salesTotal * 0.3)}`;
+    `Cobranza pendiente: $${formatCurrency(openCredit)}`;
 
   if (!sellers.length) {
     leaderboard.innerHTML = `
@@ -509,17 +703,28 @@ function renderTeam() {
   }
 
   teamVisits.innerHTML = visits.length
-    ? visits.slice(0, 12).map((visit) => renderVisitCard(visit)).join("")
+    ? visits
+      .slice()
+      .sort((a, b) => {
+        const rank = (visit) => (visit.status === "En curso" ? 0 : visit.status === "Programada" ? 1 : 2);
+        const byStatus = rank(a) - rank(b);
+        if (byStatus !== 0) return byStatus;
+        return String(b.createdAt).localeCompare(String(a.createdAt));
+      })
+      .slice(0, 12)
+      .map((visit) => renderVisitCard(visit))
+      .join("")
     : `<div class="empty"><h3>Sin visitas</h3><p>No hay registros con estos filtros.</p></div>`;
 
   teamOrders.innerHTML = orders.length
     ? orders.slice(0, 12).map((order) => renderOrderCard(order)).join("")
-    : `<div class="empty"><h3>Sin órdenes</h3><p>Asigna una orden o espera actividad del equipo.</p></div>`;
+    : `<div class="empty"><h3>Sin órdenes</h3><p>No hay registros con estos filtros.</p></div>`;
 
   if (selectedSellerId) showSeller(selectedSellerId);
   else sellerDetail.classList.add("hidden");
 
   syncActivityView();
+  if (screens.orders?.classList.contains("active")) renderOrdersDashboard();
   renderSellers();
   renderClients();
   renderCharts();
@@ -555,10 +760,13 @@ function showSeller(sellerId) {
 
 filterFecha.value = todayISO();
 document.getElementById("assign-visit-date").value = addDaysISO(todayISO(), 1);
+document.getElementById("ord-credit-day").value = "";
+document.getElementById("ord-paid-day").value = "";
 fillSellerSelects();
 fillClientSelects();
 renderAssignProducts();
 syncAssignType();
+syncOrdersPanel();
 syncActivityView();
 
 if (!loadVisits().length && !loadOrders().length) seedDemoData();
@@ -567,11 +775,44 @@ document.querySelectorAll(".tab[data-sup-tab]").forEach((button) => {
   button.addEventListener("click", () => switchSupTab(button.dataset.supTab));
 });
 
+document.getElementById("kpi-orders-btn")?.addEventListener("click", openOrdersBI);
+document.getElementById("orders-bi-back")?.addEventListener("click", () => switchSupTab("team"));
+
 document.querySelectorAll("#activity-chips .chip").forEach((chip) => {
   chip.addEventListener("click", () => {
     activityView = chip.dataset.activity;
     syncActivityView();
   });
+});
+
+document.querySelectorAll("#orders-panel-chips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    ordersPanel = chip.dataset.ordersPanel;
+    syncOrdersPanel();
+    renderOrdersDashboard();
+  });
+});
+
+document.getElementById("ord-credit-day").addEventListener("change", (event) => {
+  creditDayFilter = event.target.value || "";
+  renderOrdersDashboard();
+});
+
+document.getElementById("ord-credit-all-btn").addEventListener("click", () => {
+  creditDayFilter = "";
+  document.getElementById("ord-credit-day").value = "";
+  renderOrdersDashboard();
+});
+
+document.getElementById("ord-paid-day").addEventListener("change", (event) => {
+  paidDayFilter = event.target.value || "";
+  renderOrdersDashboard();
+});
+
+document.getElementById("ord-paid-all-btn").addEventListener("click", () => {
+  paidDayFilter = "";
+  document.getElementById("ord-paid-day").value = "";
+  renderOrdersDashboard();
 });
 
 document.querySelectorAll("#assign-type-group .segment").forEach((button) => {
@@ -598,6 +839,11 @@ document.getElementById("seed-btn").addEventListener("click", () => {
   seedDemoData();
   fillClientSelects();
   selectedSellerId = "";
+  creditDayFilter = "";
+  paidDayFilter = "";
+  document.getElementById("ord-credit-day").value = "";
+  document.getElementById("ord-paid-day").value = "";
+  ordersCalDay = todayISO();
   renderTeam();
 });
 
@@ -681,3 +927,4 @@ document.getElementById("assign-order-form").addEventListener("submit", (event) 
 });
 
 renderTeam();
+initOrderDetailSheet();

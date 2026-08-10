@@ -40,13 +40,14 @@
           <p>Visitas</p>
           <strong id="kpi-visitas">0</strong>
         </article>
-        <article class="metric-card">
+        <button class="metric-card metric-card-btn" type="button" id="kpi-orders-btn" aria-label="Abrir panel BI de órdenes">
           <div class="metric-icon gray" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/></svg>
           </div>
           <p>Órdenes</p>
           <strong id="kpi-ventas">$0</strong>
-        </article>
+          <span class="metric-hint">Ver BI</span>
+        </button>
         <article class="metric-card">
           <div class="metric-icon sand" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
@@ -98,6 +99,113 @@
       <div class="toolbar" style="margin-top:18px">
         <button class="ghost" id="seed-btn" type="button">Cargar demo</button>
         <button class="danger-link" id="clear-btn" type="button">Vaciar</button>
+      </div>
+    </main>
+
+    <main id="sup-screen-orders" class="screen" data-screen="orders">
+      <div class="greeting-row">
+        <div>
+          <p class="eyebrow">INTELIGENCIA COMERCIAL</p>
+          <h1 class="screen-title" style="font-size:28px; margin:0">Órdenes</h1>
+          <p class="sub">Créditos, cobros y calendario de ventas</p>
+        </div>
+        <button class="avatar" id="orders-bi-back" type="button" aria-label="Volver al equipo">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+      </div>
+
+      <div id="orders-dashboard" class="orders-dashboard">
+        <section class="sales-summary" aria-label="KPIs de órdenes">
+          <article>
+            <span>Facturado</span>
+            <strong id="ord-kpi-total">$0</strong>
+          </article>
+          <article>
+            <span>Cobrado</span>
+            <strong id="ord-kpi-paid">$0</strong>
+          </article>
+          <article>
+            <span>Por cobrar</span>
+            <strong id="ord-kpi-credit">$0</strong>
+          </article>
+        </section>
+
+        <div class="chips chips-scroll" role="tablist" id="orders-panel-chips">
+          <button class="chip active" type="button" data-orders-panel="resumen">Resumen</button>
+          <button class="chip" type="button" data-orders-panel="credito">Por cobrar</button>
+          <button class="chip" type="button" data-orders-panel="pagadas">Pagadas</button>
+          <button class="chip" type="button" data-orders-panel="calendario">Calendario</button>
+          <button class="chip" type="button" data-orders-panel="listado">Listado</button>
+        </div>
+
+        <div id="orders-panel-resumen" class="orders-panel">
+          <section class="card chart-card">
+            <h2>Mix de cobro</h2>
+            <div id="ord-mix-bars" class="bar-list"></div>
+          </section>
+          <section class="card chart-card">
+            <h2>Aging de créditos</h2>
+            <div id="ord-aging-bars" class="bar-list"></div>
+          </section>
+          <section class="card chart-card">
+            <h2>Top deudores</h2>
+            <div id="ord-debtors" class="bar-list"></div>
+          </section>
+        </div>
+
+        <div id="orders-panel-credito" class="orders-panel hidden">
+          <div class="section-head" style="margin-top:0">
+            <h2>Créditos pendientes</h2>
+            <p class="sub" id="ord-credit-sub" style="margin:0">Saldo abierto</p>
+          </div>
+          <div class="filter-row">
+            <input id="ord-credit-day" type="date" aria-label="Vence el">
+            <button class="ghost" id="ord-credit-all-btn" type="button">Todas</button>
+          </div>
+          <div id="ord-credit-kpis" class="sales-summary"></div>
+          <div id="ord-credit-list" class="visits-stack"></div>
+        </div>
+
+        <div id="orders-panel-pagadas" class="orders-panel hidden">
+          <div class="section-head" style="margin-top:0">
+            <h2>Órdenes pagadas</h2>
+            <p class="sub" id="ord-paid-sub" style="margin:0">Cobrado</p>
+          </div>
+          <div class="filter-row">
+            <input id="ord-paid-day" type="date" aria-label="Pagadas el">
+            <button class="ghost" id="ord-paid-all-btn" type="button">Todas</button>
+          </div>
+          <div id="ord-paid-kpis" class="sales-summary"></div>
+          <div id="ord-paid-list" class="visits-stack"></div>
+        </div>
+
+        <div id="orders-panel-calendario" class="orders-panel hidden">
+          <div class="section-head" style="margin-top:0">
+            <h2>Calendario comercial</h2>
+            <p class="sub" id="ord-cal-label" style="margin:0">Día seleccionado</p>
+          </div>
+          <div id="ord-week-strip" class="week-strip" aria-label="Semana de órdenes"></div>
+          <section class="sales-summary">
+            <article>
+              <span>Pagado hoy</span>
+              <strong id="ord-cal-paid">$0</strong>
+            </article>
+            <article>
+              <span>Vence hoy</span>
+              <strong id="ord-cal-due">$0</strong>
+            </article>
+            <article>
+              <span>Neto día</span>
+              <strong id="ord-cal-net">$0</strong>
+            </article>
+          </section>
+          <div class="section-head"><h2>Detalle del día</h2></div>
+          <div id="ord-cal-list" class="visits-stack"></div>
+        </div>
+
+        <div id="orders-panel-listado" class="orders-panel hidden">
+          <div id="orders-bi-list" class="visits-stack"></div>
+        </div>
       </div>
     </main>
 
@@ -246,6 +354,15 @@
         <div class="sheet-handle" aria-hidden="true"></div>
         <div id="seller-profile-content"></div>
         <button class="ghost" id="close-profile-btn" type="button" style="width:100%; margin-top:8px">Cerrar ficha</button>
+      </div>
+    </div>
+
+    <div id="order-detail-sheet" class="sheet order-detail-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
+      <button class="sheet-backdrop" id="order-detail-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div id="order-detail-content"></div>
+        <button class="ghost" id="close-order-detail-btn" type="button" style="width:100%; margin-top:8px">Cerrar orden</button>
       </div>
     </div>
 

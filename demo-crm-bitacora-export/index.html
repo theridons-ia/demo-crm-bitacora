@@ -122,8 +122,8 @@
       </div>
 
       <div class="chips" role="tablist" aria-label="Filtros de bitácora">
-        <button class="chip active" type="button" data-filter="all">Hechas</button>
-        <button class="chip" type="button" data-filter="open">Abiertas</button>
+        <button class="chip" type="button" data-filter="all">Hechas</button>
+        <button class="chip active" type="button" data-filter="open">Abiertas</button>
         <button class="chip" type="button" data-filter="scheduled">Agenda</button>
         <button class="chip" type="button" data-filter="sale">Con venta</button>
         <button class="chip" type="button" data-filter="none">Sin venta</button>
@@ -415,6 +415,21 @@
           </div>
         </div>
         <div class="field">
+          <label>Cobro</label>
+          <div class="segmented" id="order-payment-group">
+            <button class="segment active" type="button" data-value="pagada">Contado</button>
+            <button class="segment" type="button" data-value="credito">Crédito</button>
+            <button class="segment" type="button" data-value="parcial">Abono</button>
+          </div>
+        </div>
+        <div class="field hidden" id="order-due-field">
+          <label for="order-due-date">Vence</label>
+          <div class="input-with-icon">
+            <i data-lucide="calendar-clock" class="field-icon"></i>
+            <input id="order-due-date" type="date">
+          </div>
+        </div>
+        <div class="field">
           <label>Lista de precios</label>
           <div class="segmented" id="order-price-group">
             <button class="segment active" type="button" data-value="list">Precio lista</button>
@@ -556,6 +571,15 @@
         <h2 id="seller-sheet-title">Elegir vendedor</h2>
         <p class="sub">Toca un perfil para cambiar de ruta demo.</p>
         <div id="seller-options" class="seller-options"></div>
+      </div>
+    </div>
+
+    <div id="order-detail-sheet" class="sheet order-detail-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
+      <button class="sheet-backdrop" id="order-detail-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div id="order-detail-content"></div>
+        <button class="ghost" id="close-order-detail-btn" type="button" style="width:100%; margin-top:8px">Cerrar orden</button>
       </div>
     </div>
 

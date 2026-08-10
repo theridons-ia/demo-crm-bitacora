@@ -22,7 +22,7 @@ const orderForm = document.getElementById("order-form");
 const clientForm = document.getElementById("client-form");
 
 let currentTab = "home";
-let resultFilter = "all";
+let resultFilter = "open";
 let salesFilter = "all";
 let inventoryCategory = "all";
 let calendarDay = todayISO();
@@ -30,6 +30,7 @@ let createWhen = "now";
 let closeOutcome = "con_venta";
 let closeFollowUp = "none";
 let orderStatus = "Confirmada";
+let orderPayment = "pagada";
 let orderPriceList = "list";
 let pendingPhoto = "";
 let orderQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
@@ -48,6 +49,8 @@ function snapshotForm(mode) {
       visitId: document.getElementById("order-visit-id").value,
       notes: document.getElementById("order-notes").value,
       status: orderStatus,
+      payment: orderPayment,
+      dueDate: document.getElementById("order-due-date")?.value || "",
       priceList: orderPriceList,
       qty: { ...orderQty },
     };
@@ -336,9 +339,12 @@ function openForm(mode = "create", options = {}) {
     orderForm.classList.remove("hidden");
     const restore = options.restore;
     orderStatus = restore?.status || "Confirmada";
+    orderPayment = restore?.payment || "pagada";
     orderPriceList = restore?.priceList || "list";
     setSegmentGroup("order-status-group", orderStatus);
+    setSegmentGroup("order-payment-group", orderPayment);
     setSegmentGroup("order-price-group", orderPriceList);
+    syncOrderPayment();
     if (restore?.qty) {
       orderQty = { ...Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])), ...restore.qty };
     } else {
@@ -357,6 +363,9 @@ function openForm(mode = "create", options = {}) {
     }
     if (restore?.notes != null) {
       document.getElementById("order-notes").value = restore.notes;
+    }
+    if (restore?.dueDate) {
+      document.getElementById("order-due-date").value = restore.dueDate;
     }
     renderProductList("order-products", orderQty, "order-total", orderPriceList);
   } else if (mode === "client") {
@@ -409,11 +418,22 @@ function switchTab(tab) {
   render();
 }
 
+function visitPriority(visit) {
+  if (visit.status === "En curso") return 0;
+  if (visit.status === "Programada") return 1;
+  if (visit.status === "Completada") return 2;
+  return 3;
+}
+
 function getSellerVisits() {
   const seller = getSeller();
   return loadVisits()
     .filter((visit) => visit.vendedorId === seller.id)
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    .sort((a, b) => {
+      const byStatus = visitPriority(a) - visitPriority(b);
+      if (byStatus !== 0) return byStatus;
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
 }
 
 function getSellerOrders() {
@@ -868,10 +888,26 @@ document.querySelectorAll("#close-follow-group .segment").forEach((button) => {
   });
 });
 
+function syncOrderPayment() {
+  const needsDue = orderPayment === "credito" || orderPayment === "parcial";
+  document.getElementById("order-due-field").classList.toggle("hidden", !needsDue);
+  if (needsDue && !document.getElementById("order-due-date").value) {
+    document.getElementById("order-due-date").value = addDaysISO(todayISO(), 7);
+  }
+}
+
 document.querySelectorAll("#order-status-group .segment").forEach((button) => {
   button.addEventListener("click", () => {
     orderStatus = button.dataset.value;
     setSegmentGroup("order-status-group", orderStatus);
+  });
+});
+
+document.querySelectorAll("#order-payment-group .segment").forEach((button) => {
+  button.addEventListener("click", () => {
+    orderPayment = button.dataset.value;
+    setSegmentGroup("order-payment-group", orderPayment);
+    syncOrderPayment();
   });
 });
 
@@ -1062,9 +1098,9 @@ closeVisitForm.addEventListener("submit", (event) => {
   closeVisitForm.reset();
   clearClosePhoto();
   closeForm();
-  resultFilter = "all";
+  resultFilter = "open";
   document.querySelectorAll(".chip[data-filter]").forEach((node) => {
-    node.classList.toggle("active", node.dataset.filter === "all");
+    node.classList.toggle("active", node.dataset.filter === "open");
   });
 
   if (shouldOpenOrder) {
@@ -1094,6 +1130,12 @@ orderForm.addEventListener("submit", (event) => {
   const seller = getSeller();
   const now = new Date();
   const visitId = document.getElementById("order-visit-id").value;
+  const amount = linesTotal(lines);
+  const paidAmount = orderPayment === "pagada"
+    ? amount
+    : orderPayment === "parcial"
+      ? Math.round(amount * 0.5)
+      : 0;
 
   const created = upsertOrder({
     clientId,
@@ -1102,6 +1144,10 @@ orderForm.addEventListener("submit", (event) => {
     vendedor: seller.name,
     ruta: seller.ruta,
     status: orderStatus,
+    paymentStatus: orderStatus === "Borrador" ? "pendiente" : orderPayment,
+    paidAmount,
+    dueDate: orderPayment === "pagada" ? "" : (document.getElementById("order-due-date").value || addDaysISO(todayISO(), 7)),
+    paidAt: orderPayment === "pagada" ? now.toISOString() : "",
     priceList: orderPriceList,
     lines,
     notes: document.getElementById("order-notes").value.trim(),
@@ -1164,3 +1210,4 @@ clientForm.addEventListener("submit", (event) => {
 });
 
 render();
+initOrderDetailSheet();

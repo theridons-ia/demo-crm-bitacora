@@ -247,6 +247,33 @@ button {
   min-height: 96px;
 }
 
+.metric-card-btn {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.metric-card-btn:active {
+  transform: scale(.98);
+}
+
+.metric-card-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.metric-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent, #b24a3a);
+  letter-spacing: .02em;
+}
+
 .metric-icon {
   width: 28px;
   height: 28px;
@@ -631,6 +658,7 @@ button {
 }
 
 .linked-order-row {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -639,6 +667,10 @@ button {
   border-radius: 14px;
   background: var(--card);
   border: 1px solid var(--border);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
 }
 
 .linked-order-row strong {
@@ -1142,6 +1174,145 @@ button {
   padding-bottom: calc(24px + var(--safe-bottom));
 }
 
+.order-detail-sheet .sheet-panel {
+  max-height: min(92vh, 820px);
+  overflow: auto;
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+
+.order-hero {
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, #1f2a24 0%, #2d4338 55%, #3d5a48 100%);
+  color: #fffdfc;
+  margin-bottom: 14px;
+}
+
+.order-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-hero h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  word-break: break-word;
+}
+
+.order-hero p {
+  margin: 0;
+  opacity: .82;
+  font-size: 13px;
+}
+
+.order-detail-section h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.order-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.order-info-grid span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.order-info-grid strong {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.order-lines-list {
+  display: grid;
+  gap: 10px;
+}
+
+.order-line-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--secondary);
+}
+
+.order-line-fallback {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+}
+
+.order-line-fallback svg {
+  width: 18px;
+  height: 18px;
+}
+
+.order-line-body strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.order-line-body p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.order-line-qty {
+  text-align: right;
+}
+
+.order-line-qty em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-bottom: 2px;
+}
+
+.order-line-qty strong {
+  font-size: 14px;
+}
+
+.order-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.order-total-row strong {
+  font-size: 18px;
+}
+
+.order-notes-box {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .seller-hero {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1559,9 +1730,41 @@ button {
   padding: 0 12px;
 }
 
-.assign-panel {
-  margin-top: 8px;
+.chips-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin: 12px 0 14px;
+  -webkit-overflow-scrolling: touch;
 }
+
+.chips-scroll .chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.orders-dashboard {
+  margin-top: 4px;
+}
+
+.orders-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.day-chip .day-paid,
+.day-chip .day-due {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.day-chip .day-paid { color: #2f6b4f; }
+.day-chip .day-due { color: #9c671b; }
+.day-chip.active .day-paid,
+.day-chip.active .day-due { color: inherit; opacity: .9; }
 
 .tabbar-sup {
   grid-template-columns: repeat(5, 1fr);
