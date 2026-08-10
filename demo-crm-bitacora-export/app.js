@@ -13,24 +13,20 @@ const searchInput = document.getElementById("search-input");
 const calendarPanel = document.getElementById("calendar-panel");
 const weekStrip = document.getElementById("week-strip");
 
-const visitForm = document.getElementById("visit-form");
-const scheduleForm = document.getElementById("schedule-form");
+const createForm = document.getElementById("create-form");
+const closeVisitForm = document.getElementById("close-form");
 const saleForm = document.getElementById("sale-form");
-
-const gpsBtn = document.getElementById("gps-btn");
-const photoInput = document.getElementById("photo");
-const photoPreview = document.getElementById("photo-preview");
-const gpsStatus = document.getElementById("gps-status");
-const clientError = document.getElementById("client-error");
 
 let currentTab = "home";
 let resultFilter = "all";
 let calendarDay = todayISO();
-let selectedStatus = "Visitado";
-let selectedResult = "Venta cerrada";
+let createWhen = "now";
+let closeResult = "Venta cerrada";
+let closeFollowUp = "none";
+let saleLink = "visit";
 let saleResult = "Venta cerrada";
 let pendingPhoto = "";
-let visitQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
+let closeQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
 let saleQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
 
 function firstName(fullName) {
@@ -90,8 +86,7 @@ function renderProductList(containerId, qtyMap, totalId) {
     const productId = row.dataset.product;
     row.querySelectorAll("[data-step]").forEach((button) => {
       button.addEventListener("click", () => {
-        const next = Math.max(0, Number(qtyMap[productId] || 0) + Number(button.dataset.step));
-        qtyMap[productId] = next;
+        qtyMap[productId] = Math.max(0, Number(qtyMap[productId] || 0) + Number(button.dataset.step));
         renderProductList(containerId, qtyMap, totalId);
       });
     });
@@ -100,14 +95,79 @@ function renderProductList(containerId, qtyMap, totalId) {
   document.getElementById(totalId).textContent = `$${formatCurrency(qtyMapTotal(qtyMap))}`;
 }
 
-function syncVisitProductsVisibility() {
-  const show = isSale(selectedResult);
-  document.getElementById("visit-products-field").classList.toggle("hidden", !show);
-  if (show) renderProductList("visit-products", visitQty, "visit-sale-total");
+function closableVisits(visits) {
+  const today = todayISO();
+  return openVisits(visits).filter((visit) =>
+    visit.status === "En curso" || (visit.status === "Programada" && visit.fecha === today)
+  );
 }
 
-function hideAllFormModes() {
-  document.querySelectorAll(".form-mode").forEach((form) => form.classList.add("hidden"));
+function syncCreateWhen() {
+  const later = createWhen === "later";
+  document.getElementById("create-date-field").classList.toggle("hidden", !later);
+  document.getElementById("create-submit-btn").textContent = later
+    ? "Guardar en agenda"
+    : "Iniciar visita ahora";
+  if (later && !document.getElementById("create-date").value) {
+    document.getElementById("create-date").value = addDaysISO(todayISO(), 1);
+  }
+}
+
+function syncCloseResult() {
+  const showProducts = isSale(closeResult);
+  document.getElementById("close-products-field").classList.toggle("hidden", !showProducts);
+  if (showProducts) renderProductList("close-products", closeQty, "close-sale-total");
+  document.getElementById("close-follow-date-field").classList.toggle(
+    "hidden",
+    closeFollowUp !== "schedule"
+  );
+}
+
+function syncSaleLink() {
+  const linked = saleLink === "visit";
+  document.getElementById("sale-visit-field").classList.toggle("hidden", !linked);
+  document.getElementById("sale-client-field").classList.toggle("hidden", linked);
+  document.getElementById("sale-estado-field").classList.toggle("hidden", linked);
+}
+
+function fillCloseVisitSelect() {
+  const select = document.getElementById("close-visit-id");
+  const options = closableVisits(getSellerVisits());
+  if (!options.length) {
+    select.innerHTML = `<option value="">No hay visitas abiertas</option>`;
+    return;
+  }
+  select.innerHTML = options.map((visit) => `
+    <option value="${escapeHtml(visit.id)}">
+      ${escapeHtml(visit.client)} · ${escapeHtml(visit.status)}
+    </option>
+  `).join("");
+}
+
+function fillSaleVisitSelect() {
+  const select = document.getElementById("sale-visit-id");
+  const options = closableVisits(getSellerVisits()).concat(
+    completedVisits(getSellerVisits()).filter((visit) => visit.fecha === todayISO() && !visit.saleOnly)
+  );
+  const unique = [];
+  const seen = new Set();
+  options.forEach((visit) => {
+    if (!seen.has(visit.id)) {
+      seen.add(visit.id);
+      unique.push(visit);
+    }
+  });
+
+  if (!unique.length) {
+    select.innerHTML = `<option value="">No hay visitas de hoy</option>`;
+    return;
+  }
+
+  select.innerHTML = unique.map((visit) => `
+    <option value="${escapeHtml(visit.id)}">
+      ${escapeHtml(visit.client)} · ${escapeHtml(visit.status)}${visit.result ? ` · ${escapeHtml(visit.result)}` : ""}
+    </option>
+  `).join("");
 }
 
 function openActionSheet() {
@@ -119,37 +179,49 @@ function closeActionSheet() {
   actionSheet.classList.add("hidden");
 }
 
-function openForm(mode = "visit") {
+function hideAllFormModes() {
+  document.querySelectorAll(".form-mode").forEach((form) => form.classList.add("hidden"));
+}
+
+function openForm(mode = "create") {
   closeActionSheet();
   hideAllFormModes();
   formScreen.classList.remove("hidden");
   document.querySelector(".tabbar").style.display = "none";
 
   const titles = {
-    visit: ["CERRAR VISITA", "Registrar visita hecha"],
-    schedule: ["AGENDA", "Programar visita"],
+    create: ["CREAR VISITA", "Nueva visita"],
+    close: ["CERRAR VISITA", "Completar visita abierta"],
     sale: ["VENTA", "Registrar venta"],
   };
-  const [eyebrow, title] = titles[mode] || titles.visit;
+  const [eyebrow, title] = titles[mode];
   document.getElementById("form-eyebrow").textContent = eyebrow;
   document.getElementById("form-title").textContent = title;
 
-  if (mode === "visit") {
-    visitForm.classList.remove("hidden");
-    selectedStatus = "Visitado";
-    selectedResult = "Venta cerrada";
-    setSegmentGroup("status-group", selectedStatus);
-    setSegmentGroup("result-group", selectedResult);
-    resetQty(visitQty);
-    syncVisitProductsVisibility();
-  } else if (mode === "schedule") {
-    scheduleForm.classList.remove("hidden");
-    document.getElementById("schedule-date").value = calendarDay || addDaysISO(todayISO(), 1);
+  if (mode === "create") {
+    createForm.classList.remove("hidden");
+    createWhen = "now";
+    setSegmentGroup("when-group", createWhen);
+    syncCreateWhen();
+  } else if (mode === "close") {
+    closeVisitForm.classList.remove("hidden");
+    closeResult = "Venta cerrada";
+    closeFollowUp = "none";
+    setSegmentGroup("close-result-group", closeResult);
+    setSegmentGroup("close-follow-group", closeFollowUp);
+    resetQty(closeQty);
+    fillCloseVisitSelect();
+    syncCloseResult();
+    document.getElementById("close-follow-date").value = addDaysISO(todayISO(), 1);
   } else if (mode === "sale") {
     saleForm.classList.remove("hidden");
+    saleLink = "visit";
     saleResult = "Venta cerrada";
+    setSegmentGroup("sale-link-group", saleLink);
     setSegmentGroup("sale-result-group", saleResult);
     resetQty(saleQty);
+    fillSaleVisitSelect();
+    syncSaleLink();
     renderProductList("sale-products", saleQty, "sale-total");
   }
 
@@ -160,6 +232,7 @@ function closeForm() {
   formScreen.classList.add("hidden");
   document.querySelector(".tabbar").style.display = "";
   hideAllFormModes();
+  clearClosePhoto();
 }
 
 function switchTab(tab) {
@@ -185,12 +258,14 @@ function getSellerVisits() {
 function filteredVisits(visits) {
   const query = searchInput.value.trim().toLowerCase();
   return visits.filter((visit) => {
-    if (resultFilter === "scheduled" && visit.kind !== "scheduled") return false;
-    if (resultFilter === "scheduled" && visit.fecha !== calendarDay) return false;
+    if (resultFilter === "all" && visit.status !== "Completada") return false;
+    if (resultFilter === "open" && !isOpenVisit(visit)) return false;
+    if (resultFilter === "scheduled") {
+      if (visit.status !== "Programada") return false;
+      if (visit.fecha !== calendarDay) return false;
+    }
     if (resultFilter === "sale" && !isSale(visit.result)) return false;
-    if (resultFilter === "partial" && visit.result !== "Venta parcial") return false;
     if (resultFilter === "none" && visit.result !== "Sin venta") return false;
-    if (resultFilter === "all" && visit.kind === "scheduled") return false;
     if (!query) return true;
     const haystack = `${visit.client} ${visit.location} ${visit.estado} ${visit.notes}`.toLowerCase();
     return haystack.includes(query);
@@ -243,7 +318,7 @@ function renderWeekStrip(visits) {
   });
 
   document.getElementById("calendar-day-label").textContent =
-    `Programadas · ${formatDateShort(calendarDay)}`;
+    `Agenda · ${formatDateShort(calendarDay)}`;
 }
 
 function renderHome(visits) {
@@ -268,13 +343,12 @@ function renderHome(visits) {
   const recent = document.getElementById("recent-list");
   if (!recentSource.length) {
     recent.innerHTML = renderEmpty(
-      "Registra una visita o una venta para ver actividad.",
+      "Crea una visita o registra una venta para empezar.",
       "Registrar actividad"
     );
     bindEmptyActions(recent);
     return;
   }
-
   recent.innerHTML = recentSource.slice(0, 3).map((visit) => renderVisitCard(visit)).join("");
 }
 
@@ -285,16 +359,12 @@ function renderVisits(visits) {
   if (showCalendar) renderWeekStrip(visits);
 
   const filtered = filteredVisits(visits);
-  const completedCount = completedVisits(visits).length;
-  const scheduledCount = scheduledVisits(visits).length;
+  const summary = summarizeVisits(visits);
   document.getElementById("visits-count").textContent =
-    `${completedCount} hechas · ${scheduledCount} programadas`;
+    `${summary.visits} hechas · ${summary.inProgress} en curso · ${summary.scheduled} en agenda`;
 
   if (!visits.length) {
-    list.innerHTML = renderEmpty(
-      "Aún no hay visitas ni ventas en este dispositivo.",
-      "Registrar actividad"
-    );
+    list.innerHTML = renderEmpty("Aún no hay actividad en este dispositivo.", "Registrar actividad");
     bindEmptyActions(list);
     return;
   }
@@ -302,14 +372,10 @@ function renderVisits(visits) {
   if (!filtered.length) {
     list.innerHTML = `
       <div class="empty">
-        <h3>${showCalendar ? "Sin visitas ese día" : "Sin coincidencias"}</h3>
-        <p>${showCalendar ? "Programa una visita o elige otro día del calendario." : "Prueba otra búsqueda o filtro."}</p>
-        ${showCalendar ? '<button class="primary-btn" type="button" data-empty-action="schedule">Programar visita</button>' : ""}
+        <h3>Sin coincidencias</h3>
+        <p>Prueba otro filtro o crea una visita.</p>
       </div>
     `;
-    list.querySelectorAll("[data-empty-action='schedule']").forEach((button) => {
-      button.addEventListener("click", () => openForm("schedule"));
-    });
     return;
   }
 
@@ -324,7 +390,7 @@ function renderInsights(visits) {
 
   document.getElementById("insight-sales").textContent = `$${formatCurrency(all.sales)}`;
   document.getElementById("insight-sales-sub").textContent =
-    `en ${all.visits} visita${all.visits === 1 ? "" : "s"} · ${all.scheduled} programada${all.scheduled === 1 ? "" : "s"}`;
+    `en ${all.visits} completadas · ${all.scheduled} en agenda`;
   document.getElementById("count-closed").textContent = all.closed;
   document.getElementById("count-partial").textContent = all.partial;
   document.getElementById("count-none").textContent = all.none;
@@ -347,11 +413,12 @@ function render() {
   renderInsights(visits);
 }
 
-function clearPhotoPreview() {
+function clearClosePhoto() {
   pendingPhoto = "";
-  photoPreview.innerHTML = "";
-  photoPreview.classList.add("hidden");
-  photoInput.value = "";
+  const preview = document.getElementById("close-photo-preview");
+  preview.innerHTML = "";
+  preview.classList.add("hidden");
+  document.getElementById("close-photo").value = "";
 }
 
 function openSellerSheet() {
@@ -359,8 +426,8 @@ function openSellerSheet() {
   const current = getSeller();
   sellerOptions.innerHTML = SELLERS.map((seller) => `
     <button class="seller-option ${seller.id === current.id ? "active" : ""}" type="button" data-seller="${seller.id}">
-      <span class="avatar">${escapeHtml(seller.initials)}</span>
-      <span>
+      <span class="seller-avatar">${escapeHtml(seller.initials)}</span>
+      <span class="seller-copy">
         <strong>${escapeHtml(seller.name)}</strong>
         <span>${escapeHtml(seller.ruta)}</span>
       </span>
@@ -382,14 +449,50 @@ function closeSellerSheet() {
   sellerSheet.classList.add("hidden");
 }
 
-function pushVisit(payload) {
+function captureGps(locationId, latId, lngId, statusId, button) {
+  const status = document.getElementById(statusId);
+  if (!navigator.geolocation) {
+    status.textContent = "GPS no disponible. Escribe la dirección.";
+    status.classList.add("error");
+    return;
+  }
+  button.disabled = true;
+  status.textContent = "Obteniendo ubicación…";
+  status.classList.remove("error");
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      document.getElementById(latId).value = String(latitude);
+      document.getElementById(lngId).value = String(longitude);
+      try {
+        document.getElementById(locationId).value = await reverseGeocode(latitude, longitude);
+        status.textContent = `Ubicación capturada (±${Math.round(accuracy)} m).`;
+      } catch (error) {
+        document.getElementById(locationId).value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        status.textContent = "Coordenadas capturadas.";
+      } finally {
+        button.disabled = false;
+      }
+    },
+    () => {
+      button.disabled = false;
+      status.classList.add("error");
+      status.textContent = "No se pudo obtener GPS. Escribe la dirección.";
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
+function upsertVisit(visit) {
   const visits = loadVisits();
-  visits.push(normalizeVisit(payload));
+  const index = visits.findIndex((item) => item.id === visit.id);
+  if (index >= 0) visits[index] = normalizeVisit(visit);
+  else visits.push(normalizeVisit(visit));
   saveVisits(visits);
 }
 
-fillEstadoSelect(document.getElementById("estado"));
-fillEstadoSelect(document.getElementById("schedule-estado"));
+fillEstadoSelect(document.getElementById("create-estado"));
 fillEstadoSelect(document.getElementById("sale-estado"));
 
 if (!loadVisits().length) seedDemoVisits();
@@ -402,7 +505,7 @@ document.getElementById("cta-register").addEventListener("click", openActionShee
 document.getElementById("visits-add-btn").addEventListener("click", openActionSheet);
 document.getElementById("see-all-btn").addEventListener("click", () => switchTab("visits"));
 document.getElementById("form-back-btn").addEventListener("click", closeForm);
-document.getElementById("schedule-from-visits-btn").addEventListener("click", () => openForm("schedule"));
+document.getElementById("schedule-from-visits-btn").addEventListener("click", () => openForm("create"));
 homeAvatar.addEventListener("click", openSellerSheet);
 document.getElementById("seller-sheet-backdrop").addEventListener("click", closeSellerSheet);
 document.getElementById("action-sheet-backdrop").addEventListener("click", closeActionSheet);
@@ -423,19 +526,36 @@ document.querySelectorAll(".chip").forEach((chip) => {
   });
 });
 
-document.querySelectorAll("#status-group .segment").forEach((button) => {
+document.querySelectorAll("#when-group .segment").forEach((button) => {
   button.addEventListener("click", () => {
-    selectedStatus = button.dataset.value;
-    setSegmentGroup("status-group", selectedStatus);
+    createWhen = button.dataset.value;
+    setSegmentGroup("when-group", createWhen);
+    syncCreateWhen();
   });
 });
 
-document.querySelectorAll("#result-group .segment").forEach((button) => {
+document.querySelectorAll("#close-result-group .segment").forEach((button) => {
   button.addEventListener("click", () => {
-    selectedResult = button.dataset.value;
-    setSegmentGroup("result-group", selectedResult);
-    if (!isSale(selectedResult)) resetQty(visitQty);
-    syncVisitProductsVisibility();
+    closeResult = button.dataset.value;
+    setSegmentGroup("close-result-group", closeResult);
+    if (!isSale(closeResult)) resetQty(closeQty);
+    syncCloseResult();
+  });
+});
+
+document.querySelectorAll("#close-follow-group .segment").forEach((button) => {
+  button.addEventListener("click", () => {
+    closeFollowUp = button.dataset.value;
+    setSegmentGroup("close-follow-group", closeFollowUp);
+    syncCloseResult();
+  });
+});
+
+document.querySelectorAll("#sale-link-group .segment").forEach((button) => {
+  button.addEventListener("click", () => {
+    saleLink = button.dataset.value;
+    setSegmentGroup("sale-link-group", saleLink);
+    syncSaleLink();
   });
 });
 
@@ -451,121 +571,35 @@ document.getElementById("clear-btn").addEventListener("click", () => {
   render();
 });
 
-gpsBtn.addEventListener("click", () => {
-  if (!navigator.geolocation) {
-    gpsStatus.textContent = "Este dispositivo no soporta GPS. Escribe la dirección manualmente.";
-    gpsStatus.classList.add("error");
-    return;
-  }
-
-  gpsBtn.disabled = true;
-  gpsStatus.textContent = "Obteniendo ubicación…";
-  gpsStatus.classList.remove("error");
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      const { latitude, longitude, accuracy } = position.coords;
-      document.getElementById("latitude").value = String(latitude);
-      document.getElementById("longitude").value = String(longitude);
-      try {
-        document.getElementById("location").value = await reverseGeocode(latitude, longitude);
-        gpsStatus.textContent = `Ubicación capturada (±${Math.round(accuracy)} m).`;
-      } catch (error) {
-        document.getElementById("location").value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-        gpsStatus.textContent = "Coordenadas capturadas. Puedes editar la dirección.";
-      } finally {
-        gpsBtn.disabled = false;
-      }
-    },
-    (error) => {
-      gpsBtn.disabled = false;
-      gpsStatus.classList.add("error");
-      const messages = {
-        1: "Permiso de ubicación denegado. Puedes escribir la dirección manualmente.",
-        2: "No se pudo obtener la ubicación. Escribe la dirección.",
-        3: "Tiempo de espera agotado. Escribe la dirección.",
-      };
-      gpsStatus.textContent = messages[error.code] || "Error de GPS. Escribe la dirección.";
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-  );
+document.getElementById("create-gps-btn").addEventListener("click", (event) => {
+  captureGps("create-location", "create-lat", "create-lng", "create-gps-status", event.currentTarget);
 });
 
-photoInput.addEventListener("change", async () => {
-  const file = photoInput.files && photoInput.files[0];
+document.getElementById("close-photo").addEventListener("change", async () => {
+  const file = document.getElementById("close-photo").files?.[0];
   if (!file) {
-    clearPhotoPreview();
+    clearClosePhoto();
     return;
   }
   try {
     pendingPhoto = await compressImage(file);
-    photoPreview.innerHTML = `
-      <img src="${pendingPhoto}" alt="Vista previa del establecimiento">
-      <button class="ghost" type="button" id="remove-photo">Quitar foto</button>
+    const preview = document.getElementById("close-photo-preview");
+    preview.innerHTML = `
+      <img src="${pendingPhoto}" alt="Evidencia">
+      <button class="ghost" type="button" id="remove-close-photo">Quitar foto</button>
     `;
-    photoPreview.classList.remove("hidden");
-    document.getElementById("remove-photo").addEventListener("click", clearPhotoPreview);
+    preview.classList.remove("hidden");
+    document.getElementById("remove-close-photo").addEventListener("click", clearClosePhoto);
   } catch (error) {
-    clearPhotoPreview();
+    clearClosePhoto();
     alert("No se pudo procesar la foto.");
   }
 });
 
-visitForm.addEventListener("submit", (event) => {
+createForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const client = document.getElementById("client").value.trim();
-  if (!client) {
-    clientError.classList.remove("hidden");
-    return;
-  }
-  clientError.classList.add("hidden");
-
-  if (isSale(selectedResult) && qtyMapTotal(visitQty) <= 0) {
-    alert("Agrega al menos un producto para registrar la venta.");
-    return;
-  }
-
-  const seller = getSeller();
-  const now = new Date();
-  const lines = isSale(selectedResult) ? qtyMapToLines(visitQty) : [];
-  pushVisit({
-    kind: "completed",
-    client,
-    status: selectedStatus,
-    result: selectedResult,
-    lines,
-    amount: linesTotal(lines),
-    location: document.getElementById("location").value.trim(),
-    estado: document.getElementById("estado").value,
-    latitude: document.getElementById("latitude").value
-      ? Number(document.getElementById("latitude").value)
-      : null,
-    longitude: document.getElementById("longitude").value
-      ? Number(document.getElementById("longitude").value)
-      : null,
-    photoUri: pendingPhoto || "",
-    notes: document.getElementById("notes").value.trim(),
-    createdAt: now.toISOString(),
-    hora: formatTime(now),
-    fecha: todayISO(),
-    vendedorId: seller.id,
-    vendedor: seller.name,
-    ruta: seller.ruta,
-  });
-
-  visitForm.reset();
-  clearPhotoPreview();
-  resetQty(visitQty);
-  fillEstadoSelect(document.getElementById("estado"));
-  gpsStatus.textContent = "Usa el GPS del teléfono o escribe la dirección.";
-  closeForm();
-  switchTab("visits");
-});
-
-scheduleForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const client = document.getElementById("schedule-client").value.trim();
-  const error = document.getElementById("schedule-client-error");
+  const client = document.getElementById("create-client").value.trim();
+  const error = document.getElementById("create-client-error");
   if (!client) {
     error.classList.remove("hidden");
     return;
@@ -573,74 +607,181 @@ scheduleForm.addEventListener("submit", (event) => {
   error.classList.add("hidden");
 
   const seller = getSeller();
-  const date = document.getElementById("schedule-date").value || addDaysISO(todayISO(), 1);
-  pushVisit({
-    kind: "scheduled",
+  const now = new Date();
+  const later = createWhen === "later";
+  const date = later
+    ? (document.getElementById("create-date").value || addDaysISO(todayISO(), 1))
+    : todayISO();
+
+  upsertVisit({
+    status: later ? "Programada" : "En curso",
     client,
-    status: "Programada",
-    result: "Programada",
-    scheduledDate: date,
+    estado: document.getElementById("create-estado").value,
+    location: document.getElementById("create-location").value.trim(),
+    latitude: document.getElementById("create-lat").value
+      ? Number(document.getElementById("create-lat").value)
+      : null,
+    longitude: document.getElementById("create-lng").value
+      ? Number(document.getElementById("create-lng").value)
+      : null,
+    notes: document.getElementById("create-notes").value.trim(),
+    createdAt: now.toISOString(),
     fecha: date,
-    estado: document.getElementById("schedule-estado").value,
-    location: document.getElementById("schedule-location").value.trim(),
-    notes: document.getElementById("schedule-notes").value.trim(),
-    createdAt: new Date().toISOString(),
+    scheduledDate: later ? date : "",
+    hora: later ? "" : formatTime(now),
     vendedorId: seller.id,
     vendedor: seller.name,
     ruta: seller.ruta,
   });
 
-  scheduleForm.reset();
-  fillEstadoSelect(document.getElementById("schedule-estado"));
-  calendarDay = date;
-  resultFilter = "scheduled";
-  document.querySelectorAll(".chip").forEach((node) => {
-    node.classList.toggle("active", node.dataset.filter === "scheduled");
-  });
+  createForm.reset();
+  fillEstadoSelect(document.getElementById("create-estado"));
+  createWhen = "now";
+  setSegmentGroup("when-group", createWhen);
+  syncCreateWhen();
   closeForm();
+  resultFilter = later ? "scheduled" : "open";
+  if (later) calendarDay = date;
+  document.querySelectorAll(".chip").forEach((node) => {
+    node.classList.toggle("active", node.dataset.filter === resultFilter);
+  });
+  switchTab("visits");
+});
+
+closeVisitForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const visitId = document.getElementById("close-visit-id").value;
+  if (!visitId) {
+    alert("No hay visitas abiertas para cerrar. Crea una visita primero.");
+    return;
+  }
+
+  if (isSale(closeResult) && qtyMapTotal(closeQty) <= 0) {
+    alert("Agrega productos para una venta parcial o cerrada.");
+    return;
+  }
+
+  const visits = loadVisits();
+  const current = visits.find((visit) => visit.id === visitId);
+  if (!current) return;
+
+  const now = new Date();
+  const lines = isSale(closeResult) ? qtyMapToLines(closeQty) : [];
+  const notes = document.getElementById("close-notes").value.trim() || current.notes;
+
+  upsertVisit({
+    ...current,
+    status: "Completada",
+    result: closeResult,
+    lines,
+    amount: linesTotal(lines),
+    followUp: closeFollowUp,
+    notes,
+    photoUri: pendingPhoto || current.photoUri || "",
+    hora: formatTime(now),
+    fecha: todayISO(),
+    createdAt: now.toISOString(),
+  });
+
+  if (closeFollowUp === "schedule") {
+    const seller = getSeller();
+    const followDate = document.getElementById("close-follow-date").value || addDaysISO(todayISO(), 1);
+    upsertVisit({
+      status: "Programada",
+      client: current.client,
+      estado: current.estado,
+      location: current.location,
+      notes: `Seguimiento de visita anterior. ${notes}`.trim(),
+      fecha: followDate,
+      scheduledDate: followDate,
+      createdAt: now.toISOString(),
+      vendedorId: seller.id,
+      vendedor: seller.name,
+      ruta: seller.ruta,
+    });
+  }
+
+  closeVisitForm.reset();
+  resetQty(closeQty);
+  clearClosePhoto();
+  closeForm();
+  resultFilter = "all";
+  document.querySelectorAll(".chip").forEach((node) => {
+    node.classList.toggle("active", node.dataset.filter === "all");
+  });
   switchTab("visits");
 });
 
 saleForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const client = document.getElementById("sale-client").value.trim();
-  const error = document.getElementById("sale-client-error");
-  if (!client) {
-    error.classList.remove("hidden");
-    return;
-  }
-  error.classList.add("hidden");
-
   const lines = qtyMapToLines(saleQty);
   if (!lines.length) {
-    alert("Selecciona al menos un producto del inventario.");
+    alert("Selecciona al menos un producto.");
     return;
   }
 
   const seller = getSeller();
   const now = new Date();
-  pushVisit({
-    kind: "completed",
-    client,
-    status: "Visitado",
-    result: saleResult,
-    lines,
-    amount: linesTotal(lines),
-    estado: document.getElementById("sale-estado").value,
-    location: document.getElementById("sale-estado").value,
-    notes: document.getElementById("sale-notes").value.trim(),
-    createdAt: now.toISOString(),
-    hora: formatTime(now),
-    fecha: todayISO(),
-    vendedorId: seller.id,
-    vendedor: seller.name,
-    ruta: seller.ruta,
-  });
+  const notes = document.getElementById("sale-notes").value.trim();
+
+  if (saleLink === "visit") {
+    const visitId = document.getElementById("sale-visit-id").value;
+    if (!visitId) {
+      alert("No hay visita para relacionar. Cambia a venta suelta o crea una visita.");
+      return;
+    }
+    const current = loadVisits().find((visit) => visit.id === visitId);
+    if (!current) return;
+
+    upsertVisit({
+      ...current,
+      status: "Completada",
+      result: saleResult,
+      lines,
+      amount: linesTotal(lines),
+      notes: notes || current.notes,
+      hora: formatTime(now),
+      fecha: todayISO(),
+      createdAt: now.toISOString(),
+      saleOnly: false,
+      relatedVisitId: "",
+    });
+  } else {
+    const client = document.getElementById("sale-client").value.trim();
+    const error = document.getElementById("sale-client-error");
+    if (!client) {
+      error.classList.remove("hidden");
+      return;
+    }
+    error.classList.add("hidden");
+
+    upsertVisit({
+      status: "Completada",
+      result: saleResult,
+      saleOnly: true,
+      client,
+      lines,
+      amount: linesTotal(lines),
+      estado: document.getElementById("sale-estado").value,
+      location: document.getElementById("sale-estado").value,
+      notes: notes || "Venta sin visita presencial.",
+      createdAt: now.toISOString(),
+      hora: formatTime(now),
+      fecha: todayISO(),
+      vendedorId: seller.id,
+      vendedor: seller.name,
+      ruta: seller.ruta,
+    });
+  }
 
   saleForm.reset();
   resetQty(saleQty);
   fillEstadoSelect(document.getElementById("sale-estado"));
   closeForm();
+  resultFilter = "sale";
+  document.querySelectorAll(".chip").forEach((node) => {
+    node.classList.toggle("active", node.dataset.filter === "sale");
+  });
   switchTab("visits");
 });
 

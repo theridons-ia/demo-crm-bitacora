@@ -155,11 +155,15 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, .12);
-  color: var(--primary-foreground);
+  background: rgba(245, 201, 101, .18);
+  color: var(--progress);
   display: inline-grid;
   place-items: center;
   flex-shrink: 0;
+}
+
+.route-arrow svg {
+  display: block;
 }
 
 .route-card .label {
@@ -198,6 +202,11 @@ button {
   margin-top: 10px;
   font-size: 13px;
   opacity: .9;
+}
+
+.route-meta strong {
+  color: var(--progress);
+  opacity: 1;
 }
 
 .section-head {
@@ -406,9 +415,89 @@ button {
   color: #b4453c;
 }
 
+.badge-progress {
+  background: #fff4d9;
+  color: #9c671b;
+}
+
 .badge-muted {
   background: var(--muted);
   color: var(--muted-foreground);
+}
+
+.follow-line {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+.segmented-wrap {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.seller-options {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.seller-option {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+
+.seller-option:active {
+  transform: scale(.985);
+}
+
+.seller-option.active {
+  border-color: var(--primary);
+  background: var(--secondary);
+}
+
+.seller-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fffdfc;
+  display: inline-grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.seller-option.active .seller-avatar {
+  background: var(--primary);
+  color: #fffdfc;
+}
+
+.seller-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.seller-copy strong {
+  display: block;
+  font-size: 15px;
+  color: var(--foreground);
+}
+
+.seller-copy span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .products-line {
@@ -1048,52 +1137,6 @@ button {
 .sheet-panel h2 {
   margin: 0;
   font-size: 20px;
-}
-
-.seller-options {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.seller-option {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--card);
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-align: left;
-  transition: transform .12s ease, border-color .12s ease;
-}
-
-.seller-option:active {
-  transform: scale(.985);
-}
-
-.seller-option.active {
-  border-color: var(--primary);
-  background: var(--secondary);
-}
-
-.seller-option .avatar {
-  width: 40px;
-  height: 40px;
-  pointer-events: none;
-}
-
-.seller-option strong {
-  display: block;
-  font-size: 15px;
-}
-
-.seller-option span {
-  display: block;
-  margin-top: 2px;
-  color: var(--muted-foreground);
-  font-size: 12px;
 }
 
 @keyframes sheetUp {

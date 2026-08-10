@@ -23,9 +23,8 @@
         <div class="route-card-top">
           <p class="label">TU RUTA DE HOY</p>
           <span class="route-arrow" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 17L17 7"/>
-              <path d="M8 7h9v9"/>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+              <path d="M3.4 11.2 19.1 3.7c.9-.4 1.8.5 1.3 1.4l-3.4 7.1c-.1.3-.1.6 0 .9l2.7 6.4c.4.9-.5 1.8-1.4 1.3L3.5 13.7c-.8-.4-.8-1.6-.1-2.5z"/>
             </svg>
           </span>
         </div>
@@ -82,7 +81,7 @@
         </span>
         <span class="cta-copy">
           <strong>Registrar actividad</strong>
-          <span>Visita, agenda o venta con productos</span>
+          <span>Crear visita, cerrarla o registrar una venta</span>
         </span>
         <span class="cta-arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -119,10 +118,10 @@
       </div>
 
       <div class="chips" role="tablist" aria-label="Filtros de bitácora">
-        <button class="chip active" type="button" data-filter="all">Todas</button>
-        <button class="chip" type="button" data-filter="scheduled">Programadas</button>
+        <button class="chip active" type="button" data-filter="all">Hechas</button>
+        <button class="chip" type="button" data-filter="open">Abiertas</button>
+        <button class="chip" type="button" data-filter="scheduled">Agenda</button>
         <button class="chip" type="button" data-filter="sale">Con venta</button>
-        <button class="chip" type="button" data-filter="partial">Parciales</button>
         <button class="chip" type="button" data-filter="none">Sin venta</button>
       </div>
 
@@ -198,108 +197,114 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <div>
-          <p class="eyebrow" id="form-eyebrow">NUEVA VISITA</p>
-          <h1 class="screen-title" id="form-title" style="font-size:24px">Registrar visita</h1>
+          <p class="eyebrow" id="form-eyebrow">VISITA</p>
+          <h1 class="screen-title" id="form-title" style="font-size:24px">Crear visita</h1>
         </div>
       </div>
 
-      <!-- Cerrar visita -->
-      <form id="visit-form" class="form form-mode" data-mode="visit">
+      <!-- Crear visita: ahora o programar -->
+      <form id="create-form" class="form form-mode" data-mode="create">
         <div class="field">
-          <label for="client">Cliente o establecimiento</label>
-          <input id="client" name="client" type="text" placeholder="Ej. Mercado San Rafael" required>
-          <p class="error hidden" id="client-error">El nombre del cliente es obligatorio.</p>
-        </div>
-
-        <div class="field">
-          <label>Estado de la visita</label>
-          <div class="segmented" id="status-group">
-            <button class="segment active" type="button" data-value="Visitado">Visitado</button>
-            <button class="segment" type="button" data-value="No visitado">No visitado</button>
-            <button class="segment" type="button" data-value="Reprogramar">Reprogramar</button>
+          <label>¿Cuándo?</label>
+          <div class="segmented" id="when-group">
+            <button class="segment active" type="button" data-value="now">Ahora</button>
+            <button class="segment" type="button" data-value="later">Programar</button>
           </div>
         </div>
-
         <div class="field">
-          <label>Resultado</label>
-          <div class="segmented" id="result-group">
-            <button class="segment active" type="button" data-value="Venta cerrada">Cerrada</button>
-            <button class="segment" type="button" data-value="Venta parcial">Parcial</button>
-            <button class="segment" type="button" data-value="Sin venta">Sin venta</button>
-          </div>
+          <label for="create-client">Cliente o establecimiento</label>
+          <input id="create-client" type="text" placeholder="Ej. Mercado San Rafael" required>
+          <p class="error hidden" id="create-client-error">El cliente es obligatorio.</p>
         </div>
-
-        <div class="field" id="visit-products-field">
-          <label>Productos vendidos</label>
-          <div id="visit-products" class="product-list"></div>
-          <div class="sale-total-row">
-            <span>Total</span>
-            <strong id="visit-sale-total">$0</strong>
-          </div>
-          <p class="hint">Selecciona cantidades del inventario demo.</p>
+        <div class="field hidden" id="create-date-field">
+          <label for="create-date">Fecha programada</label>
+          <input id="create-date" type="date">
         </div>
-
         <div class="field">
-          <label for="estado">Estado / zona</label>
-          <select id="estado" name="estado" required></select>
+          <label for="create-estado">Estado / zona</label>
+          <select id="create-estado" required></select>
         </div>
-
         <div class="field">
-          <label for="location">Ubicación GPS</label>
+          <label for="create-location">Ubicación</label>
           <div class="gps-row">
-            <input id="location" name="location" type="text" placeholder="Captura o escribe la dirección" required>
-            <button class="secondary-btn" id="gps-btn" type="button">GPS</button>
+            <input id="create-location" type="text" placeholder="Dirección o referencia">
+            <button class="secondary-btn" id="create-gps-btn" type="button">GPS</button>
           </div>
-          <p class="hint" id="gps-status">Usa el GPS del teléfono o escribe la dirección.</p>
-          <input type="hidden" id="latitude" name="latitude" value="">
-          <input type="hidden" id="longitude" name="longitude" value="">
+          <p class="hint" id="create-gps-status">Opcional al programar. Recomendado si es ahora.</p>
+          <input type="hidden" id="create-lat" value="">
+          <input type="hidden" id="create-lng" value="">
         </div>
-
         <div class="field">
-          <label for="photo">Foto del establecimiento (opcional)</label>
-          <input id="photo" name="photo" type="file" accept="image/*" capture="environment">
-          <div id="photo-preview" class="foto-preview hidden"></div>
+          <label for="create-notes">Nota</label>
+          <textarea id="create-notes" placeholder="Qué hacer en esta parada…"></textarea>
         </div>
-
-        <div class="field">
-          <label for="notes">Observaciones / próximo paso</label>
-          <textarea id="notes" name="notes" placeholder="Ej. Volver con catálogo el viernes"></textarea>
-        </div>
-
-        <button class="primary-btn" type="submit">Guardar visita</button>
+        <button class="primary-btn" type="submit" id="create-submit-btn">Iniciar visita ahora</button>
       </form>
 
-      <!-- Programar visita -->
-      <form id="schedule-form" class="form form-mode hidden" data-mode="schedule">
+      <!-- Cerrar visita abierta -->
+      <form id="close-form" class="form form-mode hidden" data-mode="close">
         <div class="field">
-          <label for="schedule-client">Cliente o establecimiento</label>
-          <input id="schedule-client" type="text" placeholder="Ej. Abastos El Río" required>
-          <p class="error hidden" id="schedule-client-error">El cliente es obligatorio.</p>
+          <label for="close-visit-id">Visita a cerrar</label>
+          <select id="close-visit-id" required></select>
+          <p class="hint">Solo visitas abiertas: En curso o Programadas de hoy.</p>
         </div>
         <div class="field">
-          <label for="schedule-date">Fecha programada</label>
-          <input id="schedule-date" type="date" required>
+          <label>Resultado comercial</label>
+          <div class="segmented" id="close-result-group">
+            <button class="segment" type="button" data-value="Sin venta">Sin venta</button>
+            <button class="segment" type="button" data-value="Venta parcial">Parcial</button>
+            <button class="segment active" type="button" data-value="Venta cerrada">Cerrada</button>
+          </div>
+        </div>
+        <div class="field" id="close-products-field">
+          <label>Productos</label>
+          <div id="close-products" class="product-list"></div>
+          <div class="sale-total-row">
+            <span>Total</span>
+            <strong id="close-sale-total">$0</strong>
+          </div>
         </div>
         <div class="field">
-          <label for="schedule-estado">Estado / zona</label>
-          <select id="schedule-estado" required></select>
+          <label>Seguimiento</label>
+          <div class="segmented segmented-wrap" id="close-follow-group">
+            <button class="segment active" type="button" data-value="none">Ninguno</button>
+            <button class="segment" type="button" data-value="call">Llamar</button>
+            <button class="segment" type="button" data-value="schedule">Agendar</button>
+          </div>
+          <p class="hint">Si quedó parcial o sin stock, agenda el próximo paso.</p>
+        </div>
+        <div class="field hidden" id="close-follow-date-field">
+          <label for="close-follow-date">Fecha del seguimiento</label>
+          <input id="close-follow-date" type="date">
         </div>
         <div class="field">
-          <label for="schedule-location">Dirección o punto de la ruta</label>
-          <input id="schedule-location" type="text" placeholder="Calle, sector o referencia">
+          <label for="close-photo">Foto (opcional)</label>
+          <input id="close-photo" type="file" accept="image/*" capture="environment">
+          <div id="close-photo-preview" class="foto-preview hidden"></div>
         </div>
         <div class="field">
-          <label for="schedule-notes">Nota de agenda</label>
-          <textarea id="schedule-notes" placeholder="Qué llevar, horario tentativo, contacto…"></textarea>
+          <label for="close-notes">Observaciones</label>
+          <textarea id="close-notes" placeholder="Qué pasó en la visita…"></textarea>
         </div>
-        <button class="primary-btn" type="submit">Guardar en agenda</button>
+        <button class="primary-btn" type="submit">Cerrar visita</button>
       </form>
 
       <!-- Registrar venta -->
       <form id="sale-form" class="form form-mode hidden" data-mode="sale">
         <div class="field">
-          <label for="sale-client">Cliente o establecimiento</label>
-          <input id="sale-client" type="text" placeholder="Ej. Supermercado Plaza" required>
+          <label>¿Relacionada a una visita?</label>
+          <div class="segmented" id="sale-link-group">
+            <button class="segment active" type="button" data-value="visit">Sí, a una visita</button>
+            <button class="segment" type="button" data-value="solo">No, venta suelta</button>
+          </div>
+        </div>
+        <div class="field" id="sale-visit-field">
+          <label for="sale-visit-id">Visita relacionada</label>
+          <select id="sale-visit-id"></select>
+        </div>
+        <div class="field" id="sale-client-field">
+          <label for="sale-client">Cliente</label>
+          <input id="sale-client" type="text" placeholder="Ej. Supermercado Plaza">
           <p class="error hidden" id="sale-client-error">El cliente es obligatorio.</p>
         </div>
         <div class="field">
@@ -317,9 +322,9 @@
             <strong id="sale-total">$0</strong>
           </div>
         </div>
-        <div class="field">
+        <div class="field" id="sale-estado-field">
           <label for="sale-estado">Estado / zona</label>
-          <select id="sale-estado" required></select>
+          <select id="sale-estado"></select>
         </div>
         <div class="field">
           <label for="sale-notes">Observaciones</label>
@@ -333,25 +338,25 @@
       <button class="sheet-backdrop" id="action-sheet-backdrop" type="button" aria-label="Cerrar"></button>
       <div class="sheet-panel">
         <div class="sheet-handle" aria-hidden="true"></div>
-        <h2 id="action-sheet-title">¿Qué quieres registrar?</h2>
-        <p class="sub">Visita y venta pueden ir juntas, pero no son lo mismo.</p>
+        <h2 id="action-sheet-title">¿Qué quieres hacer?</h2>
+        <p class="sub">La visita es la parada. La venta es el pedido.</p>
         <div class="action-options">
-          <button class="action-option" type="button" data-action="schedule">
+          <button class="action-option" type="button" data-action="create">
             <span class="action-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
             </span>
             <span>
-              <strong>Programar visita</strong>
-              <span>Agenda un cliente en el calendario</span>
+              <strong>Crear visita</strong>
+              <span>Ahora (en curso) o programarla en agenda</span>
             </span>
           </button>
-          <button class="action-option" type="button" data-action="visit">
+          <button class="action-option" type="button" data-action="close">
             <span class="action-icon">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
             </span>
             <span>
               <strong>Cerrar visita</strong>
-              <span>Marca una parada hecha (con o sin venta)</span>
+              <span>Completa una visita abierta con su resultado</span>
             </span>
           </button>
           <button class="action-option" type="button" data-action="sale">
@@ -360,7 +365,7 @@
             </span>
             <span>
               <strong>Registrar venta</strong>
-              <span>Elige productos y cantidades del inventario</span>
+              <span>Ligada a una visita o como venta suelta</span>
             </span>
           </button>
         </div>
@@ -372,7 +377,7 @@
       <div class="sheet-panel">
         <div class="sheet-handle" aria-hidden="true"></div>
         <h2 id="seller-sheet-title">Elegir vendedor</h2>
-        <p class="sub">Cambia el perfil demo desde el icono de usuario.</p>
+        <p class="sub">Toca un perfil para cambiar de ruta demo.</p>
         <div id="seller-options" class="seller-options"></div>
       </div>
     </div>
