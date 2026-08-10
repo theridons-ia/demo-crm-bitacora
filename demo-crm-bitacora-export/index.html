@@ -81,8 +81,8 @@
           </svg>
         </span>
         <span class="cta-copy">
-          <strong>Registrar visita</strong>
-          <span>Toma nota de tu próximo cliente</span>
+          <strong>Registrar actividad</strong>
+          <span>Visita, agenda o venta con productos</span>
         </span>
         <span class="cta-arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -118,12 +118,22 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>
       </div>
 
-      <div class="chips" role="tablist" aria-label="Filtros de resultado">
+      <div class="chips" role="tablist" aria-label="Filtros de bitácora">
         <button class="chip active" type="button" data-filter="all">Todas</button>
+        <button class="chip" type="button" data-filter="scheduled">Programadas</button>
         <button class="chip" type="button" data-filter="sale">Con venta</button>
         <button class="chip" type="button" data-filter="partial">Parciales</button>
         <button class="chip" type="button" data-filter="none">Sin venta</button>
       </div>
+
+      <section id="calendar-panel" class="calendar-panel hidden">
+        <div class="section-head" style="margin-top:0">
+          <h2>Agenda</h2>
+          <button class="link" id="schedule-from-visits-btn" type="button">Programar</button>
+        </div>
+        <div id="week-strip" class="week-strip" aria-label="Calendario semanal"></div>
+        <p class="sub" id="calendar-day-label">Visitas del día</p>
+      </section>
 
       <div class="toolbar">
         <button class="danger-link" id="clear-btn" type="button">Vaciar demo</button>
@@ -182,18 +192,19 @@
       </section>
     </main>
 
-    <section id="screen-form" class="screen-form hidden" aria-label="Registrar visita">
+    <section id="screen-form" class="screen-form hidden" aria-label="Formulario">
       <div class="form-header">
         <button class="back-btn" id="form-back-btn" type="button" aria-label="Volver">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <div>
-          <p class="eyebrow">NUEVA VISITA</p>
-          <h1 class="screen-title" style="font-size:24px">Registrar visita</h1>
+          <p class="eyebrow" id="form-eyebrow">NUEVA VISITA</p>
+          <h1 class="screen-title" id="form-title" style="font-size:24px">Registrar visita</h1>
         </div>
       </div>
 
-      <form id="visit-form" class="form">
+      <!-- Cerrar visita -->
+      <form id="visit-form" class="form form-mode" data-mode="visit">
         <div class="field">
           <label for="client">Cliente o establecimiento</label>
           <input id="client" name="client" type="text" placeholder="Ej. Mercado San Rafael" required>
@@ -218,16 +229,19 @@
           </div>
         </div>
 
-        <div class="field">
-          <label for="amount">Monto de venta (USD)</label>
-          <input id="amount" name="amount" type="number" min="0" step="0.01" placeholder="0" value="0">
+        <div class="field" id="visit-products-field">
+          <label>Productos vendidos</label>
+          <div id="visit-products" class="product-list"></div>
+          <div class="sale-total-row">
+            <span>Total</span>
+            <strong id="visit-sale-total">$0</strong>
+          </div>
+          <p class="hint">Selecciona cantidades del inventario demo.</p>
         </div>
 
         <div class="field">
           <label for="estado">Estado / zona</label>
-          <select id="estado" name="estado" required>
-            <option value="">Selecciona un estado</option>
-          </select>
+          <select id="estado" name="estado" required></select>
         </div>
 
         <div class="field">
@@ -245,7 +259,6 @@
           <label for="photo">Foto del establecimiento (opcional)</label>
           <input id="photo" name="photo" type="file" accept="image/*" capture="environment">
           <div id="photo-preview" class="foto-preview hidden"></div>
-          <p class="hint">Evidencia opcional. Puedes guardar sin foto.</p>
         </div>
 
         <div class="field">
@@ -255,7 +268,104 @@
 
         <button class="primary-btn" type="submit">Guardar visita</button>
       </form>
+
+      <!-- Programar visita -->
+      <form id="schedule-form" class="form form-mode hidden" data-mode="schedule">
+        <div class="field">
+          <label for="schedule-client">Cliente o establecimiento</label>
+          <input id="schedule-client" type="text" placeholder="Ej. Abastos El Río" required>
+          <p class="error hidden" id="schedule-client-error">El cliente es obligatorio.</p>
+        </div>
+        <div class="field">
+          <label for="schedule-date">Fecha programada</label>
+          <input id="schedule-date" type="date" required>
+        </div>
+        <div class="field">
+          <label for="schedule-estado">Estado / zona</label>
+          <select id="schedule-estado" required></select>
+        </div>
+        <div class="field">
+          <label for="schedule-location">Dirección o punto de la ruta</label>
+          <input id="schedule-location" type="text" placeholder="Calle, sector o referencia">
+        </div>
+        <div class="field">
+          <label for="schedule-notes">Nota de agenda</label>
+          <textarea id="schedule-notes" placeholder="Qué llevar, horario tentativo, contacto…"></textarea>
+        </div>
+        <button class="primary-btn" type="submit">Guardar en agenda</button>
+      </form>
+
+      <!-- Registrar venta -->
+      <form id="sale-form" class="form form-mode hidden" data-mode="sale">
+        <div class="field">
+          <label for="sale-client">Cliente o establecimiento</label>
+          <input id="sale-client" type="text" placeholder="Ej. Supermercado Plaza" required>
+          <p class="error hidden" id="sale-client-error">El cliente es obligatorio.</p>
+        </div>
+        <div class="field">
+          <label>Tipo de venta</label>
+          <div class="segmented" id="sale-result-group">
+            <button class="segment active" type="button" data-value="Venta cerrada">Cerrada</button>
+            <button class="segment" type="button" data-value="Venta parcial">Parcial</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Inventario</label>
+          <div id="sale-products" class="product-list"></div>
+          <div class="sale-total-row">
+            <span>Total venta</span>
+            <strong id="sale-total">$0</strong>
+          </div>
+        </div>
+        <div class="field">
+          <label for="sale-estado">Estado / zona</label>
+          <select id="sale-estado" required></select>
+        </div>
+        <div class="field">
+          <label for="sale-notes">Observaciones</label>
+          <textarea id="sale-notes" placeholder="Condiciones, entrega, cobranza…"></textarea>
+        </div>
+        <button class="primary-btn" type="submit">Guardar venta</button>
+      </form>
     </section>
+
+    <div id="action-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="action-sheet-title">
+      <button class="sheet-backdrop" id="action-sheet-backdrop" type="button" aria-label="Cerrar"></button>
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <h2 id="action-sheet-title">¿Qué quieres registrar?</h2>
+        <p class="sub">Visita y venta pueden ir juntas, pero no son lo mismo.</p>
+        <div class="action-options">
+          <button class="action-option" type="button" data-action="schedule">
+            <span class="action-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+            </span>
+            <span>
+              <strong>Programar visita</strong>
+              <span>Agenda un cliente en el calendario</span>
+            </span>
+          </button>
+          <button class="action-option" type="button" data-action="visit">
+            <span class="action-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <span>
+              <strong>Cerrar visita</strong>
+              <span>Marca una parada hecha (con o sin venta)</span>
+            </span>
+          </button>
+          <button class="action-option" type="button" data-action="sale">
+            <span class="action-icon accent">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M6 6 5 3H2"/></svg>
+            </span>
+            <span>
+              <strong>Registrar venta</strong>
+              <span>Elige productos y cantidades del inventario</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div id="seller-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="seller-sheet-title">
       <button class="sheet-backdrop" id="seller-sheet-backdrop" type="button" aria-label="Cerrar"></button>

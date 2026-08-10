@@ -8,6 +8,12 @@ const SELLERS = [
   { id: "carlos", name: "Carlos Pérez", initials: "CP", ruta: "Ruta Este · Carabobo" },
 ];
 
+const PRODUCTS = [
+  { id: "cola1", name: "Cola #1", price: 12, unit: "caja" },
+  { id: "cola2", name: "Cola #2", price: 15, unit: "caja" },
+  { id: "leche", name: "Leche ABC", price: 8, unit: "pack" },
+];
+
 const VISIT_STATUSES = ["Visitado", "No visitado", "Reprogramar"];
 const VISIT_RESULTS = ["Venta cerrada", "Venta parcial", "Sin venta"];
 const ESTADOS = ["Lara", "Carabobo", "Yaracuy", "Aragua", "Distrito Capital"];
@@ -16,6 +22,13 @@ function todayISO() {
   const now = new Date();
   const offset = now.getTimezoneOffset();
   return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
+function addDaysISO(iso, days) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d + days);
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
 }
 
 function loadVisits() {
@@ -48,15 +61,52 @@ function getSeller(id = loadSellerId()) {
   return SELLERS.find((seller) => seller.id === id) || SELLERS[0];
 }
 
+function getProduct(id) {
+  return PRODUCTS.find((product) => product.id === id);
+}
+
+function normalizeLines(lines) {
+  if (!Array.isArray(lines)) return [];
+  return lines
+    .map((line) => {
+      const product = getProduct(line.productId) || {
+        id: line.productId,
+        name: line.name,
+        price: line.unitPrice,
+      };
+      const qty = Math.max(0, Number(line.qty || 0));
+      const unitPrice = Number(line.unitPrice ?? product.price ?? 0);
+      return {
+        productId: product.id,
+        name: line.name || product.name,
+        unitPrice,
+        qty,
+        total: qty * unitPrice,
+      };
+    })
+    .filter((line) => line.qty > 0);
+}
+
+function linesTotal(lines) {
+  return normalizeLines(lines).reduce((sum, line) => sum + line.total, 0);
+}
+
 function normalizeVisit(visit) {
   const createdAt = visit.createdAt || new Date().toISOString();
-  const date = visit.fecha || createdAt.slice(0, 10);
+  const lines = normalizeLines(visit.lines);
+  const kind = visit.kind || (visit.status === "Programada" || visit.result === "Programada"
+    ? "scheduled"
+    : "completed");
+  const date = visit.fecha || visit.scheduledDate || createdAt.slice(0, 10);
+  const amountFromLines = linesTotal(lines);
   return {
     id: visit.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    kind,
     client: visit.client || visit.cliente || "",
-    status: visit.status || "Visitado",
-    result: visit.result || visit.resultado || "Sin venta",
-    amount: Number(visit.amount ?? visit.monto ?? 0),
+    status: kind === "scheduled" ? "Programada" : (visit.status || "Visitado"),
+    result: kind === "scheduled" ? "Programada" : (visit.result || visit.resultado || "Sin venta"),
+    amount: amountFromLines || Number(visit.amount ?? visit.monto ?? 0),
+    lines,
     location: visit.location || visit.direccion || visit.estado || "",
     estado: visit.estado || "",
     latitude: visit.latitude ?? visit.lat ?? null,
@@ -65,7 +115,8 @@ function normalizeVisit(visit) {
     notes: visit.notes || visit.nota || "",
     createdAt,
     fecha: date,
-    hora: visit.hora || formatTime(createdAt),
+    scheduledDate: visit.scheduledDate || (kind === "scheduled" ? date : ""),
+    hora: visit.hora || (kind === "scheduled" ? "" : formatTime(createdAt)),
     vendedorId: visit.vendedorId || loadSellerId(),
     vendedor: visit.vendedor || getSeller(visit.vendedorId).name,
     ruta: visit.ruta || getSeller(visit.vendedorId).ruta,
@@ -95,6 +146,16 @@ function formatDateLong(date = new Date()) {
     .toUpperCase();
 }
 
+function formatDateShort(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("es-VE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -103,56 +164,74 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function mapsUrl(lat, lng, location) {
-  if (lat && lng) return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
-  if (location) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
-  return "";
-}
-
 function isSale(result) {
   return result === "Venta cerrada" || result === "Venta parcial";
 }
 
+function isCompleted(visit) {
+  return visit.kind !== "scheduled";
+}
+
+function completedVisits(visits) {
+  return visits.filter(isCompleted);
+}
+
+function scheduledVisits(visits) {
+  return visits.filter((visit) => visit.kind === "scheduled");
+}
+
 function visitsToday(visits, date = todayISO()) {
-  return visits.filter((visit) => visit.fecha === date);
+  return completedVisits(visits).filter((visit) => visit.fecha === date);
 }
 
 function summarizeVisits(visits) {
-  const sales = visits.reduce((sum, visit) => sum + Number(visit.amount || 0), 0);
-  const closed = visits.filter((visit) => visit.result === "Venta cerrada").length;
-  const partial = visits.filter((visit) => visit.result === "Venta parcial").length;
-  const none = visits.filter((visit) => visit.result === "Sin venta").length;
+  const completed = completedVisits(visits);
+  const sales = completed.reduce((sum, visit) => sum + Number(visit.amount || 0), 0);
+  const closed = completed.filter((visit) => visit.result === "Venta cerrada").length;
+  const partial = completed.filter((visit) => visit.result === "Venta parcial").length;
+  const none = completed.filter((visit) => visit.result === "Sin venta").length;
   const withSale = closed + partial;
   return {
-    visits: visits.length,
+    visits: completed.length,
     sales,
     closed,
     partial,
     none,
     withSale,
-    effectiveness: visits.length ? Math.round((withSale / visits.length) * 100) : 0,
-    goalProgress: Math.min(100, Math.round((visits.length / DAILY_GOAL) * 100)),
-    remaining: Math.max(0, DAILY_GOAL - visits.length),
+    scheduled: scheduledVisits(visits).length,
+    effectiveness: completed.length ? Math.round((withSale / completed.length) * 100) : 0,
+    goalProgress: Math.min(100, Math.round((completed.length / DAILY_GOAL) * 100)),
+    remaining: Math.max(0, DAILY_GOAL - completed.length),
   };
 }
 
 function resultBadgeClass(result) {
+  if (result === "Programada") return "badge badge-accent";
   if (result === "Venta parcial") return "badge badge-partial";
   if (result === "Venta cerrada") return "badge badge-success";
   return "badge badge-muted";
 }
 
 function renderVisitCard(visit, { showAmount = true } = {}) {
-  const meta = [visit.estado || visit.location, visit.hora].filter(Boolean).join(" · ");
+  const metaParts = [
+    visit.estado || visit.location,
+    visit.kind === "scheduled" ? formatDateShort(visit.fecha) : visit.hora,
+  ].filter(Boolean);
+  const linesLabel = visit.lines?.length
+    ? visit.lines.map((line) => `${line.qty}× ${line.name}`).join(" · ")
+    : "";
   const amount = showAmount && Number(visit.amount) > 0
     ? `<strong class="visit-amount">$${formatCurrency(visit.amount)}</strong>`
     : "";
+  const iconPath = visit.kind === "scheduled"
+    ? '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+    : '<path d="M20 6L9 17l-5-5"/>';
 
   return `
     <article class="visit-card" data-id="${escapeHtml(visit.id)}">
       <div class="visit-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 6L9 17l-5-5"/>
+          ${iconPath}
         </svg>
       </div>
       <div class="visit-body">
@@ -160,9 +239,10 @@ function renderVisitCard(visit, { showAmount = true } = {}) {
           <h3>${escapeHtml(visit.client)}</h3>
           <span class="${resultBadgeClass(visit.result)}">${escapeHtml(visit.result)}</span>
         </div>
-        <p class="meta">${escapeHtml(meta)}</p>
+        <p class="meta">${escapeHtml(metaParts.join(" · "))}</p>
+        ${linesLabel ? `<p class="meta products-line">${escapeHtml(linesLabel)}</p>` : ""}
         <div class="visit-footer">
-          <p class="notes">${escapeHtml(visit.notes || "Sin observaciones")}</p>
+          <p class="notes">${escapeHtml(visit.notes || (visit.kind === "scheduled" ? "Visita en agenda" : "Sin observaciones"))}</p>
           ${amount}
         </div>
       </div>
@@ -204,12 +284,17 @@ function seedDemoVisits() {
   const marina = SELLERS[0];
   const luis = SELLERS[1];
   const carlos = SELLERS[2];
+  const tomorrow = addDaysISO(todayISO(), 1);
   const samples = [
     {
+      kind: "completed",
       client: "Mercado San Rafael",
       status: "Visitado",
       result: "Venta parcial",
-      amount: 120,
+      lines: [
+        { productId: "cola1", qty: 5 },
+        { productId: "leche", qty: 8 },
+      ],
       location: "San Felipe, Yaracuy",
       estado: "Yaracuy",
       latitude: 10.34,
@@ -221,6 +306,7 @@ function seedDemoVisits() {
       ruta: marina.ruta,
     },
     {
+      kind: "completed",
       client: "Bodega La Esquina",
       status: "Visitado",
       result: "Sin venta",
@@ -236,14 +322,31 @@ function seedDemoVisits() {
       ruta: marina.ruta,
     },
     {
+      kind: "scheduled",
+      client: "Abastos El Río",
+      status: "Programada",
+      result: "Programada",
+      scheduledDate: tomorrow,
+      fecha: tomorrow,
+      estado: "Lara",
+      location: "Barquisimeto",
+      notes: "Llevar promoción de Cola #2.",
+      createdAt: now.toISOString(),
+      vendedorId: marina.id,
+      vendedor: marina.name,
+      ruta: marina.ruta,
+    },
+    {
+      kind: "completed",
       client: "Farmacia Central",
       status: "Visitado",
       result: "Venta cerrada",
-      amount: 420,
+      lines: [
+        { productId: "cola2", qty: 20 },
+        { productId: "cola1", qty: 10 },
+      ],
       location: "Barquisimeto, Lara",
       estado: "Lara",
-      latitude: 10.07,
-      longitude: -69.32,
       notes: "Pedido completo entregado.",
       createdAt: new Date(now.getTime() - 50 * 60000).toISOString(),
       vendedorId: luis.id,
@@ -251,14 +354,16 @@ function seedDemoVisits() {
       ruta: luis.ruta,
     },
     {
+      kind: "completed",
       client: "Supermercado Plaza",
       status: "Visitado",
       result: "Venta cerrada",
-      amount: 610,
+      lines: [
+        { productId: "leche", qty: 40 },
+        { productId: "cola2", qty: 18 },
+      ],
       location: "Caracas, Distrito Capital",
       estado: "Distrito Capital",
-      latitude: 10.49,
-      longitude: -66.89,
       notes: "Incluye promoción semanal.",
       createdAt: new Date(now.getTime() - 70 * 60000).toISOString(),
       vendedorId: carlos.id,

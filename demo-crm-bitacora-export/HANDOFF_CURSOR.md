@@ -6,14 +6,15 @@ Demo comercial web que reproduce la UX de la app móvil Bitácora Campo para val
 ## Estado actual
 Frontend estático mobile-first con estética Bitácora Campo:
 
-- `index.html` + `app.js`: app del vendedor
-  - Inicio (saludo, ruta del día, métricas, CTA, actividad)
-  - Visitas (búsqueda, chips, listado, vaciar demo)
-  - Resumen (ventas acumuladas, barras, objetivo diario)
-  - Pantalla Nueva visita (estado, resultado, GPS, foto)
-- `supervisor.html` + `supervisor.js`: panel gerencial
-- `shared.js`: modelo, storage `@bitacora-campo/visits`, seed
-- `styles.css`: tokens visuales de la guía
+- Inicio / Visitas / Resumen
+- CTA “Registrar actividad” con 3 flujos:
+  - Programar visita (calendario/agenda)
+  - Cerrar visita (GPS/foto + productos si hubo venta)
+  - Registrar venta (inventario demo con cantidades)
+- Inventario demo: Cola #1, Cola #2, Leche ABC
+- Filtro Programadas con franja semanal
+- Supervisor restyleado
+- Persistencia local `@bitacora-campo/visits`
 
 ## Cómo ejecutar
 ```bash
