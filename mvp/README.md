@@ -11,17 +11,20 @@ MVP online-first con cola offline mínima para **visita + GPS (+ venta)**.
 - Frontend HTML simple servido por FastAPI
 
 ## Requisitos
-- Python 3.12+
+- Python 3.10+ (recomendado 3.11/3.12)
 - PostgreSQL
+- `pip` actualizado: `python3 -m pip install -U pip`
 
 ## Setup local
 ```bash
 cd mvp
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install -U pip
 pip install -r requirements.txt
 
-# configurar .env (ya hay uno de ejemplo)
+# configurar .env
+cp .env.example .env
 # DATABASE_URL=postgresql+psycopg2://bitacora:bitacora@127.0.0.1:5432/bitacora_mvp
 
 python seed.py
