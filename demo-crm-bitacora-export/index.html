@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo CRM Bitácora</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <p class="eyebrow">Demo comercial</p>
+      <h1>CRM de Campo · Bitácora</h1>
+      <p class="sub">Vendedores, visitas, ventas y métricas gerenciales.</p>
+    </header>
+
+    <section class="kpis" aria-label="Indicadores">
+      <article class="card kpi">
+        <p>Vendedores activos</p>
+        <strong id="kpi-vendedores">14</strong>
+      </article>
+      <article class="card kpi">
+        <p>Visitas hoy</p>
+        <strong id="kpi-visitas">0</strong>
+      </article>
+      <article class="card kpi">
+        <p>Ventas hoy (USD)</p>
+        <strong id="kpi-ventas">$ 0</strong>
+      </article>
+      <article class="card kpi">
+        <p>Efectividad</p>
+        <strong id="kpi-efectividad">0%</strong>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Registrar visita</h2>
+      <form id="visit-form" class="form">
+        <input id="cliente" name="cliente" type="text" placeholder="Cliente visitado" required>
+        <div class="grid-2">
+          <select id="estado" name="estado" required>
+            <option value="">Estado</option>
+            <option>Lara</option>
+            <option>Carabobo</option>
+            <option>Yaracuy</option>
+            <option>Aragua</option>
+            <option>Distrito Capital</option>
+          </select>
+          <select id="resultado" name="resultado" required>
+            <option value="">Resultado</option>
+            <option>Venta cerrada</option>
+            <option>Venta parcial</option>
+            <option>Pedido para mañana</option>
+            <option>Sin venta</option>
+          </select>
+        </div>
+        <input id="monto" name="monto" type="number" min="0" step="0.01" placeholder="Monto venta USD (0 si no vendió)" required>
+        <textarea id="nota" name="nota" rows="2" placeholder="Observaciones de la visita"></textarea>
+        <button type="submit">Guardar visita</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="title-row">
+        <h2>Últimas visitas</h2>
+        <button id="clear-btn" class="ghost" type="button">Limpiar demo</button>
+      </div>
+      <ul id="visits-list" class="list"></ul>
+    </section>
+
+    <section class="card">
+      <div class="title-row">
+        <h2>Panel gerencial rápido</h2>
+        <p class="small" id="pendiente-cobro">Cobranza pendiente: $ 0</p>
+      </div>
+      <ul id="leaderboard" class="list"></ul>
+    </section>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
