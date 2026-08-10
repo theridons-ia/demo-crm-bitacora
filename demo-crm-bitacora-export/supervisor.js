@@ -30,6 +30,8 @@ function switchSupTab(tab) {
   if (tab === "charts") renderCharts();
   if (tab === "sellers") renderSellers();
   if (tab === "clients") renderClients();
+  if (tab === "assign") refreshIcons();
+  refreshIcons();
 }
 
 function syncAssignType() {
@@ -276,7 +278,7 @@ function renderSellers() {
   document.getElementById("sellers-count").textContent = `${SELLERS.length} vendedores en la fuerza de campo`;
 
   document.getElementById("sellers-list").innerHTML = sellers.map((seller) => `
-    <article class="visit-card">
+    <button class="visit-card visit-card-btn seller-card-btn" type="button" data-profile="${escapeHtml(seller.id)}">
       <div class="visit-icon seller-avatar-sm" aria-hidden="true">${escapeHtml(seller.initials || "?")}</div>
       <div class="visit-body">
         <div class="visit-row">
@@ -286,7 +288,136 @@ function renderSellers() {
         <p class="meta">${escapeHtml(seller.ruta)}</p>
         <p class="notes">${seller.visits.length} visitas · ${seller.orders.length} órdenes · ${seller.effectiveness}% efectividad</p>
       </div>
-    </article>
+    </button>
+  `).join("");
+
+  document.querySelectorAll("[data-profile]").forEach((node) => {
+    node.addEventListener("click", () => openSellerProfile(node.dataset.profile));
+  });
+  refreshIcons();
+}
+
+function openSellerProfile(sellerId) {
+  const seller = SELLERS.find((item) => item.id === sellerId) || groupBySeller(loadVisits(), loadOrders()).find((item) => item.id === sellerId);
+  if (!seller) return;
+
+  const visits = loadVisits().filter((visit) => visit.vendedorId === sellerId);
+  const orders = loadOrders().filter((order) => order.vendedorId === sellerId);
+  const completed = completedVisits(visits);
+  const sales = orders.reduce((sum, order) => sum + Number(order.amount || 0), 0);
+  const withSale = completed.filter((visit) => visit.outcome === "con_venta").length;
+  const withoutSale = completed.filter((visit) => visit.outcome === "sin_venta").length;
+  const open = visits.filter((visit) => visit.status === "En curso").length;
+  const scheduled = visits.filter((visit) => visit.status === "Programada").length;
+  const durations = completed.map(visitDurationMinutes).filter((value) => value != null);
+  const avgMinutes = durations.length
+    ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)
+    : 0;
+  const ticket = orders.length ? Math.round(sales / orders.length) : 0;
+  const cobranza = Math.round(sales * 0.3);
+  const conversion = completed.length ? Math.round((withSale / completed.length) * 100) : 0;
+  const base = SELLERS.find((item) => item.id === sellerId);
+
+  const content = document.getElementById("seller-profile-content");
+  content.innerHTML = `
+    <div class="seller-hero">
+      <div class="seller-hero-avatar">${escapeHtml(base?.initials || seller.initials || "?")}</div>
+      <div>
+        <h2 id="profile-name">${escapeHtml(base?.name || seller.name)}</h2>
+        <p>${escapeHtml(base?.ruta || seller.ruta || "Sin ruta")}</p>
+        <div class="seller-hero-meta">
+          <span class="seller-chip"><i data-lucide="badge-check"></i> Activo</span>
+          <span class="seller-chip"><i data-lucide="map-pinned"></i> ${escapeHtml((base?.ruta || "").split("·")[0].trim() || "Ruta")}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-metrics">
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="shopping-cart"></i> Ventas</div>
+        <strong>$${formatCurrency(sales)}</strong>
+        <em>${orders.length} órdenes</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="route"></i> Visitas</div>
+        <strong>${visits.length}</strong>
+        <em>${completed.length} completadas</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="wallet"></i> Cobranza</div>
+        <strong>$${formatCurrency(cobranza)}</strong>
+        <em>30% estimado</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="timer"></i> Tiempo medio</div>
+        <strong>${avgMinutes || "—"} min</strong>
+        <em>por visita cerrada</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="receipt"></i> Ticket</div>
+        <strong>$${formatCurrency(ticket)}</strong>
+        <em>promedio por orden</em>
+      </article>
+      <article class="profile-metric">
+        <div class="metric-label"><i data-lucide="percent"></i> Conversión</div>
+        <strong>${conversion}%</strong>
+        <em>visitas con venta</em>
+      </article>
+    </div>
+
+    <section class="card chart-card">
+      <h2>Resultado de visitas</h2>
+      <div class="bar-list">
+        ${renderInlineBars([
+          { label: "Con venta", value: withSale, display: String(withSale) },
+          { label: "Sin venta", value: withoutSale, display: String(withoutSale), dark: true },
+          { label: "En curso", value: open, display: String(open) },
+          { label: "Agenda", value: scheduled, display: String(scheduled) },
+        ])}
+      </div>
+    </section>
+
+    <section class="card chart-card">
+      <h2>Financiero</h2>
+      <div class="bar-list">
+        ${renderInlineBars([
+          { label: "Ventas netas", value: sales, display: `$${formatCurrency(sales)}` },
+          { label: "Cobranza pend.", value: cobranza, display: `$${formatCurrency(cobranza)}`, dark: true },
+          { label: "Ticket promedio", value: ticket, display: `$${formatCurrency(ticket)}` },
+        ])}
+      </div>
+    </section>
+
+    <section class="card chart-card">
+      <h2>Órdenes recientes</h2>
+      <div class="visits-stack">
+        ${orders.length
+          ? orders.slice(0, 4).map((order) => renderOrderCard(order)).join("")
+          : `<div class="empty"><h3>Sin órdenes</h3><p>Este vendedor aún no tiene pedidos.</p></div>`}
+      </div>
+    </section>
+  `;
+
+  document.getElementById("seller-profile-sheet").classList.remove("hidden");
+  refreshIcons(content);
+}
+
+function closeSellerProfile() {
+  document.getElementById("seller-profile-sheet").classList.add("hidden");
+}
+
+function renderInlineBars(rows) {
+  const max = Math.max(...rows.map((row) => row.value), 1);
+  return rows.map((row) => `
+    <div class="bar-item">
+      <div class="bar-item-top">
+        <span>${escapeHtml(row.label)}</span>
+        <strong>${escapeHtml(row.display)}</strong>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill ${row.dark ? "dark" : ""}" style="width:${Math.max(6, (row.value / max) * 100)}%"></div>
+      </div>
+    </div>
   `).join("");
 }
 
@@ -370,7 +501,10 @@ function renderTeam() {
     `).join("");
 
     leaderboard.querySelectorAll("[data-seller]").forEach((node) => {
-      node.addEventListener("click", () => showSeller(node.dataset.seller));
+      node.addEventListener("click", () => {
+        showSeller(node.dataset.seller);
+        openSellerProfile(node.dataset.seller);
+      });
     });
   }
 
@@ -389,6 +523,7 @@ function renderTeam() {
   renderSellers();
   renderClients();
   renderCharts();
+  refreshIcons();
 }
 
 function showSeller(sellerId) {
@@ -477,6 +612,9 @@ document.getElementById("close-seller-btn").addEventListener("click", () => {
   selectedSellerId = "";
   sellerDetail.classList.add("hidden");
 });
+
+document.getElementById("seller-profile-backdrop").addEventListener("click", closeSellerProfile);
+document.getElementById("close-profile-btn").addEventListener("click", closeSellerProfile);
 
 document.getElementById("assign-visit-form").addEventListener("submit", (event) => {
   event.preventDefault();

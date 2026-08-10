@@ -783,3 +783,21 @@ function seedDemoVisits() {
 function isSale(result) {
   return result === "con_venta" || result === "Con venta" || result === "Venta cerrada" || result === "Venta parcial";
 }
+
+function refreshIcons(root) {
+  if (window.lucide && typeof window.lucide.createIcons === "function") {
+    window.lucide.createIcons({
+      attrs: { "stroke-width": 2, "aria-hidden": "true" },
+      nameAttr: "data-lucide",
+      root: root || document,
+    });
+  }
+}
+
+function visitDurationMinutes(visit) {
+  if (!visit?.startAt || !visit?.endAt) return null;
+  const start = new Date(visit.startAt).getTime();
+  const end = new Date(visit.endAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+  return Math.round((end - start) / 60000);
+}

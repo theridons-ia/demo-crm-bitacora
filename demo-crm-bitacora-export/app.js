@@ -34,9 +34,38 @@ let orderPriceList = "list";
 let pendingPhoto = "";
 let orderQty = Object.fromEntries(PRODUCTS.map((p) => [p.id, 0]));
 let activeVisitId = "";
-let clientReturnMode = "create";
+let clientReturnMode = "";
+let currentFormMode = "";
+let formDraft = null;
 let pendingCloseVisitId = "";
 const salesSearchInput = document.getElementById("sales-search-input");
+
+function snapshotForm(mode) {
+  if (mode === "order") {
+    return {
+      mode: "order",
+      clientId: document.getElementById("order-client-id").value,
+      visitId: document.getElementById("order-visit-id").value,
+      notes: document.getElementById("order-notes").value,
+      status: orderStatus,
+      priceList: orderPriceList,
+      qty: { ...orderQty },
+    };
+  }
+  if (mode === "create") {
+    return {
+      mode: "create",
+      clientId: document.getElementById("create-client-id").value,
+      when: createWhen,
+      date: document.getElementById("create-date").value,
+      location: document.getElementById("create-location").value,
+      lat: document.getElementById("create-lat").value,
+      lng: document.getElementById("create-lng").value,
+      notes: document.getElementById("create-notes").value,
+    };
+  }
+  return null;
+}
 
 function firstName(fullName) {
   return String(fullName || "").split(" ")[0] || "vendedor";
@@ -258,6 +287,7 @@ function openForm(mode = "create", options = {}) {
   hideAllFormModes();
   formScreen.classList.remove("hidden");
   document.querySelector(".tabbar").style.display = "none";
+  currentFormMode = mode;
 
   const titles = {
     create: ["CREAR VISITA", "Nueva visita"],
@@ -271,13 +301,26 @@ function openForm(mode = "create", options = {}) {
 
   if (mode === "create") {
     createForm.classList.remove("hidden");
-    createWhen = "now";
+    const restore = options.restore;
+    createWhen = restore?.when || "now";
     setSegmentGroup("when-group", createWhen);
     syncCreateWhen();
-    fillClientSelect("create-client-id", options.clientId || "", "create-client-meta");
-    const client = getClient(document.getElementById("create-client-id").value);
-    if (client && !document.getElementById("create-location").value) {
-      document.getElementById("create-location").value = client.address;
+    fillClientSelect(
+      "create-client-id",
+      options.clientId || restore?.clientId || "",
+      "create-client-meta"
+    );
+    if (restore) {
+      document.getElementById("create-date").value = restore.date || "";
+      document.getElementById("create-location").value = restore.location || "";
+      document.getElementById("create-lat").value = restore.lat || "";
+      document.getElementById("create-lng").value = restore.lng || "";
+      document.getElementById("create-notes").value = restore.notes || "";
+    } else {
+      const client = getClient(document.getElementById("create-client-id").value);
+      if (client && !document.getElementById("create-location").value) {
+        document.getElementById("create-location").value = client.address;
+      }
     }
   } else if (mode === "close") {
     closeVisitForm.classList.remove("hidden");
@@ -291,30 +334,41 @@ function openForm(mode = "create", options = {}) {
     document.getElementById("close-follow-date").value = addDaysISO(todayISO(), 1);
   } else if (mode === "order") {
     orderForm.classList.remove("hidden");
-    orderStatus = "Confirmada";
-    orderPriceList = "list";
+    const restore = options.restore;
+    orderStatus = restore?.status || "Confirmada";
+    orderPriceList = restore?.priceList || "list";
     setSegmentGroup("order-status-group", orderStatus);
     setSegmentGroup("order-price-group", orderPriceList);
-    resetQty(orderQty);
-    fillClientSelect("order-client-id", options.clientId || "", "order-client-meta");
-    fillOrderVisitSelect(options.visitId || "", options.clientId || document.getElementById("order-client-id").value);
-    if (options.visitId) {
-      const visit = loadVisits().find((item) => item.id === options.visitId);
+    if (restore?.qty) {
+      orderQty = { ...Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])), ...restore.qty };
+    } else {
+      resetQty(orderQty);
+    }
+    const clientId = options.clientId || restore?.clientId || "";
+    const visitId = options.visitId || restore?.visitId || "";
+    fillClientSelect("order-client-id", clientId, "order-client-meta");
+    fillOrderVisitSelect(visitId, clientId || document.getElementById("order-client-id").value);
+    if (visitId && !restore) {
+      const visit = loadVisits().find((item) => item.id === visitId);
       if (visit) {
         fillClientSelect("order-client-id", visit.clientId, "order-client-meta");
         fillOrderVisitSelect(visit.id, visit.clientId);
       }
     }
+    if (restore?.notes != null) {
+      document.getElementById("order-notes").value = restore.notes;
+    }
     renderProductList("order-products", orderQty, "order-total", orderPriceList);
   } else if (mode === "client") {
     clientForm.classList.remove("hidden");
-    clientReturnMode = options.returnMode || "create";
+    clientReturnMode = options.returnMode || "";
     fillEstadoSelect(document.getElementById("client-estado"));
     clientForm.reset();
     fillEstadoSelect(document.getElementById("client-estado"));
   }
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+  refreshIcons();
 }
 
 function closeForm() {
@@ -323,6 +377,22 @@ function closeForm() {
   hideAllFormModes();
   clearClosePhoto();
   pendingCloseVisitId = "";
+  currentFormMode = "";
+  clientReturnMode = "";
+  formDraft = null;
+}
+
+function handleFormBack() {
+  if (currentFormMode === "client" && clientReturnMode) {
+    const returnTo = clientReturnMode;
+    const draft = formDraft;
+    clientReturnMode = "";
+    formDraft = null;
+    if (draft) openForm(returnTo, { restore: draft });
+    else openForm(returnTo);
+    return;
+  }
+  closeForm();
 }
 
 function switchTab(tab) {
@@ -616,6 +686,7 @@ function render() {
   renderSales(orders);
   renderInventory();
   renderInsights(visits, orders);
+  refreshIcons();
 }
 
 function clearClosePhoto() {
@@ -700,7 +771,7 @@ document.getElementById("cta-register").addEventListener("click", openActionShee
 document.getElementById("visits-add-btn").addEventListener("click", openActionSheet);
 document.getElementById("sales-add-btn").addEventListener("click", () => openForm("order"));
 document.getElementById("see-all-btn").addEventListener("click", () => switchTab("visits"));
-document.getElementById("form-back-btn").addEventListener("click", closeForm);
+document.getElementById("form-back-btn").addEventListener("click", handleFormBack);
 document.getElementById("schedule-from-visits-btn").addEventListener("click", () => openForm("create"));
 homeAvatar.addEventListener("click", openSellerSheet);
 document.getElementById("seller-sheet-backdrop").addEventListener("click", closeSellerSheet);
@@ -826,10 +897,12 @@ document.getElementById("order-client-id").addEventListener("change", () => {
 document.getElementById("close-visit-id").addEventListener("change", syncCloseOutcome);
 
 document.getElementById("create-new-client-btn").addEventListener("click", () => {
+  formDraft = snapshotForm("create");
   openForm("client", { returnMode: "create" });
 });
 
 document.getElementById("order-new-client-btn").addEventListener("click", () => {
+  formDraft = snapshotForm("order");
   openForm("client", { returnMode: "order" });
 });
 
@@ -1080,7 +1153,14 @@ clientForm.addEventListener("submit", (event) => {
     estado: document.getElementById("client-estado").value,
   });
 
-  openForm(clientReturnMode, { clientId: created.id });
+  const returnTo = clientReturnMode || "create";
+  const draft = formDraft
+    ? { ...formDraft, clientId: created.id }
+    : null;
+  clientReturnMode = "";
+  formDraft = null;
+  if (draft) openForm(returnTo, { clientId: created.id, restore: draft });
+  else openForm(returnTo, { clientId: created.id });
 });
 
 render();

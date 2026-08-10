@@ -270,7 +270,10 @@
         <div class="field">
           <label for="create-client-id">Cliente</label>
           <div class="client-pick-row">
-            <select id="create-client-id" required></select>
+            <div class="input-with-icon">
+              <i data-lucide="store" class="field-icon"></i>
+              <select id="create-client-id" required></select>
+            </div>
             <button class="secondary-btn" id="create-new-client-btn" type="button">Nuevo</button>
           </div>
           <p class="error hidden" id="create-client-error">Selecciona o crea un cliente.</p>
@@ -278,12 +281,18 @@
         </div>
         <div class="field hidden" id="create-date-field">
           <label for="create-date">Fecha programada</label>
-          <input id="create-date" type="date">
+          <div class="input-with-icon">
+            <i data-lucide="calendar" class="field-icon"></i>
+            <input id="create-date" type="date">
+          </div>
         </div>
         <div class="field">
           <label for="create-location">Ubicación</label>
           <div class="gps-row">
-            <input id="create-location" type="text" placeholder="Dirección o referencia">
+            <div class="input-with-icon">
+              <i data-lucide="map-pin" class="field-icon"></i>
+              <input id="create-location" type="text" placeholder="Dirección o referencia">
+            </div>
             <button class="secondary-btn" id="create-gps-btn" type="button">GPS</button>
           </div>
           <p class="hint" id="create-gps-status">Se prellena con la dirección del cliente.</p>
@@ -292,7 +301,10 @@
         </div>
         <div class="field">
           <label for="create-notes">Nota</label>
-          <textarea id="create-notes" placeholder="Qué hacer en esta parada…"></textarea>
+          <div class="input-with-icon textarea-icon">
+            <i data-lucide="notebook-pen" class="field-icon"></i>
+            <textarea id="create-notes" placeholder="Qué hacer en esta parada…"></textarea>
+          </div>
         </div>
         <button class="primary-btn" type="submit" id="create-submit-btn">Iniciar visita ahora</button>
       </form>
@@ -300,7 +312,10 @@
       <form id="close-form" class="form form-mode hidden" data-mode="close">
         <div class="field">
           <label for="close-visit-id">Visita a cerrar</label>
-          <select id="close-visit-id" required></select>
+          <div class="input-with-icon">
+            <i data-lucide="route" class="field-icon"></i>
+            <select id="close-visit-id" required></select>
+          </div>
           <p class="hint">En curso o programadas de hoy. Cierre con hora automática.</p>
         </div>
 
@@ -308,7 +323,10 @@
           <p class="form-section-label">Detalle comercial</p>
           <div class="field">
             <label for="close-motive">Motivo de la visita</label>
-            <select id="close-motive" required></select>
+            <div class="input-with-icon">
+              <i data-lucide="target" class="field-icon"></i>
+              <select id="close-motive" required></select>
+            </div>
           </div>
           <div class="field">
             <label>Resultado</label>
@@ -340,16 +358,25 @@
           </div>
           <div class="field hidden" id="close-follow-date-field">
             <label for="close-follow-date">Fecha del seguimiento</label>
-            <input id="close-follow-date" type="date">
+            <div class="input-with-icon">
+              <i data-lucide="calendar-clock" class="field-icon"></i>
+              <input id="close-follow-date" type="date">
+            </div>
           </div>
           <div class="field">
             <label for="close-photo">Foto (opcional)</label>
-            <input id="close-photo" type="file" accept="image/*" capture="environment">
+            <div class="input-with-icon">
+              <i data-lucide="camera" class="field-icon"></i>
+              <input id="close-photo" type="file" accept="image/*" capture="environment">
+            </div>
             <div id="close-photo-preview" class="foto-preview hidden"></div>
           </div>
           <div class="field">
             <label for="close-notes">Observaciones</label>
-            <textarea id="close-notes" placeholder="Qué pasó en la visita…"></textarea>
+            <div class="input-with-icon textarea-icon">
+              <i data-lucide="message-square-text" class="field-icon"></i>
+              <textarea id="close-notes" placeholder="Qué pasó en la visita…"></textarea>
+            </div>
           </div>
         </div>
 
@@ -360,7 +387,10 @@
         <div class="field">
           <label for="order-client-id">Cliente</label>
           <div class="client-pick-row">
-            <select id="order-client-id" required></select>
+            <div class="input-with-icon">
+              <i data-lucide="store" class="field-icon"></i>
+              <select id="order-client-id" required></select>
+            </div>
             <button class="secondary-btn" id="order-new-client-btn" type="button">Nuevo</button>
           </div>
           <p class="error hidden" id="order-client-error">El cliente es obligatorio.</p>
@@ -369,9 +399,12 @@
         <p class="hint" id="order-code-preview">El código se genera al guardar (OV-fecha-hora-xxxx).</p>
         <div class="field">
           <label for="order-visit-id">Visita relacionada (opcional)</label>
-          <select id="order-visit-id">
-            <option value="">Sin visita</option>
-          </select>
+          <div class="input-with-icon">
+            <i data-lucide="map-pinned" class="field-icon"></i>
+            <select id="order-visit-id">
+              <option value="">Sin visita</option>
+            </select>
+          </div>
         </div>
         <div class="field">
           <label>Estado de la orden</label>
@@ -398,7 +431,10 @@
         </div>
         <div class="field">
           <label for="order-notes">Observaciones</label>
-          <textarea id="order-notes" placeholder="Condiciones, entrega, cobranza…"></textarea>
+          <div class="input-with-icon textarea-icon">
+            <i data-lucide="file-text" class="field-icon"></i>
+            <textarea id="order-notes" placeholder="Condiciones, entrega, cobranza…"></textarea>
+          </div>
         </div>
         <button class="primary-btn" type="submit">Guardar orden de venta</button>
       </form>
@@ -406,20 +442,32 @@
       <form id="client-form" class="form form-mode hidden" data-mode="client">
         <div class="field">
           <label for="client-rif">RIF</label>
-          <input id="client-rif" type="text" placeholder="J-12345678-9" required>
+          <div class="input-with-icon">
+            <i data-lucide="badge-check" class="field-icon"></i>
+            <input id="client-rif" type="text" placeholder="J-12345678-9" required>
+          </div>
         </div>
         <div class="field">
           <label for="client-name">Nombre / razón social</label>
-          <input id="client-name" type="text" placeholder="Ej. Bodega La Esquina" required>
+          <div class="input-with-icon">
+            <i data-lucide="building-2" class="field-icon"></i>
+            <input id="client-name" type="text" placeholder="Ej. Bodega La Esquina" required>
+          </div>
           <p class="error hidden" id="client-name-error">El nombre es obligatorio.</p>
         </div>
         <div class="field">
           <label for="client-address">Dirección</label>
-          <input id="client-address" type="text" placeholder="Calle, ciudad…" required>
+          <div class="input-with-icon">
+            <i data-lucide="map-pin" class="field-icon"></i>
+            <input id="client-address" type="text" placeholder="Calle, ciudad…" required>
+          </div>
         </div>
         <div class="field">
           <label for="client-estado">Estado / zona</label>
-          <select id="client-estado" required></select>
+          <div class="input-with-icon">
+            <i data-lucide="map" class="field-icon"></i>
+            <select id="client-estado" required></select>
+          </div>
         </div>
         <button class="primary-btn" type="submit">Guardar cliente</button>
       </form>
@@ -535,6 +583,7 @@
     </nav>
   </div>
 
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
   <script src="./shared.js"></script>
   <script src="./app.js"></script>
 </body>

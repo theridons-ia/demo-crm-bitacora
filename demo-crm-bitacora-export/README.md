@@ -26,3 +26,4 @@ Abrir:
 - No requiere backend.
 - Al vaciar/cargar demo se siembran 6 clientes, visitas y órdenes de ejemplo.
 - Incluye `manifest.webmanifest` (PWA ligera; service worker pendiente).
+- Iconos con **Lucide** (`unpkg.com/lucide`) en formularios y navegación.
