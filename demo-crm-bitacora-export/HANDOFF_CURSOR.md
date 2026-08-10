@@ -6,13 +6,14 @@ Demo comercial web que reproduce la UX de la app móvil Bitácora Campo para val
 ## Estado actual
 Frontend estático mobile-first con estética Bitácora Campo:
 
-- Inicio / Visitas / Resumen
-- CTA “Registrar actividad” con 3 flujos:
-  - Programar visita (calendario/agenda)
-  - Cerrar visita (GPS/foto + productos si hubo venta)
-  - Registrar venta (inventario demo con cantidades)
+- CTA **Registrar actividad** con 3 flujos:
+  - **Crear visita** (Ahora → En curso | Programar → Agenda)
+  - **Cerrar visita** (elige visita abierta + resultado + productos + seguimiento)
+  - **Registrar venta** (ligada a visita o venta suelta)
+- Estados de visita: Programada · En curso · Completada
+- Resultado comercial solo al completar: Sin venta / Parcial / Cerrada
 - Inventario demo: Cola #1, Cola #2, Leche ABC
-- Filtro Programadas con franja semanal
+- Filtros: Hechas / Abiertas / Agenda / Con venta / Sin venta
 - Supervisor restyleado
 - Persistencia local `@bitacora-campo/visits`
 
