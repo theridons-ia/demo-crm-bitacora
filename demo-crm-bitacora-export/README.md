@@ -6,8 +6,10 @@ Demo web mobile-first para presentar una app de control comercial:
 - registro de ventas por visita
 - captura de ubicación GPS (dirección + coordenadas)
 - foto opcional del establecimiento como evidencia
+- filtros por fecha, estado y resultado
+- detalle por vendedor/ruta
+- dashboard de supervisor separado
 - KPIs diarios rápidos
-- panel gerencial simple
 
 ## Ejecutar local
 
@@ -21,10 +23,12 @@ python3 -m http.server 8080
 
 Luego abre:
 
-- `http://localhost:8080`
+- Vendedor: `http://localhost:8080/index.html`
+- Supervisor: `http://localhost:8080/supervisor.html`
 
 ## Notas
 
 - Es una demo visual (no backend real).
 - Los datos se guardan en `localStorage` del navegador para simular uso.
+- Usa **Datos demo** / **Cargar datos demo** para poblar visitas de ejemplo.
 - Ideal para reuniones de descubrimiento y validación funcional.

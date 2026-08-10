@@ -1,8 +1,7 @@
-const STORAGE_KEY = "demo_crm_visitas";
-
 const form = document.getElementById("visit-form");
 const visitsList = document.getElementById("visits-list");
 const clearBtn = document.getElementById("clear-btn");
+const seedBtn = document.getElementById("seed-btn");
 const gpsBtn = document.getElementById("gps-btn");
 const fotoInput = document.getElementById("foto");
 const fotoPreview = document.getElementById("foto-preview");
@@ -11,179 +10,63 @@ const latInput = document.getElementById("lat");
 const lngInput = document.getElementById("lng");
 const gpsStatus = document.getElementById("gps-status");
 
+const vendedorActivo = document.getElementById("vendedor-activo");
+const rutaActiva = document.getElementById("ruta-activa");
+const filterFecha = document.getElementById("filter-fecha");
+const filterEstado = document.getElementById("filter-estado");
+const filterResultado = document.getElementById("filter-resultado");
+const resetFiltersBtn = document.getElementById("reset-filters-btn");
+const openDetailBtn = document.getElementById("open-detail-btn");
+const backHomeBtn = document.getElementById("back-home-btn");
+const viewHome = document.getElementById("view-home");
+const viewDetail = document.getElementById("view-detail");
+
 const kpiVisitas = document.getElementById("kpi-visitas");
 const kpiVentas = document.getElementById("kpi-ventas");
 const kpiEfectividad = document.getElementById("kpi-efectividad");
-const pendienteCobro = document.getElementById("pendiente-cobro");
+const kpiPendiente = document.getElementById("kpi-pendiente");
+
+const estadoSelect = document.getElementById("estado");
+const resultadoSelect = document.getElementById("resultado");
 
 let pendingFoto = "";
 
-function loadVisits() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (error) {
-    return [];
-  }
+function fillSelect(select, values, placeholder) {
+  select.innerHTML = `<option value="">${placeholder}</option>` +
+    values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
 }
 
-function saveVisits(visits) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(visits));
+function initControls() {
+  vendedorActivo.innerHTML = SELLERS.map(
+    (seller) => `<option value="${escapeHtml(seller.name)}">${escapeHtml(seller.name)}</option>`
+  ).join("");
+
+  fillSelect(estadoSelect, ESTADOS, "Estado");
+  fillSelect(resultadoSelect, RESULTADOS, "Resultado");
+  fillSelect(filterEstado, ESTADOS, "Todos");
+  fillSelect(filterResultado, RESULTADOS, "Todos");
+
+  filterFecha.value = todayISO();
+  syncRuta();
 }
 
-function formatCurrency(value) {
-  return Number(value || 0).toLocaleString("es-VE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
+function syncRuta() {
+  const seller = SELLERS.find((item) => item.name === vendedorActivo.value) || SELLERS[0];
+  rutaActiva.value = seller.ruta;
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function mapsUrl(lat, lng, direccion) {
-  if (lat && lng) {
-    return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
-  }
-  if (direccion) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`;
-  }
-  return "";
+function currentFilters() {
+  return {
+    fecha: filterFecha.value || "",
+    estado: filterEstado.value || "",
+    resultado: filterResultado.value || "",
+    vendedor: vendedorActivo.value || "",
+  };
 }
 
 function setGpsStatus(message, isError = false) {
   gpsStatus.textContent = message;
   gpsStatus.classList.toggle("error", isError);
-}
-
-function compressImage(file, maxWidth = 900, quality = 0.72) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Imagen inválida"));
-      img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const width = Math.round(img.width * scale);
-        const height = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-async function reverseGeocode(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-    },
-  });
-  if (!response.ok) throw new Error("Geocoding falló");
-  const data = await response.json();
-  return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-}
-
-function renderLeaderboard(visits) {
-  const leaderboard = document.getElementById("leaderboard");
-  const bySeller = new Map();
-
-  // Reparto simple para demo: alterna 3 vendedores.
-  const sellers = ["Luis Rojas", "María Gutiérrez", "Carlos Pérez"];
-  visits.forEach((visit, index) => {
-    const name = sellers[index % sellers.length];
-    if (!bySeller.has(name)) bySeller.set(name, { visits: 0, sales: 0, wins: 0 });
-    const row = bySeller.get(name);
-    row.visits += 1;
-    row.sales += Number(visit.monto || 0);
-    if (visit.resultado !== "Sin venta") row.wins += 1;
-  });
-
-  const ordered = [...bySeller.entries()]
-    .map(([name, stats]) => ({
-      name,
-      ...stats,
-      effectiveness: stats.visits ? Math.round((stats.wins / stats.visits) * 100) : 0,
-    }))
-    .sort((a, b) => b.sales - a.sales);
-
-  if (!ordered.length) {
-    leaderboard.innerHTML = '<p class="empty">Aún no hay datos de vendedores en la demo.</p>';
-    return;
-  }
-
-  leaderboard.innerHTML = ordered
-    .map((seller) => `
-      <li class="item">
-        <div class="item-top">
-          <strong>${escapeHtml(seller.name)}</strong>
-          <strong>$ ${formatCurrency(seller.sales)}</strong>
-        </div>
-        <p>${seller.visits} visitas · ${seller.effectiveness}% efectividad</p>
-      </li>
-    `)
-    .join("");
-}
-
-function renderVisits() {
-  const visits = loadVisits();
-  const totalSales = visits.reduce((sum, visit) => sum + Number(visit.monto || 0), 0);
-  const successful = visits.filter((visit) => visit.resultado !== "Sin venta").length;
-  const effectiveness = visits.length ? Math.round((successful / visits.length) * 100) : 0;
-
-  kpiVisitas.textContent = visits.length;
-  kpiVentas.textContent = `$ ${formatCurrency(totalSales)}`;
-  kpiEfectividad.textContent = `${effectiveness}%`;
-  // Supuesto simple: 30% de lo vendido queda por cobrar.
-  pendienteCobro.textContent = `Cobranza pendiente: $ ${formatCurrency(totalSales * 0.3)}`;
-
-  if (!visits.length) {
-    visitsList.innerHTML = '<p class="empty">No hay visitas cargadas todavía.</p>';
-    renderLeaderboard(visits);
-    return;
-  }
-
-  visitsList.innerHTML = visits
-    .slice()
-    .reverse()
-    .map((visit) => {
-      const mapLink = mapsUrl(visit.lat, visit.lng, visit.direccion);
-      const locationLabel = visit.direccion
-        || (visit.lat && visit.lng ? `${Number(visit.lat).toFixed(5)}, ${Number(visit.lng).toFixed(5)}` : "");
-
-      return `
-      <li class="item">
-        <div class="item-top">
-          <strong>${escapeHtml(visit.cliente)}</strong>
-          <span class="badge">${escapeHtml(visit.resultado)}</span>
-        </div>
-        <p>${escapeHtml(visit.estado)} · ${escapeHtml(visit.hora)} · Venta USD $ ${formatCurrency(visit.monto)}</p>
-        ${locationLabel ? `
-          <p class="location">
-            ${mapLink ? `<a href="${mapLink}" target="_blank" rel="noopener noreferrer">${escapeHtml(locationLabel)}</a>` : escapeHtml(locationLabel)}
-          </p>
-        ` : ""}
-        ${visit.nota ? `<p>Nota: ${escapeHtml(visit.nota)}</p>` : ""}
-        ${visit.foto ? `<img class="visit-foto" src="${visit.foto}" alt="Foto de ${escapeHtml(visit.cliente)}">` : ""}
-      </li>
-    `;
-    })
-    .join("");
-
-  renderLeaderboard(visits);
 }
 
 function clearFotoPreview() {
@@ -192,6 +75,98 @@ function clearFotoPreview() {
   fotoPreview.classList.add("hidden");
   fotoInput.value = "";
 }
+
+function showHome() {
+  viewHome.classList.remove("hidden");
+  viewDetail.classList.add("hidden");
+}
+
+function showDetail() {
+  renderDetail();
+  viewHome.classList.add("hidden");
+  viewDetail.classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function getFilteredVisits() {
+  return filterVisits(loadVisits(), currentFilters());
+}
+
+function renderHome() {
+  const visits = getFilteredVisits();
+  const summary = summarizeVisits(visits);
+
+  kpiVisitas.textContent = summary.visits;
+  kpiVentas.textContent = `$ ${formatCurrency(summary.sales)}`;
+  kpiEfectividad.textContent = `${summary.effectiveness}%`;
+  kpiPendiente.textContent = `$ ${formatCurrency(summary.pending)}`;
+
+  if (!visits.length) {
+    visitsList.innerHTML = '<p class="empty">No hay visitas con estos filtros.</p>';
+    return;
+  }
+
+  visitsList.innerHTML = visits
+    .slice()
+    .sort((a, b) => `${b.fecha}${b.hora}`.localeCompare(`${a.fecha}${a.hora}`))
+    .map((visit) => renderVisitItem(visit))
+    .join("");
+}
+
+function renderDetail() {
+  const sellerName = vendedorActivo.value;
+  const seller = SELLERS.find((item) => item.name === sellerName) || SELLERS[0];
+  const filters = { ...currentFilters(), vendedor: seller.name };
+  const visits = filterVisits(loadVisits(), filters)
+    .slice()
+    .sort((a, b) => `${a.fecha}${a.hora}`.localeCompare(`${b.fecha}${b.hora}`));
+  const summary = summarizeVisits(visits);
+
+  document.getElementById("detail-title").textContent = seller.name;
+  document.getElementById("detail-sub").textContent =
+    `Detalle de ruta y paradas según filtros activos.`;
+  document.getElementById("detail-ruta-chip").textContent = seller.ruta;
+  document.getElementById("detail-visitas").textContent = summary.visits;
+  document.getElementById("detail-ventas").textContent = `$ ${formatCurrency(summary.sales)}`;
+  document.getElementById("detail-efectividad").textContent = `${summary.effectiveness}%`;
+  document.getElementById("detail-exitos").textContent = summary.successful;
+
+  const detailList = document.getElementById("detail-visits");
+  if (!visits.length) {
+    detailList.innerHTML = '<p class="empty">Sin paradas para esta ruta con los filtros actuales.</p>';
+    return;
+  }
+
+  detailList.innerHTML = visits.map((visit) => renderVisitItem(visit)).join("");
+}
+
+function renderAll() {
+  renderHome();
+  if (!viewDetail.classList.contains("hidden")) {
+    renderDetail();
+  }
+}
+
+initControls();
+
+vendedorActivo.addEventListener("change", () => {
+  syncRuta();
+  renderAll();
+});
+
+[filterFecha, filterEstado, filterResultado].forEach((input) => {
+  input.addEventListener("change", renderAll);
+});
+
+resetFiltersBtn.addEventListener("click", () => {
+  filterFecha.value = todayISO();
+  filterEstado.value = "";
+  filterResultado.value = "";
+  renderAll();
+});
+
+openDetailBtn.addEventListener("click", showDetail);
+backHomeBtn.addEventListener("click", showHome);
 
 gpsBtn.addEventListener("click", () => {
   if (!navigator.geolocation) {
@@ -260,8 +235,9 @@ fotoInput.addEventListener("change", async () => {
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(form);
+  const seller = SELLERS.find((item) => item.name === vendedorActivo.value) || SELLERS[0];
 
-  const newVisit = {
+  const newVisit = normalizeVisit({
     cliente: String(formData.get("cliente") || "").trim(),
     estado: String(formData.get("estado") || ""),
     resultado: String(formData.get("resultado") || ""),
@@ -272,7 +248,10 @@ form.addEventListener("submit", (event) => {
     foto: pendingFoto || "",
     nota: String(formData.get("nota") || "").trim(),
     hora: new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }),
-  };
+    fecha: filterFecha.value || todayISO(),
+    vendedor: seller.name,
+    ruta: seller.ruta,
+  });
 
   const visits = loadVisits();
   visits.push(newVisit);
@@ -280,14 +259,21 @@ form.addEventListener("submit", (event) => {
   form.reset();
   latInput.value = "";
   lngInput.value = "";
+  fillSelect(estadoSelect, ESTADOS, "Estado");
+  fillSelect(resultadoSelect, RESULTADOS, "Resultado");
   clearFotoPreview();
   setGpsStatus("Usa el GPS del teléfono para registrar dónde estás.");
-  renderVisits();
+  renderAll();
 });
 
 clearBtn.addEventListener("click", () => {
-  localStorage.removeItem(STORAGE_KEY);
-  renderVisits();
+  clearVisits();
+  renderAll();
 });
 
-renderVisits();
+seedBtn.addEventListener("click", () => {
+  seedDemoVisits();
+  renderAll();
+});
+
+renderAll();

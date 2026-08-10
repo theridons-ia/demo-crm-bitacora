@@ -3,99 +3,166 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Demo CRM Bitácora</title>
+  <title>Demo CRM Bitácora · Vendedor</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div class="app">
+    <nav class="role-nav" aria-label="Roles">
+      <a class="active" href="./index.html">Vendedor</a>
+      <a href="./supervisor.html">Supervisor</a>
+    </nav>
+
     <header class="topbar">
-      <p class="eyebrow">Demo comercial</p>
+      <p class="eyebrow">Demo comercial · Fase 2</p>
       <h1>CRM de Campo · Bitácora</h1>
-      <p class="sub">Vendedores, visitas, ventas y métricas gerenciales.</p>
+      <p class="sub">Registra visitas con GPS, foto y seguimiento por ruta.</p>
     </header>
 
-    <section class="kpis" aria-label="Indicadores">
-      <article class="card kpi">
-        <p>Vendedores activos</p>
-        <strong id="kpi-vendedores">14</strong>
-      </article>
-      <article class="card kpi">
-        <p>Visitas hoy</p>
-        <strong id="kpi-visitas">0</strong>
-      </article>
-      <article class="card kpi">
-        <p>Ventas hoy (USD)</p>
-        <strong id="kpi-ventas">$ 0</strong>
-      </article>
-      <article class="card kpi">
-        <p>Efectividad</p>
-        <strong id="kpi-efectividad">0%</strong>
-      </article>
-    </section>
-
-    <section class="card">
-      <h2>Registrar visita</h2>
-      <form id="visit-form" class="form">
-        <input id="cliente" name="cliente" type="text" placeholder="Cliente visitado" required>
+    <section id="view-home">
+      <section class="card">
+        <h2>Tu jornada</h2>
         <div class="grid-2">
-          <select id="estado" name="estado" required>
-            <option value="">Estado</option>
-            <option>Lara</option>
-            <option>Carabobo</option>
-            <option>Yaracuy</option>
-            <option>Aragua</option>
-            <option>Distrito Capital</option>
-          </select>
-          <select id="resultado" name="resultado" required>
-            <option value="">Resultado</option>
-            <option>Venta cerrada</option>
-            <option>Venta parcial</option>
-            <option>Pedido para mañana</option>
-            <option>Sin venta</option>
-          </select>
+          <label class="field-block">
+            <span>Vendedor</span>
+            <select id="vendedor-activo"></select>
+          </label>
+          <label class="field-block">
+            <span>Ruta</span>
+            <input id="ruta-activa" type="text" readonly>
+          </label>
         </div>
-        <input id="monto" name="monto" type="number" min="0" step="0.01" placeholder="Monto venta USD (0 si no vendió)" required>
+        <button id="open-detail-btn" class="secondary full" type="button">Ver detalle de mi ruta</button>
+      </section>
 
-        <div class="field-block">
-          <label for="direccion">Ubicación GPS</label>
-          <div class="gps-row">
-            <input id="direccion" name="direccion" type="text" placeholder="Captura o escribe la dirección" required>
-            <button id="gps-btn" class="secondary" type="button">GPS</button>
+      <section class="kpis" aria-label="Indicadores">
+        <article class="card kpi">
+          <p>Visitas (filtro)</p>
+          <strong id="kpi-visitas">0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Ventas (USD)</p>
+          <strong id="kpi-ventas">$ 0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Efectividad</p>
+          <strong id="kpi-efectividad">0%</strong>
+        </article>
+        <article class="card kpi">
+          <p>Pendiente cobro</p>
+          <strong id="kpi-pendiente">$ 0</strong>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Filtros</h2>
+        <div class="filters">
+          <label class="field-block">
+            <span>Fecha</span>
+            <input id="filter-fecha" type="date">
+          </label>
+          <label class="field-block">
+            <span>Estado</span>
+            <select id="filter-estado">
+              <option value="">Todos</option>
+            </select>
+          </label>
+          <label class="field-block">
+            <span>Resultado</span>
+            <select id="filter-resultado">
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+        <button id="reset-filters-btn" class="ghost" type="button">Limpiar filtros</button>
+      </section>
+
+      <section class="card">
+        <h2>Registrar visita</h2>
+        <form id="visit-form" class="form">
+          <input id="cliente" name="cliente" type="text" placeholder="Cliente visitado" required>
+          <div class="grid-2">
+            <select id="estado" name="estado" required>
+              <option value="">Estado</option>
+            </select>
+            <select id="resultado" name="resultado" required>
+              <option value="">Resultado</option>
+            </select>
           </div>
-          <p class="hint" id="gps-status">Usa el GPS del teléfono para registrar dónde estás.</p>
-          <input type="hidden" id="lat" name="lat" value="">
-          <input type="hidden" id="lng" name="lng" value="">
-        </div>
+          <input id="monto" name="monto" type="number" min="0" step="0.01" placeholder="Monto venta USD (0 si no vendió)" required>
 
-        <div class="field-block">
-          <label for="foto">Foto del establecimiento <span class="optional">(opcional)</span></label>
-          <input id="foto" name="foto" type="file" accept="image/*" capture="environment">
-          <div id="foto-preview" class="foto-preview hidden" aria-live="polite"></div>
-          <p class="hint">Sirve como evidencia de la visita. Puedes omitirla si no hace falta.</p>
-        </div>
+          <div class="field-block">
+            <label for="direccion">Ubicación GPS</label>
+            <div class="gps-row">
+              <input id="direccion" name="direccion" type="text" placeholder="Captura o escribe la dirección" required>
+              <button id="gps-btn" class="secondary" type="button">GPS</button>
+            </div>
+            <p class="hint" id="gps-status">Usa el GPS del teléfono para registrar dónde estás.</p>
+            <input type="hidden" id="lat" name="lat" value="">
+            <input type="hidden" id="lng" name="lng" value="">
+          </div>
 
-        <textarea id="nota" name="nota" rows="2" placeholder="Observaciones de la visita"></textarea>
-        <button type="submit">Guardar visita</button>
-      </form>
+          <div class="field-block">
+            <label for="foto">Foto del establecimiento <span class="optional">(opcional)</span></label>
+            <input id="foto" name="foto" type="file" accept="image/*" capture="environment">
+            <div id="foto-preview" class="foto-preview hidden" aria-live="polite"></div>
+            <p class="hint">Sirve como evidencia de la visita. Puedes omitirla si no hace falta.</p>
+          </div>
+
+          <textarea id="nota" name="nota" rows="2" placeholder="Observaciones de la visita"></textarea>
+          <button type="submit">Guardar visita</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="title-row">
+          <h2>Últimas visitas</h2>
+          <div class="actions">
+            <button id="seed-btn" class="ghost" type="button">Datos demo</button>
+            <button id="clear-btn" class="ghost" type="button">Limpiar</button>
+          </div>
+        </div>
+        <ul id="visits-list" class="list"></ul>
+      </section>
     </section>
 
-    <section class="card">
-      <div class="title-row">
-        <h2>Últimas visitas</h2>
-        <button id="clear-btn" class="ghost" type="button">Limpiar demo</button>
-      </div>
-      <ul id="visits-list" class="list"></ul>
-    </section>
+    <section id="view-detail" class="hidden">
+      <section class="card">
+        <div class="title-row">
+          <button id="back-home-btn" class="ghost" type="button">← Volver</button>
+          <p class="small" id="detail-ruta-chip">Ruta</p>
+        </div>
+        <h2 id="detail-title">Detalle del vendedor</h2>
+        <p class="sub" id="detail-sub">Resumen de ruta y visitas filtradas.</p>
+      </section>
 
-    <section class="card">
-      <div class="title-row">
-        <h2>Panel gerencial rápido</h2>
-        <p class="small" id="pendiente-cobro">Cobranza pendiente: $ 0</p>
-      </div>
-      <ul id="leaderboard" class="list"></ul>
+      <section class="kpis" aria-label="Indicadores del vendedor">
+        <article class="card kpi">
+          <p>Visitas</p>
+          <strong id="detail-visitas">0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Ventas (USD)</p>
+          <strong id="detail-ventas">$ 0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Efectividad</p>
+          <strong id="detail-efectividad">0%</strong>
+        </article>
+        <article class="card kpi">
+          <p>Clientes con venta</p>
+          <strong id="detail-exitos">0</strong>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Paradas de la ruta</h2>
+        <ul id="detail-visits" class="list"></ul>
+      </section>
     </section>
   </div>
 
+  <script src="./shared.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo CRM Bitácora · Supervisor</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app app-wide">
+    <nav class="role-nav" aria-label="Roles">
+      <a href="./index.html">Vendedor</a>
+      <a class="active" href="./supervisor.html">Supervisor</a>
+    </nav>
+
+    <header class="topbar">
+      <p class="eyebrow">Demo comercial · Fase 2</p>
+      <h1>Panel de supervisor</h1>
+      <p class="sub">Monitorea rutas, efectividad y cobranza del equipo.</p>
+    </header>
+
+    <section id="view-team">
+      <section class="card">
+        <h2>Filtros del equipo</h2>
+        <div class="filters filters-3">
+          <label class="field-block">
+            <span>Fecha</span>
+            <input id="filter-fecha" type="date">
+          </label>
+          <label class="field-block">
+            <span>Estado</span>
+            <select id="filter-estado">
+              <option value="">Todos</option>
+            </select>
+          </label>
+          <label class="field-block">
+            <span>Resultado</span>
+            <select id="filter-resultado">
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="reset-filters-btn" class="ghost" type="button">Limpiar filtros</button>
+          <button id="seed-btn" class="ghost" type="button">Cargar datos demo</button>
+          <button id="clear-btn" class="ghost" type="button">Limpiar demo</button>
+        </div>
+      </section>
+
+      <section class="kpis kpis-4" aria-label="Indicadores del equipo">
+        <article class="card kpi">
+          <p>Vendedores con actividad</p>
+          <strong id="kpi-vendedores">0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Visitas</p>
+          <strong id="kpi-visitas">0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Ventas (USD)</p>
+          <strong id="kpi-ventas">$ 0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Efectividad</p>
+          <strong id="kpi-efectividad">0%</strong>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="title-row">
+          <h2>Ranking del equipo</h2>
+          <p class="small" id="pendiente-cobro">Cobranza pendiente: $ 0</p>
+        </div>
+        <ul id="leaderboard" class="list"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Actividad reciente</h2>
+        <ul id="team-visits" class="list"></ul>
+      </section>
+    </section>
+
+    <section id="view-seller" class="hidden">
+      <section class="card">
+        <div class="title-row">
+          <button id="back-team-btn" class="ghost" type="button">← Equipo</button>
+          <p class="small" id="seller-ruta">Ruta</p>
+        </div>
+        <h2 id="seller-title">Vendedor</h2>
+        <p class="sub" id="seller-sub">Detalle de ruta y resultados.</p>
+      </section>
+
+      <section class="kpis" aria-label="Indicadores del vendedor">
+        <article class="card kpi">
+          <p>Visitas</p>
+          <strong id="seller-visitas">0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Ventas (USD)</p>
+          <strong id="seller-ventas">$ 0</strong>
+        </article>
+        <article class="card kpi">
+          <p>Efectividad</p>
+          <strong id="seller-efectividad">0%</strong>
+        </article>
+        <article class="card kpi">
+          <p>Pendiente</p>
+          <strong id="seller-pendiente">$ 0</strong>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Bitácora del vendedor</h2>
+        <ul id="seller-visits" class="list"></ul>
+      </section>
+    </section>
+  </div>
+
+  <script src="./shared.js"></script>
+  <script src="./supervisor.js"></script>
+</body>
+</html>

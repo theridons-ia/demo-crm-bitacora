@@ -3,22 +3,22 @@
 ## Objetivo
 Continuar este proyecto como repositorio independiente para una demo comercial móvil de CRM de vendedores.
 
-## Estado actual del demo
+## Estado actual del demo (Fase 2)
 Proyecto frontend estático, mobile-first, sin backend:
 
-- `index.html`: layout principal con
-  - KPIs
-  - formulario "Registrar visita"
-  - lista de últimas visitas
-  - panel gerencial rápido
-- `styles.css`: estilos responsive y tarjetas
-- `app.js`: lógica de demo con `localStorage`
-  - guarda visitas
-  - captura GPS (Geolocation + reverse geocode)
-  - foto opcional del establecimiento (comprimida)
-  - calcula KPIs (visitas, ventas, efectividad)
-  - leaderboard simple por vendedor
-  - botón para limpiar demo
+- `index.html` + `app.js`: panel del vendedor
+  - selección de vendedor/ruta
+  - KPIs filtrados
+  - filtros por fecha/estado/resultado
+  - formulario de visita (GPS + foto opcional)
+  - pantalla detalle de ruta del vendedor
+- `supervisor.html` + `supervisor.js`: dashboard de supervisor
+  - filtros del equipo
+  - ranking clickable
+  - detalle por vendedor/ruta
+  - actividad reciente
+- `shared.js`: storage, sellers, filtros, seed demo, helpers
+- `styles.css`: estilos responsive compartidos
 - `README.md`: instrucciones de ejecución
 
 ## Cómo ejecutar
@@ -26,12 +26,12 @@ Proyecto frontend estático, mobile-first, sin backend:
 python3 -m http.server 8080
 ```
 
-Abrir la app desde el puerto 8080 (preview/forwarded port en Cursor).
+Abrir:
+
+- `http://localhost:8080/index.html` (vendedor)
+- `http://localhost:8080/supervisor.html` (supervisor)
 
 ## Próximos pasos sugeridos
-1. Subir estos archivos al repo remoto `theridons-ia/demo-crm-bitacora`.
-2. Crear versión v2 con:
-   - pantalla detalle por vendedor/ruta
-   - filtros por fecha/estado
-   - dashboard de supervisor separado
-3. (Opcional) Migrar a backend real (Django/FastAPI + PostgreSQL) tras validación de negocio.
+1. Pulir UX demo (onboarding, estados vacíos, branding cliente).
+2. (Opcional) Migrar a backend real (Django/FastAPI + PostgreSQL) tras validación de negocio.
+3. Autenticación por rol (vendedor vs supervisor) y sync offline.
