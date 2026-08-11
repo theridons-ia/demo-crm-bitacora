@@ -1,0 +1,33 @@
+/* Design tokens — alineados a demo-crm-bitacora-export/styles.css */
+:root {
+  --background: #f7f3ed;
+  --foreground: #18312f;
+  --card: #fffdfc;
+  --card-foreground: #18312f;
+  --primary: #18312f;
+  --primary-foreground: #fffdfc;
+  --secondary: #e8f0ec;
+  --secondary-foreground: #18312f;
+  --muted: #ece8e1;
+  --muted-foreground: #71807b;
+  --accent: #f16b5f;
+  --accent-foreground: #fffdfc;
+  --destructive: #c84b46;
+  --destructive-foreground: #fffdfc;
+  --border: #dadfd9;
+  --input: #dadfd9;
+  --progress: #f5c965;
+  --ring: #18312f;
+
+  --radius-sm: 14px;
+  --radius: 18px;
+  --radius-lg: 24px;
+  --radius-chip: 12px;
+
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --shadow-card: 0 8px 24px rgba(24, 49, 47, 0.06);
+
+  --screen-pad: 20px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-max-width: 430px;
+}

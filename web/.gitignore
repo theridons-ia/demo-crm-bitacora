@@ -1,0 +1,10 @@
+# Dependencias y build
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Env
+.env
+.env.*
+!.env.example
