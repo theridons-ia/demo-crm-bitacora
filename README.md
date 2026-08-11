@@ -17,6 +17,7 @@ CRM de campo **Bitácora**: visitas con evidencia GPS, ventas/órdenes e inventa
 |-----|-----------|
 | [docs/SUBFASES.md](docs/SUBFASES.md) | Checkpoints SF-x.y |
 | [docs/DECISIONES_Y_ROADMAP.md](docs/DECISIONES_Y_ROADMAP.md) | Decisiones de producto + GPS |
+| [docs/REFERENCIA_POWERSTREET.md](docs/REFERENCIA_POWERSTREET.md) | Referencia competitiva PowerStreet Mobile |
 | [mvp/README.md](mvp/README.md) | API |
 | [web/README.md](web/README.md) | Frontend |
 

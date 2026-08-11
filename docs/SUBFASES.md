@@ -80,7 +80,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Agendado:** decisión **#14** navegación responsive + **SF-1.1b** (top bar en desktop).
+**Agendado:** decisión **#14** navegación responsive + **SF-1.1b**; decisión **#15** referencia PowerStreet ([REFERENCIA_POWERSTREET.md](./REFERENCIA_POWERSTREET.md)).
 
 **Siguiente al despertar:** **SF-1.2** — clientes CRUD (alta con RIF/CI), o **SF-1.1b** si preferimos el shell desktop antes.
 
