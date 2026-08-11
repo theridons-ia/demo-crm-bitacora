@@ -35,6 +35,7 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 | 11 | Backend | **FastAPI + PostgreSQL** (aprendizaje consciente; Theridon ya conoce Django/Postgres). |
 | 12 | Datos | Seed / datos de prueba hasta tener maestros reales. |
 | 13 | Identificación VE | **Clientes y proveedores** llevan identificación venezolana: **RIF** y/o **CI** (campos explícitos; al menos uno requerido en validación de negocio). |
+| 14 | Navegación responsive | **Móvil:** bottom nav (vendedor). **Tablet/desktop:** top bar o sidebar (no barra inferior tipo app). Misma app, shells distintos por ancho/rol — ver SF-1.1b / SF-2.1. |
 
 ### Coherencia visual (no negociable en UI)
 

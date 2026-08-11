@@ -43,6 +43,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | ID | Objetivo | Entregable | Estado |
 |----|----------|------------|--------|
 | **SF-1.1** | Shell UX vendedor | Bottom nav + tokens; layout móvil | hecho |
+| **SF-1.1b** | Nav desktop vendedor | ≥768px: top bar (ocultar bottom nav); móvil sigue abajo | pendiente |
 | **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | pendiente |
 | **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | pendiente |
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | pendiente |
@@ -61,7 +62,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 | ID | Objetivo | Entregable | Estado |
 |----|----------|------------|--------|
-| **SF-2.1** | Layout supervisor | Sidebar tablet/desktop | pendiente |
+| **SF-2.1** | Layout supervisor | Sidebar o top nav tablet/desktop (sin bottom nav) | pendiente |
 | **SF-2.2** | Ruta del día | Asignar / desasignar visitas planificadas | pendiente |
 | **SF-2.3** | Alertas GPS/foto | Inbox de alertas | pendiente |
 | **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | pendiente |
@@ -79,9 +80,9 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.1** (shell vendedor + bottom nav).
+**Agendado:** decisión **#14** navegación responsive + **SF-1.1b** (top bar en desktop).
 
-**Siguiente:** **SF-1.2** — clientes CRUD (alta con RIF/CI).
+**Siguiente al despertar:** **SF-1.2** — clientes CRUD (alta con RIF/CI), o **SF-1.1b** si preferimos el shell desktop antes.
 
 ### Cómo verificar SF-1.1
 
