@@ -34,6 +34,7 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 | 10 | Momento | Empezar ya aunque la propuesta comercial no esté aprobada: base reutilizable y de aprendizaje. |
 | 11 | Backend | **FastAPI + PostgreSQL** (aprendizaje consciente; Theridon ya conoce Django/Postgres). |
 | 12 | Datos | Seed / datos de prueba hasta tener maestros reales. |
+| 13 | Identificación VE | **Clientes y proveedores** llevan identificación venezolana: **RIF** y/o **CI** (campos explícitos; al menos uno requerido en validación de negocio). |
 
 ### Coherencia visual (no negociable en UI)
 

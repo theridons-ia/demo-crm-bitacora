@@ -1,43 +1,46 @@
 # demo-crm-bitacora
 
-CRM de campo **Bitácora**: visitas con evidencia GPS, ventas/órdenes e inventario para equipos pequeños de vendedores y supervisores.
+CRM de campo **Bitácora**: visitas con evidencia GPS, ventas/órdenes e inventario para equipos pequeños de vendedores y supervisores (contexto Venezuela: RIF/CI).
 
 ## Carpetas
 
 | Ruta | Rol |
 |------|-----|
 | `demo-crm-bitacora-export/` | Demo visual HTML (prototipo comercial) — referencia de UX |
-| `mvp/` | API real FastAPI + PostgreSQL (+ frontend mínimo temporal) |
-| `web/` | App React + Vite (design system; PWA en fases siguientes) |
-| `docs/` | Propuesta comercial, decisiones y **sub-fases** |
+| `mvp/` | API FastAPI + PostgreSQL (+ frontend HTML mínimo temporal) |
+| `web/` | App React + Vite (UI real en construcción) |
+| `docs/` | Propuesta, decisiones y sub-fases |
 
 ## Documentación
 
 | Doc | Contenido |
 |-----|-----------|
-| [docs/SUBFASES.md](docs/SUBFASES.md) | Checkpoints SF-x.y para revisar y commitear |
+| [docs/SUBFASES.md](docs/SUBFASES.md) | Checkpoints SF-x.y |
 | [docs/DECISIONES_Y_ROADMAP.md](docs/DECISIONES_Y_ROADMAP.md) | Decisiones de producto + GPS |
-| [docs/PROPUESTA_COMERCIAL_BITACORA_CAMPO.md](docs/PROPUESTA_COMERCIAL_BITACORA_CAMPO.md) | Propuesta comercial |
-| [mvp/README.md](mvp/README.md) | Cómo arrancar la API |
-| [web/README.md](web/README.md) | Cómo arrancar el frontend |
+| [mvp/README.md](mvp/README.md) | API |
+| [web/README.md](web/README.md) | Frontend |
 
-## Git (acuerdo de trabajo)
+## Git
 
-1. Implementamos **una sub-fase** (`SF-x.y`).
-2. Revisas en local.
-3. Commit local (puedo prepararlo si lo pides).
-4. **Tú** haces `git push` y `git pull` cuando quieras.
-5. Seguimos con la siguiente SF.
+1. Una sub-fase → commit local.  
+2. **Tú** haces `git push` / `git pull`.  
 
-No subir `mvp/.env` ni secretos.
-
-## Arranque rápido
+## Arranque dual (API + Web)
 
 ```bash
 # Terminal 1 — API
-cd mvp && source .venv/bin/activate
+cd mvp
+source .venv/bin/activate
+python seed.py          # primera vez o para enriquecer demo
 uvicorn app.main:app --host 0.0.0.0 --port 8090
 
-# Terminal 2 — Web (requiere Node 20+)
-cd web && npm install && npm run dev
+# Terminal 2 — Web (Node 20+)
+export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"   # si usas nvm
+cd web
+npm install             # primera vez
+npm run dev
 ```
+
+- API + docs: http://localhost:8090/docs  
+- Web: http://localhost:5173  
+- Login demo: `marina@bitacora.local` / `demo1234`

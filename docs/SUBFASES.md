@@ -32,7 +32,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-0.1** | App web vacía con design system | `web/` Vite+React+TS, tokens CSS, pantalla placeholder | hecho (este commit) |
 | **SF-0.2** | Web habla con API | Login → JWT → `/api/auth/me` + listar clientes | hecho |
 | **SF-0.3** | Modelo dominio ampliado | `Sale.origin`, `VisitGpsPoint`, `VisitAlert` (+ migrate/create) | hecho |
-| **SF-0.4** | Seed + CORS para Vite | Seed rico; CORS `localhost:5173`; README dual | pendiente |
+| **SF-0.4** | Seed + CORS + IDs VE | Seed rico; RIF/CI en clientes y proveedores; CORS Vite; README dual | hecho |
 
 **Criterio “Fase 0 lista”:** puedes abrir `web/`, iniciar sesión contra `mvp/` y ver clientes.
 
@@ -79,14 +79,14 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-0.3** (modelo dominio + endpoints evidencia).
+**Listo para commit / tu push:** **SF-0.4** (RIF/CI, seed, CORS Vite).
 
-**Siguiente:** **SF-0.4** — seed enriquecido + CORS explícito para Vite + README dual.
+**Siguiente:** Fase 1 empieza con **SF-1.1** — shell UX vendedor (bottom nav + layout móvil).
 
-### Cómo verificar SF-0.3
+### Cómo verificar SF-0.4
 
-1. Reinicia uvicorn (para `ensure_schema`).
-2. Abre http://localhost:8090/docs
-3. Busca `POST /api/visits/{visit_id}/gps-points` y `GET /api/alerts`.
-4. En schemas de venta debe aparecer `origin`.
+1. Reinicia uvicorn.
+2. `cd mvp && python seed.py`
+3. En `/docs` o en la web, clientes deben mostrar RIF o CI.
+4. CORS: el front en `:5173` sigue pudiendo llamar al API.
 

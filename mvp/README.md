@@ -49,3 +49,5 @@ Abrir: `http://localhost:8090`
   El arranque corre `ensure_schema()` (create_all + ALTER de columnas nuevas).
   Endpoints: `POST/GET /api/visits/{id}/gps-points`, `GET /api/alerts`.
   Reinicia uvicorn tras pull para aplicar el esquema.
+- **SF-0.4:** clientes/proveedores con **RIF y/o CI**; seed enriquecido (`python seed.py`);
+  CORS vía `CORS_ORIGINS` (default Vite `localhost:5173`).

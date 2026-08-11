@@ -11,22 +11,25 @@ from sqlalchemy.engine import Engine
 from .database import Base
 
 
+def _add_column_if_missing(engine: Engine, table: str, column: str, ddl_type: str) -> None:
+    inspector = inspect(engine)
+    if table not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns(table)}
+    if column in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
+
+
 def ensure_schema(engine: Engine) -> None:
     # Import models so metadata knows every table
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 
-    inspector = inspect(engine)
-    if "sales" not in inspector.get_table_names():
-        return
-
-    columns = {col["name"] for col in inspector.get_columns("sales")}
-    if "origin" not in columns:
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "ALTER TABLE sales "
-                    "ADD COLUMN origin VARCHAR(20) NOT NULL DEFAULT 'visita'"
-                )
-            )
+    _add_column_if_missing(engine, "sales", "origin", "VARCHAR(20) NOT NULL DEFAULT 'visita'")
+    _add_column_if_missing(engine, "clients", "rif", "VARCHAR(20)")
+    _add_column_if_missing(engine, "clients", "ci", "VARCHAR(20)")
+    _add_column_if_missing(engine, "suppliers", "rif", "VARCHAR(20)")
+    _add_column_if_missing(engine, "suppliers", "ci", "VARCHAR(20)")

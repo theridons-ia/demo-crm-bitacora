@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .models import (
     AlertSeverity,
@@ -42,15 +42,29 @@ class UserOut(ORMModel):
 
 class ClientCreate(BaseModel):
     name: str = Field(min_length=2, max_length=180)
+    rif: str | None = Field(default=None, max_length=20)
+    ci: str | None = Field(default=None, max_length=20)
     state: str | None = None
     address: str | None = None
     phone: str | None = None
     notes: str | None = None
 
+    @model_validator(mode="after")
+    def require_rif_or_ci(self):
+        rif = (self.rif or "").strip() or None
+        ci = (self.ci or "").strip() or None
+        self.rif = rif
+        self.ci = ci
+        if not rif and not ci:
+            raise ValueError("Debes indicar RIF y/o CI (identificación Venezuela)")
+        return self
+
 
 class ClientOut(ORMModel):
     id: int
     name: str
+    rif: str | None = None
+    ci: str | None = None
     state: str | None = None
     address: str | None = None
     phone: str | None = None
@@ -60,14 +74,28 @@ class ClientOut(ORMModel):
 
 class SupplierCreate(BaseModel):
     name: str = Field(min_length=2, max_length=180)
+    rif: str | None = Field(default=None, max_length=20)
+    ci: str | None = Field(default=None, max_length=20)
     phone: str | None = None
     email: str | None = None
     notes: str | None = None
+
+    @model_validator(mode="after")
+    def require_rif_or_ci(self):
+        rif = (self.rif or "").strip() or None
+        ci = (self.ci or "").strip() or None
+        self.rif = rif
+        self.ci = ci
+        if not rif and not ci:
+            raise ValueError("Debes indicar RIF y/o CI (identificación Venezuela)")
+        return self
 
 
 class SupplierOut(ORMModel):
     id: int
     name: str
+    rif: str | None = None
+    ci: str | None = None
     phone: str | None = None
     email: str | None = None
     notes: str | None = None

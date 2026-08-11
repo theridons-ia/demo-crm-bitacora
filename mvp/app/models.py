@@ -104,6 +104,8 @@ class Client(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(180), index=True)
+    rif: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    ci: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     state: Mapped[str | None] = mapped_column(String(80), nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
@@ -120,6 +122,8 @@ class Supplier(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(180), unique=True)
+    rif: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    ci: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     email: Mapped[str | None] = mapped_column(String(180), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

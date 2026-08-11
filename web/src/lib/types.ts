@@ -15,6 +15,8 @@ export type User = {
 export type Client = {
   id: number;
   name: string;
+  rif: string | null;
+  ci: string | null;
   state: string | null;
   address: string | null;
   phone: string | null;

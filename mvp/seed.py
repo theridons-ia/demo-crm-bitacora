@@ -1,14 +1,15 @@
-"""Seed inicial del MVP."""
+"""Seed inicial / enriquecido del MVP (datos de prueba Venezuela)."""
 
 from decimal import Decimal
 
 from app.auth import hash_password
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal, engine
+from app.ensure_schema import ensure_schema
 from app.models import Client, Product, Supplier, User, UserRole
 
 
 def run() -> None:
-    Base.metadata.create_all(bind=engine)
+    ensure_schema(engine)
     db = SessionLocal()
     try:
         if not db.query(User).filter(User.email == "marina@bitacora.local").first():
@@ -24,10 +25,10 @@ def run() -> None:
                     ),
                     User(
                         email="supervisor@bitacora.local",
-                        full_name="Ana Supervisor",
+                        full_name="Yuliana Supervisor",
                         hashed_password=hash_password("demo1234"),
                         role=UserRole.supervisor,
-                        initials="AS",
+                        initials="YS",
                         route_name="Equipo Occidente",
                     ),
                     User(
@@ -40,29 +41,124 @@ def run() -> None:
                 ]
             )
 
-        if db.query(Client).count() == 0:
-            db.add_all(
-                [
-                    Client(name="Mercado San Rafael", state="Yaracuy", address="San Felipe"),
-                    Client(name="Bodega La Esquina", state="Carabobo", address="Valencia"),
-                    Client(name="Abastos El Río", state="Lara", address="Barquisimeto"),
-                ]
-            )
+        demo_clients = [
+            {
+                "name": "Mercado San Rafael",
+                "rif": "J-40123456-7",
+                "ci": None,
+                "state": "Yaracuy",
+                "address": "Av. Caracas, San Felipe",
+                "phone": "+58-254-5550101",
+            },
+            {
+                "name": "Bodega La Esquina",
+                "rif": "J-29876543-2",
+                "ci": None,
+                "state": "Carabobo",
+                "address": "Calle Negra Matea, Valencia",
+                "phone": "+58-241-5550202",
+            },
+            {
+                "name": "Abastos El Río",
+                "rif": None,
+                "ci": "V-14567890",
+                "state": "Lara",
+                "address": "Carrera 19 con 28, Barquisimeto",
+                "phone": "+58-251-5550303",
+            },
+            {
+                "name": "Distribuciones Lara Sur",
+                "rif": "J-31222333-4",
+                "ci": None,
+                "state": "Lara",
+                "address": "Zona Industrial I, Cabudare",
+                "phone": "+58-251-5550404",
+            },
+            {
+                "name": "Kiosco Doña Carmen",
+                "rif": None,
+                "ci": "V-8123456",
+                "state": "Yaracuy",
+                "address": "Centro, Chivacoa",
+                "phone": "+58-254-5550505",
+            },
+            {
+                "name": "Mayorista Puerto Cabello",
+                "rif": "J-40555666-1",
+                "ci": None,
+                "state": "Carabobo",
+                "address": "Av. Principal, Puerto Cabello",
+                "phone": "+58-242-5550606",
+            },
+        ]
 
-        if db.query(Supplier).count() == 0:
-            db.add(Supplier(name="Distribuidora Central", phone="+58-000-0000"))
+        for data in demo_clients:
+            existing = db.query(Client).filter(Client.name == data["name"]).first()
+            if existing:
+                if not existing.rif and data["rif"]:
+                    existing.rif = data["rif"]
+                if not existing.ci and data["ci"]:
+                    existing.ci = data["ci"]
+                if data.get("phone") and not existing.phone:
+                    existing.phone = data["phone"]
+                if data.get("address") and (
+                    not existing.address or existing.address in ("San Felipe", "Valencia", "Barquisimeto")
+                ):
+                    existing.address = data["address"]
+            else:
+                db.add(Client(**data))
 
-        if db.query(Product).count() == 0:
-            db.add_all(
-                [
-                    Product(sku="COLA1", name="Cola #1", unit="caja", price_usd=Decimal("12"), stock=200),
-                    Product(sku="COLA2", name="Cola #2", unit="caja", price_usd=Decimal("15"), stock=180),
-                    Product(sku="LECHEABC", name="Leche ABC", unit="pack", price_usd=Decimal("8"), stock=250),
-                ]
-            )
+        demo_suppliers = [
+            {
+                "name": "Distribuidora Central",
+                "rif": "J-00011222-3",
+                "ci": None,
+                "phone": "+58-212-5551000",
+                "email": "ventas@distcentral.demo",
+            },
+            {
+                "name": "Embotelladora Andes C.A.",
+                "rif": "J-07099888-5",
+                "ci": None,
+                "phone": "+58-251-5552000",
+                "email": "pedidos@andes.demo",
+            },
+        ]
+        for data in demo_suppliers:
+            existing = db.query(Supplier).filter(Supplier.name == data["name"]).first()
+            if existing:
+                if not existing.rif and data["rif"]:
+                    existing.rif = data["rif"]
+                if data.get("email") and not existing.email:
+                    existing.email = data["email"]
+                if data.get("phone") and not existing.phone:
+                    existing.phone = data["phone"]
+            else:
+                db.add(Supplier(**data))
+
+        demo_products = [
+            ("COLA1", "Cola #1", "caja", "12.00", 200),
+            ("COLA2", "Cola #2", "caja", "15.00", 180),
+            ("LECHEABC", "Leche ABC", "pack", "8.00", 250),
+            ("AGUA600", "Agua 600ml", "paquete", "6.50", 320),
+            ("JUGO1L", "Jugo Naranja 1L", "caja", "14.00", 140),
+            ("MALTALATA", "Malta lata", "caja", "11.50", 160),
+        ]
+        for sku, name, unit, price, stock in demo_products:
+            if not db.query(Product).filter(Product.sku == sku).first():
+                db.add(
+                    Product(
+                        sku=sku,
+                        name=name,
+                        unit=unit,
+                        price_usd=Decimal(price),
+                        stock=stock,
+                    )
+                )
 
         db.commit()
         print("Seed OK")
+        print(f"Clientes: {db.query(Client).count()} · Proveedores: {db.query(Supplier).count()} · Productos: {db.query(Product).count()}")
         print("Usuarios: marina@bitacora.local / supervisor@bitacora.local / admin@bitacora.local")
         print("Password: demo1234")
     finally:
