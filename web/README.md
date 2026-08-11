@@ -58,6 +58,7 @@ Ver `../docs/SUBFASES.md`.
 
 - **SF-0.1** — scaffold + design tokens  
 - **SF-0.2** — login JWT + listado de clientes (`/login`, `/clientes`)
+- **SF-1.1** — shell vendedor: `/app/inicio|visitas|ventas|inventario|resumen` + bottom nav
 
 ### Probar login
 
@@ -65,4 +66,4 @@ Con API en `:8090` y `npm run dev`:
 
 1. Abre http://localhost:5173/login  
 2. `marina@bitacora.local` / `demo1234`  
-3. Debes ver clientes del seed.
+3. Entras a `/app/inicio` con barra inferior.

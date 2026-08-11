@@ -1,14 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import { RequireAuth } from "./auth/RequireAuth";
-import { ClientsPage } from "./pages/ClientsPage";
+import { SellerShell } from "./layout/SellerShell";
+import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { PlaceholderPage } from "./pages/PlaceholderPage";
 
-/**
- * App: define las rutas (URLs) de la SPA.
- * /login → público
- * /clientes → solo con JWT válido
- */
 export default function App() {
   return (
     <AuthProvider>
@@ -16,15 +13,59 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
-            path="/clientes"
+            path="/app"
             element={
               <RequireAuth>
-                <ClientsPage />
+                <SellerShell />
               </RequireAuth>
             }
-          />
-          <Route path="/" element={<Navigate to="/clientes" replace />} />
-          <Route path="*" element={<Navigate to="/clientes" replace />} />
+          >
+            <Route index element={<Navigate to="inicio" replace />} />
+            <Route path="inicio" element={<HomePage />} />
+            <Route
+              path="visitas"
+              element={
+                <PlaceholderPage
+                  title="Visitas"
+                  nextSf="SF-1.3"
+                  blurb="Ciclo programada → en curso → completada."
+                />
+              }
+            />
+            <Route
+              path="ventas"
+              element={
+                <PlaceholderPage
+                  title="Ventas"
+                  nextSf="SF-1.7 / SF-1.8"
+                  blurb="Órdenes ligadas a visita o sin visita (mostrador/online)."
+                />
+              }
+            />
+            <Route
+              path="inventario"
+              element={
+                <PlaceholderPage
+                  title="Inventario"
+                  nextSf="SF-1.2+"
+                  blurb="Catálogo y stock visible para el vendedor."
+                />
+              }
+            />
+            <Route
+              path="resumen"
+              element={
+                <PlaceholderPage
+                  title="Resumen"
+                  nextSf="SF-1.x"
+                  blurb="KPIs del día: visitas, ventas y evidencias."
+                />
+              }
+            />
+          </Route>
+          <Route path="/" element={<Navigate to="/app/inicio" replace />} />
+          <Route path="/clientes" element={<Navigate to="/app/inicio" replace />} />
+          <Route path="*" element={<Navigate to="/app/inicio" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

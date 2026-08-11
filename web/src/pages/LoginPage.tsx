@@ -13,7 +13,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && user) {
-    return <Navigate to="/clientes" replace />;
+    return <Navigate to="/app/inicio" replace />;
   }
 
   async function onSubmit(event: FormEvent) {

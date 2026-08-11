@@ -42,7 +42,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 | ID | Objetivo | Entregable | Estado |
 |----|----------|------------|--------|
-| **SF-1.1** | Shell UX vendedor | Bottom nav + tokens; layout móvil | pendiente |
+| **SF-1.1** | Shell UX vendedor | Bottom nav + tokens; layout móvil | hecho |
 | **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | pendiente |
 | **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | pendiente |
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | pendiente |
@@ -79,14 +79,13 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-0.4** (RIF/CI, seed, CORS Vite).
+**Listo para commit / tu push:** **SF-1.1** (shell vendedor + bottom nav).
 
-**Siguiente:** Fase 1 empieza con **SF-1.1** — shell UX vendedor (bottom nav + layout móvil).
+**Siguiente:** **SF-1.2** — clientes CRUD (alta con RIF/CI).
 
-### Cómo verificar SF-0.4
+### Cómo verificar SF-1.1
 
-1. Reinicia uvicorn.
-2. `cd mvp && python seed.py`
-3. En `/docs` o en la web, clientes deben mostrar RIF o CI.
-4. CORS: el front en `:5173` sigue pudiendo llamar al API.
+1. http://localhost:5173 → login → `/app/inicio`
+2. Barra inferior: Inicio · Visitas · Ventas · Inventario · Resumen
+3. Las pestañas vacías muestran el SF que las llenará.
 

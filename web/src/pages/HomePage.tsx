@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
 import { LogOut, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
 import { ApiError, fetchClients } from "../lib/api";
 import type { Client } from "../lib/types";
 
-export function ClientsPage() {
+/** Inicio: saludo + clientes (el CRUD completo llega en SF-1.2). */
+export function HomePage() {
   const { user, logout } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,33 +14,30 @@ export function ClientsPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     fetchClients()
       .then((data) => {
         if (!cancelled) setClients(data);
       })
       .catch((err) => {
         if (cancelled) return;
-        const message = err instanceof ApiError ? err.message : "Error al cargar clientes";
-        setError(message);
+        setError(err instanceof ApiError ? err.message : "Error al cargar clientes");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
     return () => {
       cancelled = true;
     };
   }, []);
 
   return (
-    <div className="app-shell">
+    <>
       <header className="page-header">
         <div>
           <p className="eyebrow">Bitácora Campo</p>
-          <h1>Clientes</h1>
+          <h1>Inicio</h1>
           <p className="muted">
-            Hola, <strong>{user?.full_name}</strong> · rol {user?.role}
+            Hola, <strong>{user?.full_name}</strong>
             {user?.route_name ? ` · ${user.route_name}` : ""}
           </p>
         </div>
@@ -49,20 +47,23 @@ export function ClientsPage() {
         </Button>
       </header>
 
+      <section className="card" style={{ marginBottom: "1rem" }}>
+        <p className="muted small" style={{ margin: 0 }}>
+          SF-1.1 — shell con navegación inferior. Visitas, ventas e inventario se llenan en las
+          siguientes sub-fases.
+        </p>
+      </section>
+
       <section className="card">
         <div className="section-title">
           <span className="icon-badge">
             <Users size={18} />
           </span>
-          <h2>Listado desde el API</h2>
+          <h2>Tus clientes</h2>
         </div>
 
         {loading ? <p className="muted">Cargando…</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
-
-        {!loading && !error && clients.length === 0 ? (
-          <p className="muted">No hay clientes. ¿Corriste <code>python seed.py</code> en mvp/?</p>
-        ) : null}
 
         <ul className="client-list">
           {clients.map((client) => (
@@ -77,11 +78,10 @@ export function ClientsPage() {
                   .join(" · ") || "Sin RIF/CI"}
               </p>
               {client.address ? <p className="muted small">{client.address}</p> : null}
-              {client.phone ? <p className="muted small">{client.phone}</p> : null}
             </li>
           ))}
         </ul>
       </section>
-    </div>
+    </>
   );
 }
