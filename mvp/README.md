@@ -45,3 +45,7 @@ Abrir: `http://localhost:8090`
 - Offline solo para visita/GPS/venta en cola local
 - Inventario/créditos avanzados/multimoneda completa: fases siguientes
 - El demo estático anterior sigue en `demo-crm-bitacora-export/`
+- **SF-0.3:** `Sale.origin` (`visita|mostrador|online`), tablas `visit_gps_points` y `visit_alerts`.
+  El arranque corre `ensure_schema()` (create_all + ALTER de columnas nuevas).
+  Endpoints: `POST/GET /api/visits/{id}/gps-points`, `GET /api/alerts`.
+  Reinicia uvicorn tras pull para aplicar el esquema.

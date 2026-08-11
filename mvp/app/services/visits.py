@@ -3,7 +3,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from ..models import Product, Sale, SaleItem, SaleResult, Visit, VisitStatus
+from ..models import Product, Sale, SaleItem, SaleOrigin, SaleResult, Visit, VisitStatus
 from ..schemas import SaleIn
 
 
@@ -81,6 +81,7 @@ def close_visit_with_optional_sale(
             visit_id=visit.id,
             seller_id=seller_id,
             client_id=visit.client_id,
+            origin=SaleOrigin.visita,
             currency=sale_in.currency,
             payment_method=sale_in.payment_method,
             total_amount=total,

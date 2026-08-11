@@ -55,6 +55,33 @@ class PaymentMethod(str, enum.Enum):
     credit = "credit"
 
 
+class SaleOrigin(str, enum.Enum):
+    """De dónde nace la venta: visita de campo, mostrador u online."""
+
+    visita = "visita"
+    mostrador = "mostrador"
+    online = "online"
+
+
+class GpsPointSource(str, enum.Enum):
+    start = "start"
+    watch = "watch"
+    end = "end"
+
+
+class AlertType(str, enum.Enum):
+    no_gps = "no_gps"
+    gps_far = "gps_far"
+    photo_only = "photo_only"
+    gps_skipped = "gps_skipped"
+
+
+class AlertSeverity(str, enum.Enum):
+    info = "info"
+    warning = "warning"
+    critical = "critical"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -141,6 +168,12 @@ class Visit(Base):
     seller: Mapped[User] = relationship(back_populates="visits")
     client: Mapped[Client] = relationship(back_populates="visits")
     sale: Mapped["Sale | None"] = relationship(back_populates="visit", uselist=False)
+    gps_points: Mapped[list["VisitGpsPoint"]] = relationship(
+        back_populates="visit", cascade="all, delete-orphan"
+    )
+    alerts: Mapped[list["VisitAlert"]] = relationship(
+        back_populates="visit", cascade="all, delete-orphan"
+    )
 
 
 class Sale(Base):
@@ -150,6 +183,10 @@ class Sale(Base):
     visit_id: Mapped[int | None] = mapped_column(ForeignKey("visits.id"), nullable=True, unique=True)
     seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    origin: Mapped[SaleOrigin] = mapped_column(
+        Enum(SaleOrigin, name="saleorigin", native_enum=False, length=20),
+        default=SaleOrigin.visita,
+    )
     currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode), default=CurrencyCode.USD)
     payment_method: Mapped[PaymentMethod] = mapped_column(
         Enum(PaymentMethod), default=PaymentMethod.cash_usd
@@ -180,3 +217,47 @@ class SaleItem(Base):
 
     sale: Mapped[Sale] = relationship(back_populates="items")
     product: Mapped[Product] = relationship(back_populates="sale_items")
+
+
+class VisitGpsPoint(Base):
+    """Muestra GPS durante una visita en_curso (trail ligero)."""
+
+    __tablename__ = "visit_gps_points"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visit_id: Mapped[int] = mapped_column(ForeignKey("visits.id"), index=True)
+    latitude: Mapped[Decimal] = mapped_column(Numeric(10, 7))
+    longitude: Mapped[Decimal] = mapped_column(Numeric(10, 7))
+    accuracy_m: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    source: Mapped[GpsPointSource] = mapped_column(
+        Enum(GpsPointSource, name="gpspointsource", native_enum=False, length=20),
+        default=GpsPointSource.watch,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    visit: Mapped[Visit] = relationship(back_populates="gps_points")
+
+
+class VisitAlert(Base):
+    """Alerta visible para vendedor y supervisor (GPS lejos, sin GPS, solo foto…)."""
+
+    __tablename__ = "visit_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visit_id: Mapped[int] = mapped_column(ForeignKey("visits.id"), index=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    alert_type: Mapped[AlertType] = mapped_column(
+        Enum(AlertType, name="alerttype", native_enum=False, length=32)
+    )
+    severity: Mapped[AlertSeverity] = mapped_column(
+        Enum(AlertSeverity, name="alertseverity", native_enum=False, length=20),
+        default=AlertSeverity.warning,
+    )
+    message: Mapped[str] = mapped_column(String(255))
+    meta_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    visit: Mapped[Visit] = relationship(back_populates="alerts")
+    seller: Mapped[User] = relationship()

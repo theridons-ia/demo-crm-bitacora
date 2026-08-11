@@ -6,8 +6,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
-from .database import Base, engine
-from .routers import auth, catalog, clients, sync, visits
+from .database import engine
+from .ensure_schema import ensure_schema
+from .routers import auth, catalog, clients, evidence, sync, visits
 
 settings = get_settings()
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -26,6 +27,7 @@ app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(catalog.router)
 app.include_router(visits.router)
+app.include_router(evidence.router)
 app.include_router(sync.router)
 
 if FRONTEND_DIR.exists():
@@ -34,7 +36,7 @@ if FRONTEND_DIR.exists():
 
 @app.on_event("startup")
 def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
+    ensure_schema(engine)
 
 
 @app.get("/api/health")

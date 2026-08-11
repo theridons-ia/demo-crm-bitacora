@@ -3,7 +3,17 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import CurrencyCode, PaymentMethod, SaleResult, UserRole, VisitStatus
+from .models import (
+    AlertSeverity,
+    AlertType,
+    CurrencyCode,
+    GpsPointSource,
+    PaymentMethod,
+    SaleOrigin,
+    SaleResult,
+    UserRole,
+    VisitStatus,
+)
 
 
 class ORMModel(BaseModel):
@@ -88,6 +98,7 @@ class SaleItemIn(BaseModel):
 
 
 class SaleIn(BaseModel):
+    origin: SaleOrigin = SaleOrigin.visita
     currency: CurrencyCode = CurrencyCode.USD
     payment_method: PaymentMethod = PaymentMethod.cash_usd
     is_credit: bool = False
@@ -109,6 +120,7 @@ class SaleOut(ORMModel):
     visit_id: int | None
     seller_id: int
     client_id: int
+    origin: SaleOrigin
     currency: CurrencyCode
     payment_method: PaymentMethod
     total_amount: Decimal
@@ -184,3 +196,33 @@ class SyncResponse(BaseModel):
     accepted: int
     visit_ids: list[int]
     message: str
+
+
+class VisitGpsPointCreate(BaseModel):
+    latitude: Decimal
+    longitude: Decimal
+    accuracy_m: Decimal | None = None
+    captured_at: datetime | None = None
+    source: GpsPointSource = GpsPointSource.watch
+
+
+class VisitGpsPointOut(ORMModel):
+    id: int
+    visit_id: int
+    latitude: Decimal
+    longitude: Decimal
+    accuracy_m: Decimal | None
+    captured_at: datetime
+    source: GpsPointSource
+
+
+class VisitAlertOut(ORMModel):
+    id: int
+    visit_id: int
+    seller_id: int
+    alert_type: AlertType
+    severity: AlertSeverity
+    message: str
+    meta_json: str | None
+    acknowledged_at: datetime | None
+    created_at: datetime

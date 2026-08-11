@@ -31,7 +31,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-0.0** | Brújula documentada | `docs/DECISIONES_Y_ROADMAP.md` + este archivo + README | hecho (este commit) |
 | **SF-0.1** | App web vacía con design system | `web/` Vite+React+TS, tokens CSS, pantalla placeholder | hecho (este commit) |
 | **SF-0.2** | Web habla con API | Login → JWT → `/api/auth/me` + listar clientes | hecho |
-| **SF-0.3** | Modelo dominio ampliado | `Sale.origin`, `VisitGpsPoint`, `VisitAlert` (+ migrate/create) | pendiente |
+| **SF-0.3** | Modelo dominio ampliado | `Sale.origin`, `VisitGpsPoint`, `VisitAlert` (+ migrate/create) | hecho |
 | **SF-0.4** | Seed + CORS para Vite | Seed rico; CORS `localhost:5173`; README dual | pendiente |
 
 **Criterio “Fase 0 lista”:** puedes abrir `web/`, iniciar sesión contra `mvp/` y ver clientes.
@@ -79,13 +79,14 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-0.2** (login JWT + listado de clientes).
+**Listo para commit / tu push:** **SF-0.3** (modelo dominio + endpoints evidencia).
 
-**Siguiente:** **SF-0.3** — modelo dominio ampliado (`Sale.origin`, `VisitGpsPoint`, `VisitAlert`).
+**Siguiente:** **SF-0.4** — seed enriquecido + CORS explícito para Vite + README dual.
 
-### Cómo probar SF-0.2
+### Cómo verificar SF-0.3
 
-1. Terminal API: `cd mvp && uvicorn app.main:app --host 0.0.0.0 --port 8090`
-2. Terminal web: `cd web && npm run dev` → http://localhost:5173
-3. Login: `marina@bitacora.local` / `demo1234`
-4. Debes ver clientes del seed.
+1. Reinicia uvicorn (para `ensure_schema`).
+2. Abre http://localhost:8090/docs
+3. Busca `POST /api/visits/{visit_id}/gps-points` y `GET /api/alerts`.
+4. En schemas de venta debe aparecer `origin`.
+
