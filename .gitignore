@@ -1,0 +1,14 @@
+# Root gitignore — Bitácora Campo
+.DS_Store
+*.log
+
+# Python / MVP
+mvp/.venv/
+mvp/**/__pycache__/
+mvp/.env
+mvp/.pytest_cache/
+mvp/.mypy_cache/
+
+# Web
+web/node_modules/
+web/dist/

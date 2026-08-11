@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bitácora Campo MVP</title>
+  <meta name="theme-color" content="#F7F3ED">
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <section id="view-login" class="card">
+      <p class="eyebrow">BITÁCORA CAMPO</p>
+      <h1>Iniciar sesión</h1>
+      <p class="sub">MVP FastAPI + PostgreSQL</p>
+      <form id="login-form" class="form">
+        <label>Email
+          <input id="email" type="email" value="marina@bitacora.local" required>
+        </label>
+        <label>Password
+          <input id="password" type="password" value="demo1234" required>
+        </label>
+        <button type="submit">Entrar</button>
+        <p class="hint" id="login-error"></p>
+      </form>
+    </section>
+
+    <section id="view-app" class="hidden">
+      <header class="top">
+        <div>
+          <p class="eyebrow" id="user-role">VENDEDOR</p>
+          <h1 id="user-name">Hola</h1>
+          <p class="sub" id="user-route"></p>
+        </div>
+        <button id="logout-btn" class="ghost" type="button">Salir</button>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="home" type="button">Inicio</button>
+        <button class="tab" data-tab="visit" type="button">Visita</button>
+        <button class="tab" data-tab="list" type="button">Bitácora</button>
+        <button class="tab" data-tab="stock" type="button">Inventario</button>
+      </nav>
+
+      <section id="tab-home" class="tab-panel">
+        <div class="card dark">
+          <p class="label">ESTADO</p>
+          <h2 id="online-status">En línea</h2>
+          <p id="pending-sync">Cola offline: 0</p>
+          <button id="sync-btn" class="secondary" type="button">Sincronizar ahora</button>
+        </div>
+        <div class="metrics">
+          <article class="card"><p>Visitas</p><strong id="metric-visits">0</strong></article>
+          <article class="card"><p>Productos</p><strong id="metric-products">0</strong></article>
+        </div>
+      </section>
+
+      <section id="tab-visit" class="tab-panel hidden">
+        <div class="card">
+          <h2>Cerrar visita con GPS</h2>
+          <form id="visit-form" class="form">
+            <label>Cliente
+              <select id="client-id" required></select>
+            </label>
+            <label>Resultado
+              <select id="result" required>
+                <option value="sin_venta">Sin venta</option>
+                <option value="venta_parcial">Venta parcial</option>
+                <option value="venta_cerrada" selected>Venta cerrada</option>
+              </select>
+            </label>
+            <label>Descripción
+              <textarea id="description" rows="3" placeholder="Qué pasó en la visita"></textarea>
+            </label>
+            <div id="products-box" class="products"></div>
+            <p class="hint" id="gps-status">GPS pendiente</p>
+            <button id="gps-btn" class="secondary" type="button">Capturar GPS</button>
+            <button type="submit">Guardar visita</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="tab-list" class="tab-panel hidden">
+        <div id="visits-list" class="stack"></div>
+      </section>
+
+      <section id="tab-stock" class="tab-panel hidden">
+        <div id="stock-list" class="stack"></div>
+      </section>
+    </section>
+  </div>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
