@@ -54,4 +54,15 @@ web/
 
 ## Sub-fase
 
-Ver `../docs/SUBFASES.md` — este scaffold es **SF-0.1**.
+Ver `../docs/SUBFASES.md`.
+
+- **SF-0.1** — scaffold + design tokens  
+- **SF-0.2** — login JWT + listado de clientes (`/login`, `/clientes`)
+
+### Probar login
+
+Con API en `:8090` y `npm run dev`:
+
+1. Abre http://localhost:5173/login  
+2. `marina@bitacora.local` / `demo1234`  
+3. Debes ver clientes del seed.

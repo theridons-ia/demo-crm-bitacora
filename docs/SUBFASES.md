@@ -30,7 +30,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 |----|----------|------------|--------|
 | **SF-0.0** | Brújula documentada | `docs/DECISIONES_Y_ROADMAP.md` + este archivo + README | hecho (este commit) |
 | **SF-0.1** | App web vacía con design system | `web/` Vite+React+TS, tokens CSS, pantalla placeholder | hecho (este commit) |
-| **SF-0.2** | Web habla con API | Login → JWT → `/api/auth/me` + listar clientes | pendiente |
+| **SF-0.2** | Web habla con API | Login → JWT → `/api/auth/me` + listar clientes | hecho |
 | **SF-0.3** | Modelo dominio ampliado | `Sale.origin`, `VisitGpsPoint`, `VisitAlert` (+ migrate/create) | pendiente |
 | **SF-0.4** | Seed + CORS para Vite | Seed rico; CORS `localhost:5173`; README dual | pendiente |
 
@@ -79,8 +79,13 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** SF-0.0 + SF-0.1 (juntos en el primer checkpoint de docs+web).
+**Listo para commit / tu push:** **SF-0.2** (login JWT + listado de clientes).
 
-**Siguiente:** **SF-0.2** — login real contra el API (`/api/auth/login` → JWT → clientes).
+**Siguiente:** **SF-0.3** — modelo dominio ampliado (`Sale.origin`, `VisitGpsPoint`, `VisitAlert`).
 
-Nota: en este entorno no se pudo instalar Node automáticamente; en tu máquina corre `nvm install 22` (o Node desde nodejs.org) y luego `cd web && npm install && npm run dev`.
+### Cómo probar SF-0.2
+
+1. Terminal API: `cd mvp && uvicorn app.main:app --host 0.0.0.0 --port 8090`
+2. Terminal web: `cd web && npm run dev` → http://localhost:5173
+3. Login: `marina@bitacora.local` / `demo1234`
+4. Debes ver clientes del seed.

@@ -137,3 +137,115 @@ a {
     --app-max-width: 1100px;
   }
 }
+
+/* ——— Utilidades de página (SF-0.2) ——— */
+.eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.muted {
+  color: var(--muted-foreground);
+}
+
+.muted.small,
+.small {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+}
+
+.form-error {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: #fde8e6;
+  color: var(--destructive);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.login-shell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.login-header h1 {
+  margin: 0.35rem 0 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.login-card {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.login-card .hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.login-card code {
+  font-size: 0.8rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.page-header h1 {
+  margin: 0.35rem 0 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+.section-title h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-chip);
+  background: var(--secondary);
+  color: var(--primary);
+}
+
+.client-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.client-item {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.client-item:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
