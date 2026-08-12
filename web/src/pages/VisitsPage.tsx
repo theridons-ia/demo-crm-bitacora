@@ -75,6 +75,8 @@ function localVisitToVisit(local: LocalPendingVisit): Visit {
       address: null,
       phone: null,
       notes: null,
+      latitude: null,
+      longitude: null,
       is_active: true,
     },
   };

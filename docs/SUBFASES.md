@@ -18,9 +18,12 @@ Rama de trabajo sugerida: la actual (`cursor/mvp-fastapi-postgres-1c14`) o una n
 2. Revisas en local (API + web).
 3. Commit local (puedo prepararlo yo si lo pides).
 4. **Tú** ejecutas `git push`.
-5. Pasamos a la siguiente SF.
+5. Documentamos en [`docs/implementacion/`](implementacion/README.md) qué se hizo y cómo.
+6. Pasamos a la siguiente SF.
 
 No mezclar varias SF en un solo commit si se puede evitar.
+
+**Bitácora de implementación (detalle por fase):** [implementacion/README.md](implementacion/README.md)
 
 ---
 
@@ -53,6 +56,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.8** | Orden sin visita | origen mostrador / online | hecho |
 | **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | hecho |
 | **SF-1.10** | Mapa evidencia | Leaflet: puntos de una visita | hecho |
+| **SF-1.11** | Pin PDV en cliente + mapa | Dirección + pin; PDV verde vs trail vendedor | hecho |
 
 **Criterio “Fase 1 lista”:** un vendedor hace el día de campo offline-ish con evidencia GPS.
 
@@ -80,11 +84,15 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Fase 1 vendedor:** SF-1.1 → 1.10 listos (salvo pulidos).
+**Listo para commit / tu push:** **SF-1.11** (pin PDV en cliente + leyenda en mapa).
 
-**Listo para commit / tu push:** **SF-1.10** (mapa Leaflet del trail GPS).
+**Siguiente:** Fase 2 supervisor (**SF-2.1** layout) o deploy Contabo / `enrutas.cc`.
 
-**Siguiente:** Fase 2 supervisor (**SF-2.1** layout) o pulidos PWA.
+### Cómo verificar SF-1.11
+
+1. Inicio → Nuevo cliente → dirección escrita + toca el mapa (pin verde) o «Usar mi GPS».
+2. Guarda; en la lista debe verse el pin.
+3. Visita a ese cliente → **Ver trail**: PDV verde + puntos vendedor (inicio/trail/cierre) y leyenda.
 
 ### Cómo verificar SF-1.10
 

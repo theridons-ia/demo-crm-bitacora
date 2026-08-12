@@ -1,29 +1,15 @@
 import L from "leaflet";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./Button";
 import { ApiError, fetchVisitGpsPoints } from "../lib/api";
+import { clientPdvIcon, trailIconForSource } from "../lib/mapMarkers";
 import type { Visit, VisitGpsPoint } from "../lib/types";
 
-/* Vite + Leaflet: iconos por defecto rotos con bundlers */
-const DefaultIcon = L.icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
 const SOURCE_LABEL: Record<string, string> = {
-  start: "Inicio",
-  watch: "Trail",
-  end: "Cierre",
+  start: "Inicio (vendedor)",
+  watch: "Trail (vendedor)",
+  end: "Cierre (vendedor)",
 };
 
 type Props = {
@@ -47,7 +33,7 @@ function visitFallbackPoints(visit: Visit): VisitGpsPoint[] {
   ];
 }
 
-/** Mapa Leaflet con trail GPS de una visita (SF-1.10). */
+/** Mapa Leaflet: PDV (verde) + trail del vendedor (SF-1.10 / SF-1.11). */
 export function VisitMapSheet({ visit, open, onClose }: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -103,6 +89,25 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
     }).addTo(map);
 
+    const bounds: L.LatLngExpression[] = [];
+
+    const client = visit.client;
+    if (client?.latitude != null && client?.longitude != null) {
+      const clat = Number(client.latitude);
+      const clng = Number(client.longitude);
+      if (Number.isFinite(clat) && Number.isFinite(clng)) {
+        const ll: L.LatLngExpression = [clat, clng];
+        bounds.push(ll);
+        L.marker(ll, { icon: clientPdvIcon })
+          .addTo(map)
+          .bindPopup(
+            `<strong>PDV · ${client.name}</strong>${
+              client.address ? `<br/><small>${client.address}</small>` : ""
+            }`,
+          );
+      }
+    }
+
     const latLngs: L.LatLngExpression[] = [];
     for (const p of points) {
       const lat = Number(p.latitude);
@@ -110,18 +115,22 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const ll: L.LatLngExpression = [lat, lng];
       latLngs.push(ll);
+      bounds.push(ll);
       const label = SOURCE_LABEL[p.source] ?? p.source;
       const acc = p.accuracy_m ? ` · ±${Number(p.accuracy_m).toFixed(0)} m` : "";
-      L.marker(ll)
+      L.marker(ll, { icon: trailIconForSource(p.source) })
         .addTo(map)
         .bindPopup(`<strong>${label}</strong>${acc}<br/><small>${p.captured_at}</small>`);
     }
 
     if (latLngs.length >= 2) {
-      L.polyline(latLngs, { color: "#18312f", weight: 3, opacity: 0.85 }).addTo(map);
-      map.fitBounds(L.latLngBounds(latLngs), { padding: [36, 36] });
-    } else if (latLngs.length === 1) {
-      map.setView(latLngs[0], 16);
+      L.polyline(latLngs, { color: "#f16b5f", weight: 3, opacity: 0.9 }).addTo(map);
+    }
+
+    if (bounds.length >= 2) {
+      map.fitBounds(L.latLngBounds(bounds), { padding: [36, 36] });
+    } else if (bounds.length === 1) {
+      map.setView(bounds[0], 16);
     } else {
       map.setView([10.0647, -69.334], 12);
     }
@@ -132,11 +141,15 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       map.remove();
       mapRef.current = null;
     };
-  }, [open, points]);
+  }, [open, points, visit.client]);
 
   if (!open) return null;
 
   const clientName = visit.client?.name ?? `Cliente #${visit.client_id}`;
+  const hasPdv =
+    visit.client?.latitude != null &&
+    visit.client?.longitude != null &&
+    Number.isFinite(Number(visit.client.latitude));
 
   return (
     <div className="screen-form" role="dialog" aria-modal="true" aria-labelledby="visit-map-title">
@@ -148,8 +161,10 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
             {loading
               ? "Cargando puntos…"
               : points.length
-                ? `${points.length} punto(s) · inicio / trail / cierre`
-                : "Sin coordenadas para esta visita"}
+                ? `${points.length} punto(s) vendedor${hasPdv ? " · PDV en mapa" : ""}`
+                : hasPdv
+                  ? "Solo pin del PDV (sin trail aún)"
+                  : "Sin coordenadas"}
           </p>
         </div>
         <Button variant="ghost" type="button" onClick={onClose}>
@@ -158,6 +173,21 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
+
+      <div className="map-legend" aria-hidden>
+        <span>
+          <i className="map-marker-dot map-marker-dot-pdv" /> PDV
+        </span>
+        <span>
+          <i className="map-marker-dot map-marker-dot-start" /> Inicio
+        </span>
+        <span>
+          <i className="map-marker-dot map-marker-dot-seller" /> Trail
+        </span>
+        <span>
+          <i className="map-marker-dot map-marker-dot-end" /> Cierre
+        </span>
+      </div>
 
       <div className="card visit-map-card">
         <div ref={mapEl} className="visit-map" />

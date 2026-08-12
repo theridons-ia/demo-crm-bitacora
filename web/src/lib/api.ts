@@ -105,6 +105,8 @@ export type ClientCreateInput = {
   address?: string | null;
   phone?: string | null;
   notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export function createClient(payload: ClientCreateInput): Promise<Client> {

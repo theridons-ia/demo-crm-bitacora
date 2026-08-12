@@ -112,6 +112,11 @@ export function HomePage() {
                 {client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "Sin identificación"}
               </p>
               {client.address ? <p className="muted small">{client.address}</p> : null}
+              {client.latitude != null && client.longitude != null ? (
+                <p className="muted small">
+                  Pin PDV: {Number(client.latitude).toFixed(5)}, {Number(client.longitude).toFixed(5)}
+                </p>
+              ) : null}
               {client.phone ? <p className="muted small">{client.phone}</p> : null}
             </li>
           ))}

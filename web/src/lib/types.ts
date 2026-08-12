@@ -21,6 +21,8 @@ export type Client = {
   address: string | null;
   phone: string | null;
   notes: string | null;
+  latitude: string | null;
+  longitude: string | null;
   is_active: boolean;
 };
 
