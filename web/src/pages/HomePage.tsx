@@ -1,4 +1,4 @@
-import { LogOut, Plus, Search, Users } from "lucide-react";
+import { LogOut, MapPin, Plus, Search, Store, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
@@ -8,7 +8,14 @@ import { ApiError, fetchClients } from "../lib/api";
 import { getCachedClients } from "../lib/offlineQueue";
 import type { Client } from "../lib/types";
 
-/** Inicio SF-1.2: cartera de clientes con búsqueda y alta. */
+function hasPdvPin(client: Client): boolean {
+  if (client.latitude == null || client.longitude == null) return false;
+  const lat = Number(client.latitude);
+  const lng = Number(client.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng);
+}
+
+/** Inicio SF-1.2 / 1.11: cartera de clientes con búsqueda y alta. */
 export function HomePage() {
   const { user, logout } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
@@ -16,6 +23,7 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +82,7 @@ export function HomePage() {
           <h2>Cartera</h2>
         </div>
         <p className="muted small" style={{ margin: "0 0 0.85rem" }}>
-          {clients.length} cliente{clients.length === 1 ? "" : "s"} · SF-1.2 alta con RIF/CI
+          {clients.length} cliente{clients.length === 1 ? "" : "s"} · los más recientes arriba
         </p>
         <Button variant="accent" block onClick={() => setFormOpen(true)}>
           <Plus size={18} />
@@ -87,7 +95,7 @@ export function HomePage() {
           <Search size={18} className="search-icon" aria-hidden />
           <TextField
             id="clients-search"
-            label="Buscar"
+            label="Buscar cliente"
             placeholder="Nombre, RIF, CI, estado…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -98,35 +106,57 @@ export function HomePage() {
         {error ? <p className="form-error">{error}</p> : null}
 
         {!loading && !error && filtered.length === 0 ? (
-          <p className="muted">No hay coincidencias.</p>
+          <p className="muted">No hay coincidencias. Prueba otra búsqueda o crea un cliente.</p>
         ) : null}
 
         <ul className="client-list">
-          {filtered.map((client) => (
-            <li key={client.id} className="client-item">
-              <div>
-                <strong>{client.name}</strong>
-                {client.state ? <span className="muted"> · {client.state}</span> : null}
-              </div>
-              <p className="muted small">
-                {client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "Sin identificación"}
-              </p>
-              {client.address ? <p className="muted small">{client.address}</p> : null}
-              {client.latitude != null && client.longitude != null ? (
+          {filtered.map((client) => {
+            const pinned = hasPdvPin(client);
+            const highlight = justCreatedId === client.id;
+            return (
+              <li
+                key={client.id}
+                className={`client-item${highlight ? " client-item-new" : ""}`}
+              >
+                <div className="client-item-head">
+                  <div>
+                    <strong>{client.name}</strong>
+                    {client.state ? <span className="muted"> · {client.state}</span> : null}
+                  </div>
+                  {pinned ? (
+                    <span className="client-pin-badge" title="Tiene ubicación en mapa">
+                      <Store size={14} aria-hidden />
+                      Con pin
+                    </span>
+                  ) : (
+                    <span className="client-pin-badge muted-badge">Sin pin</span>
+                  )}
+                </div>
                 <p className="muted small">
-                  Pin PDV: {Number(client.latitude).toFixed(5)}, {Number(client.longitude).toFixed(5)}
+                  {client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "Sin identificación"}
                 </p>
-              ) : null}
-              {client.phone ? <p className="muted small">{client.phone}</p> : null}
-            </li>
-          ))}
+                {client.address ? <p className="muted small">{client.address}</p> : null}
+                {pinned ? (
+                  <p className="muted small">
+                    <MapPin size={14} style={{ verticalAlign: "middle" }} />{" "}
+                    {Number(client.latitude).toFixed(5)}, {Number(client.longitude).toFixed(5)}
+                  </p>
+                ) : null}
+                {client.phone ? <p className="muted small">{client.phone}</p> : null}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
       <ClientForm
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        onCreated={(client) => setClients((prev) => [client, ...prev])}
+        onCreated={(client) => {
+          setQuery("");
+          setJustCreatedId(client.id);
+          setClients((prev) => [client, ...prev.filter((c) => c.id !== client.id)]);
+        }}
       />
     </>
   );

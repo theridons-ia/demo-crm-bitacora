@@ -11,7 +11,12 @@ router = APIRouter(prefix="/api/clients", tags=["clients"])
 
 @router.get("", response_model=list[ClientOut])
 def list_clients(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    return db.query(Client).filter(Client.is_active.is_(True)).order_by(Client.name).all()
+    return (
+        db.query(Client)
+        .filter(Client.is_active.is_(True))
+        .order_by(Client.created_at.desc(), Client.id.desc())
+        .all()
+    )
 
 
 @router.post("", response_model=ClientOut)
