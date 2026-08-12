@@ -83,6 +83,13 @@ class AlertSeverity(str, enum.Enum):
     critical = "critical"
 
 
+class StockMovementKind(str, enum.Enum):
+    """Ingreso por compra o ajuste manual (SF-3.1)."""
+
+    purchase = "purchase"
+    adjustment = "adjustment"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -147,6 +154,7 @@ class Product(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     sale_items: Mapped[list["SaleItem"]] = relationship(back_populates="product")
+    stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="product")
 
 
 class SellerProductVisibility(Base):
@@ -289,3 +297,26 @@ class VisitAlert(Base):
 
     visit: Mapped[Visit] = relationship(back_populates="alerts")
     seller: Mapped[User] = relationship()
+
+
+class StockMovement(Base):
+    """Movimiento de inventario: compra (ingreso) o ajuste (SF-3.1)."""
+
+    __tablename__ = "stock_movements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)
+    kind: Mapped[StockMovementKind] = mapped_column(
+        Enum(StockMovementKind, name="stockmovementkind", native_enum=False, length=20),
+        default=StockMovementKind.purchase,
+    )
+    quantity: Mapped[int] = mapped_column(Integer)  # + entra / - sale (ajuste)
+    unit_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    product: Mapped[Product] = relationship(back_populates="stock_movements")
+    supplier: Mapped[Supplier | None] = relationship()
+    created_by: Mapped[User] = relationship()

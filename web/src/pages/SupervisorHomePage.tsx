@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Map, Package, Route, Users } from "lucide-react";
+import { AlertTriangle, Map, Package, PackagePlus, Route, Users } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, fetchAlerts, fetchSellers, fetchVisits } from "../lib/api";
 import type { VisitAlert } from "../lib/types";
@@ -23,6 +23,12 @@ const LINKS = [
     title: "Visibilidad catálogo",
     blurb: "Qué productos ve cada vendedor.",
     icon: Package,
+  },
+  {
+    to: "/sup/inventario",
+    title: "Inventario e ingresos",
+    blurb: "Compras, ajustes y existencias.",
+    icon: PackagePlus,
   },
   {
     to: "/sup/mapa",

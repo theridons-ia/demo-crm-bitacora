@@ -353,3 +353,57 @@ export function fetchAlerts(params?: { unacked_only?: boolean }): Promise<VisitA
 export function acknowledgeAlert(alertId: number): Promise<VisitAlert> {
   return request<VisitAlert>(`/api/alerts/${alertId}/ack`, { method: "POST" });
 }
+
+export type StockMovementKind = "purchase" | "adjustment";
+
+export type StockMovement = {
+  id: number;
+  product_id: number;
+  supplier_id: number | null;
+  kind: StockMovementKind;
+  quantity: number;
+  unit_cost_usd: string | null;
+  notes: string | null;
+  created_by_id: number;
+  created_at: string;
+  product_name: string | null;
+  supplier_name: string | null;
+  created_by_name: string | null;
+  stock_after: number | null;
+};
+
+export type StockMovementInput = {
+  product_id: number;
+  kind: StockMovementKind;
+  quantity: number;
+  supplier_id?: number | null;
+  unit_cost_usd?: number | null;
+  notes?: string | null;
+};
+
+export function fetchStockMovements(): Promise<StockMovement[]> {
+  return request<StockMovement[]>("/api/stock-movements");
+}
+
+export function createStockMovement(payload: StockMovementInput): Promise<StockMovement> {
+  return request<StockMovement>("/api/stock-movements", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type Supplier = {
+  id: number;
+  name: string;
+  rif: string | null;
+  ci: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  is_active: boolean;
+};
+
+export function fetchSuppliers(): Promise<Supplier[]> {
+  return request<Supplier[]>("/api/suppliers");
+}

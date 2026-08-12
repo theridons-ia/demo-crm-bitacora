@@ -14,6 +14,7 @@ import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { RouteDayPage } from "./pages/RouteDayPage";
 import { SalesPage } from "./pages/SalesPage";
 import { SupervisorHomePage } from "./pages/SupervisorHomePage";
+import { SupervisorStockPage } from "./pages/SupervisorStockPage";
 import { TeamMapPage } from "./pages/TeamMapPage";
 import { VisitsPage } from "./pages/VisitsPage";
 
@@ -67,6 +68,7 @@ export default function App() {
             <Route path="ruta" element={<RouteDayPage />} />
             <Route path="alertas" element={<AlertsInboxPage />} />
             <Route path="catalogo" element={<CatalogVisibilityPage />} />
+            <Route path="inventario" element={<SupervisorStockPage />} />
             <Route path="mapa" element={<TeamMapPage />} />
           </Route>
 

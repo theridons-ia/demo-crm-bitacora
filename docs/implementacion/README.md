@@ -22,6 +22,7 @@ Nombre de archivos:
 | `FASE-0-CIMIENTOS.md` | Resumen Fase 0 (si se documenta retroactivo) |
 | `FASE-1-VENDEDOR.md` | SF-1.1 … SF-1.10 (+ fixes relacionados) |
 | `FASE-2-SUPERVISOR.md` | Layout `/sup` (SF-2.1) + siguientes |
+| `FASE-3-ENDURECER.md` | Inventario/ingresos (SF-3.1) + siguientes |
 | `NOTAS-PRODUCTO.md` | Decisiones sueltas (marca EnRutas, pins cliente/vendedor, etc.) |
 
 ## Índice

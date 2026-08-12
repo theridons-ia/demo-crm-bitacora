@@ -11,6 +11,7 @@ from .models import (
     PaymentMethod,
     SaleOrigin,
     SaleResult,
+    StockMovementKind,
     UserRole,
     VisitStatus,
 )
@@ -165,6 +166,39 @@ class CatalogVisibilityUpdate(BaseModel):
 
     unrestricted: bool = False
     product_ids: list[int] = Field(default_factory=list)
+
+
+class StockMovementCreate(BaseModel):
+    product_id: int
+    kind: StockMovementKind = StockMovementKind.purchase
+    quantity: int
+    supplier_id: int | None = None
+    unit_cost_usd: Decimal | None = None
+    notes: str | None = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def quantity_rules(self):
+        if self.kind == StockMovementKind.purchase and self.quantity <= 0:
+            raise ValueError("La compra requiere cantidad positiva")
+        if self.kind == StockMovementKind.adjustment and self.quantity == 0:
+            raise ValueError("El ajuste no puede ser 0")
+        return self
+
+
+class StockMovementOut(ORMModel):
+    id: int
+    product_id: int
+    supplier_id: int | None
+    kind: StockMovementKind
+    quantity: int
+    unit_cost_usd: Decimal | None
+    notes: str | None
+    created_by_id: int
+    created_at: datetime
+    product_name: str | None = None
+    supplier_name: str | None = None
+    created_by_name: str | None = None
+    stock_after: int | None = None
 
 
 class SaleItemIn(BaseModel):

@@ -79,17 +79,29 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## Fase 3 — Endurecer (post-piloto)
 
-| ID | Objetivo | Notas |
-|----|----------|--------|
-| SF-3.x | Alembic formal, crédito, compras, FX diario, import Excel | Ver roadmap |
+| ID | Objetivo | Entregable | Estado |
+|----|----------|------------|--------|
+| **SF-3.1** | Inventario e ingresos | Compras/ajustes stock (supervisor) | hecho |
+| **SF-3.2** | Crédito / cobranza | Estado de cuenta básico | pendiente |
+| **SF-3.3** | FX diario | Tasa USD/VES del día | pendiente |
+| **SF-3.4** | Import Excel | Maestros clientes/productos | pendiente |
+| **SF-3.5** | Alembic formal | Migraciones DB (pre-prod) | pendiente |
+
+Detalle: [`implementacion/FASE-3-ENDURECER.md`](implementacion/FASE-3-ENDURECER.md)
 
 ---
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-2.6** (refresh visual).
+**Listo para commit / tu push:** **SF-3.1** (inventario e ingresos supervisor).
 
-**Siguiente:** Fase 3 (endurecer) o Contabo / `enrutas.cc` cuando digas.
+**Siguiente:** **SF-3.2** crédito/cobranza (o Contabo al final).
+
+### Cómo verificar SF-3.1
+
+1. `supervisor@…` → Inventario → compra/ingreso → stock sube.
+2. Ajuste −N sin pasar de 0.
+3. Vendedor ve stock actualizado en su Inventario.
 
 ### Cómo verificar SF-2.6
 
