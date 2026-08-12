@@ -33,8 +33,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     let detail = `Error HTTP ${response.status}`;
     try {
-      const data = (await response.json()) as { detail?: string };
-      if (data.detail) detail = data.detail;
+      const data = (await response.json()) as { detail?: unknown };
+      if (typeof data.detail === "string") {
+        detail = data.detail;
+      } else if (Array.isArray(data.detail)) {
+        detail = data.detail
+          .map((item) => {
+            if (item && typeof item === "object" && "msg" in item) {
+              return String((item as { msg: string }).msg);
+            }
+            return JSON.stringify(item);
+          })
+          .join("; ");
+      }
     } catch {
       /* cuerpo no JSON */
     }
@@ -71,4 +82,22 @@ export function fetchMe(): Promise<User> {
 
 export function fetchClients(): Promise<Client[]> {
   return request<Client[]>("/api/clients");
+}
+
+export type ClientCreateInput = {
+  name: string;
+  rif?: string | null;
+  ci?: string | null;
+  state?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+};
+
+export function createClient(payload: ClientCreateInput): Promise<Client> {
+  return request<Client>("/api/clients", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }

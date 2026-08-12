@@ -44,7 +44,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 |----|----------|------------|--------|
 | **SF-1.1** | Shell UX vendedor | Bottom nav + tokens; layout móvil | hecho |
 | **SF-1.1b** | Nav desktop vendedor | ≥768px: top bar (ocultar bottom nav); móvil sigue abajo | pendiente |
-| **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | pendiente |
+| **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | hecho |
 | **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | pendiente |
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | pendiente |
 | **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | pendiente |
@@ -80,13 +80,13 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Agendado:** decisión **#14** navegación responsive + **SF-1.1b**; decisión **#15** referencia PowerStreet ([REFERENCIA_POWERSTREET.md](./REFERENCIA_POWERSTREET.md)).
+**Listo para commit / tu push:** **SF-1.2** (alta de clientes + búsqueda). También hay commits locales previos si no pusheaste (docs PowerStreet).
 
-**Siguiente al despertar:** **SF-1.2** — clientes CRUD (alta con RIF/CI), o **SF-1.1b** si preferimos el shell desktop antes.
+**Siguiente:** **SF-1.1b** (nav desktop) o **SF-1.3** (ciclo de visitas) — recomendado **SF-1.3** para valor de campo.
 
-### Cómo verificar SF-1.1
+### Cómo verificar SF-1.2
 
-1. http://localhost:5173 → login → `/app/inicio`
-2. Barra inferior: Inicio · Visitas · Ventas · Inventario · Resumen
-3. Las pestañas vacías muestran el SF que las llenará.
+1. API + `npm run dev`
+2. Login → Inicio → **Nuevo cliente** (RIF y/o CI)
+3. Buscar por nombre/RIF/CI
 

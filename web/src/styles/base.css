@@ -300,3 +300,44 @@ a {
   border-top: none;
   padding-top: 0;
 }
+
+.form-stack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 420px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.screen-form {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  background: var(--background);
+  overflow: auto;
+  padding: 18px var(--screen-pad) calc(28px + var(--safe-bottom));
+}
+
+.search-row {
+  position: relative;
+  margin-bottom: 0.75rem;
+}
+
+.search-row .field {
+  flex: 1;
+}
+
+.search-row .search-icon {
+  display: none;
+}

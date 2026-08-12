@@ -36,7 +36,7 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 | 12 | Datos | Seed / datos de prueba hasta tener maestros reales. |
 | 13 | Identificación VE | **Clientes y proveedores** llevan identificación venezolana: **RIF** y/o **CI** (campos explícitos; al menos uno requerido en validación de negocio). |
 | 14 | Navegación responsive | **Móvil:** bottom nav (vendedor). **Tablet/desktop:** top bar o sidebar (no barra inferior tipo app). Misma app, shells distintos por ancho/rol — ver SF-1.1b / SF-2.1. |
-| 15 | Referencia competitiva | Inspiración UX/flujo: **PowerStreet Mobile**. Detalle en [REFERENCIA_POWERSTREET.md](./REFERENCIA_POWERSTREET.md). No copiar ERP/facturación Enterprise en el MVP. |
+| 16 | Sin ERP (ahora) | El cliente **no tiene ERP** y no quiere integración en el arranque. Bitácora es el sistema de campo. Integración ERP queda **opcional a futuro** (API ya lo facilita). |
 
 ### Coherencia visual (no negociable en UI)
 
