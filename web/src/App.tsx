@@ -6,6 +6,7 @@ import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { SalesPage } from "./pages/SalesPage";
 import { VisitsPage } from "./pages/VisitsPage";
 
 export default function App() {
@@ -25,16 +26,7 @@ export default function App() {
             <Route index element={<Navigate to="inicio" replace />} />
             <Route path="inicio" element={<HomePage />} />
             <Route path="visitas" element={<VisitsPage />} />
-            <Route
-              path="ventas"
-              element={
-                <PlaceholderPage
-                  title="Ventas"
-                  nextSf="SF-1.7 / SF-1.8"
-                  blurb="Órdenes ligadas a visita o sin visita (mostrador/online)."
-                />
-              }
-            />
+            <Route path="ventas" element={<SalesPage />} />
             <Route path="inventario" element={<InventoryPage />} />
             <Route
               path="resumen"

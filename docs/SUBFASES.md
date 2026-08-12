@@ -50,7 +50,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | hecho |
 | **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | hecho |
 | **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | hecho |
-| **SF-1.8** | Orden sin visita | origen mostrador / online | pendiente |
+| **SF-1.8** | Orden sin visita | origen mostrador / online | hecho |
 | **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | pendiente |
 | **SF-1.10** | Mapa evidencia | Leaflet: puntos de una visita | pendiente |
 
@@ -80,9 +80,16 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.6** (GPS impreciso / omitido + foto + alertas).
+**Listo para commit / tu push:** **SF-1.8** (venta sin visita: mostrador / online).
 
-**Siguiente:** **SF-1.8** (venta sin visita) o **SF-1.1b** (nav desktop).
+**Siguiente:** **SF-1.1b** (nav desktop) o **SF-1.9** (offline cola) o **SF-1.10** (mapa).
+
+### Cómo verificar SF-1.8
+
+1. Reinicia uvicorn si hace falta (router `/api/sales`).
+2. En web → **Ventas** → **Nueva** → cliente + origen mostrador/online + productos → Confirmar.
+3. La venta aparece en la lista (sin visita) y el stock baja en Inventario.
+4. Las ventas al cerrar visita también listan aquí con origen `visita`.
 
 ### Cómo verificar SF-1.6
 

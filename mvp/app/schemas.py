@@ -144,6 +144,19 @@ class SaleIn(BaseModel):
     created_offline: bool = False
 
 
+class SaleCreate(SaleIn):
+    """Venta de primer nivel sin visita (SF-1.8)."""
+
+    client_id: int
+    origin: SaleOrigin = SaleOrigin.mostrador
+
+    @model_validator(mode="after")
+    def origin_must_be_standalone(self):
+        if self.origin == SaleOrigin.visita:
+            raise ValueError("Para origen visita cierra la visita; aquí usa mostrador u online")
+        return self
+
+
 class SaleItemOut(ORMModel):
     product_id: int
     quantity: int
@@ -165,6 +178,7 @@ class SaleOut(ORMModel):
     created_offline: bool
     created_at: datetime
     items: list[SaleItemOut] = []
+    client: ClientOut | None = None
 
 
 class VisitCreate(BaseModel):

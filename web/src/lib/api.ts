@@ -4,6 +4,8 @@ import type {
   CurrencyCode,
   PaymentMethod,
   Product,
+  Sale,
+  SaleOrigin,
   SaleResult,
   TokenResponse,
   User,
@@ -182,6 +184,30 @@ export function closeVisit(visitId: number, payload: VisitCloseInput): Promise<V
 
 export function fetchProducts(): Promise<Product[]> {
   return request<Product[]>("/api/products");
+}
+
+export function fetchSales(): Promise<Sale[]> {
+  return request<Sale[]>("/api/sales");
+}
+
+export type SaleCreateInput = {
+  client_id: number;
+  origin: Exclude<SaleOrigin, "visita">;
+  currency?: CurrencyCode;
+  payment_method?: PaymentMethod;
+  is_credit?: boolean;
+  notes?: string | null;
+  items: { product_id: number; quantity: number }[];
+  local_uuid?: string | null;
+  created_offline?: boolean;
+};
+
+export function createSale(payload: SaleCreateInput): Promise<Sale> {
+  return request<Sale>("/api/sales", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function fetchVisitGpsPoints(visitId: number): Promise<VisitGpsPoint[]> {

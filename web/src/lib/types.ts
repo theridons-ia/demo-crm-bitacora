@@ -66,6 +66,32 @@ export type PaymentMethod =
   | "cash_eur"
   | "credit";
 
+export type SaleOrigin = "visita" | "mostrador" | "online";
+
+export type SaleItem = {
+  product_id: number;
+  quantity: number;
+  unit_price: string;
+  line_total: string;
+};
+
+export type Sale = {
+  id: number;
+  visit_id: number | null;
+  seller_id: number;
+  client_id: number;
+  origin: SaleOrigin;
+  currency: CurrencyCode;
+  payment_method: PaymentMethod;
+  total_amount: string;
+  is_credit: boolean;
+  notes: string | null;
+  created_offline: boolean;
+  created_at: string;
+  items: SaleItem[];
+  client: Client | null;
+};
+
 export type GpsPointSource = "start" | "watch" | "end";
 
 export type VisitGpsPoint = {
