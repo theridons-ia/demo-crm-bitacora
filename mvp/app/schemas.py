@@ -328,3 +328,6 @@ class VisitAlertOut(ORMModel):
     meta_json: str | None
     acknowledged_at: datetime | None
     created_at: datetime
+    seller_name: str | None = None
+    client_name: str | None = None
+    client_id: int | None = None

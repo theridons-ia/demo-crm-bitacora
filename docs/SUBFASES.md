@@ -69,7 +69,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 |----|----------|------------|--------|
 | **SF-2.1** | Layout supervisor | Sidebar o top nav tablet/desktop (sin bottom nav) | hecho |
 | **SF-2.2** | Ruta del día | Asignar / desasignar visitas planificadas | hecho |
-| **SF-2.3** | Alertas GPS/foto | Inbox de alertas | pendiente |
+| **SF-2.3** | Alertas GPS/foto | Inbox de alertas | hecho |
 | **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | pendiente |
 | **SF-2.5** | Mapa equipo | Visitas del día en mapa | pendiente |
 
@@ -85,9 +85,14 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-2.2** (ruta del día).
+**Listo para commit / tu push:** **SF-2.3** (inbox de alertas).
 
-**Siguiente:** **SF-2.3** inbox de alertas. Contabo más adelante.
+**Siguiente:** **SF-2.4** visibilidad catálogo. Contabo más adelante.
+
+### Cómo verificar SF-2.3
+
+1. `supervisor@…` → Alertas → pendientes (seed o cierres reales).
+2. Marcar vista; filtrar Todas para ver historial.
 
 ### Cómo verificar SF-2.2
 

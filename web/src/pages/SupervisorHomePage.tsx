@@ -14,7 +14,7 @@ const LINKS = [
     to: "/sup/alertas",
     title: "Alertas GPS / foto",
     blurb: "Inbox de cierres lejos, sin GPS o solo foto.",
-    sf: "SF-2.3",
+    sf: "SF-2.3 · listo",
     icon: AlertTriangle,
   },
   {
@@ -60,7 +60,7 @@ export function SupervisorHomePage() {
               <h2 className="sup-home-title">{title}</h2>
               <p className="muted small">{blurb}</p>
               <p className="sup-home-sf muted small">
-                {sf.startsWith("SF-2.2") ? sf : `Pendiente · ${sf}`}
+                {sf.includes("listo") ? sf : `Pendiente · ${sf}`}
               </p>
             </div>
           </Link>

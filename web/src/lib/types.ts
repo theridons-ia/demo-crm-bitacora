@@ -97,6 +97,30 @@ export type Sale = {
 
 export type GpsPointSource = "start" | "watch" | "end";
 
+export type AlertType =
+  | "no_gps"
+  | "gps_far"
+  | "photo_only"
+  | "gps_skipped"
+  | "gps_low_accuracy";
+
+export type AlertSeverity = "info" | "warning" | "critical";
+
+export type VisitAlert = {
+  id: number;
+  visit_id: number;
+  seller_id: number;
+  alert_type: AlertType;
+  severity: AlertSeverity;
+  message: string;
+  meta_json: string | null;
+  acknowledged_at: string | null;
+  created_at: string;
+  seller_name: string | null;
+  client_name: string | null;
+  client_id: number | null;
+};
+
 export type VisitGpsPoint = {
   id: number;
   visit_id: number;

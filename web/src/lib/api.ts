@@ -10,6 +10,7 @@ import type {
   TokenResponse,
   User,
   Visit,
+  VisitAlert,
   VisitGpsPoint,
   VisitStatus,
 } from "./types";
@@ -317,4 +318,15 @@ export function syncOfflineVisits(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+}
+
+export function fetchAlerts(params?: { unacked_only?: boolean }): Promise<VisitAlert[]> {
+  const q = new URLSearchParams();
+  if (params?.unacked_only) q.set("unacked_only", "true");
+  const qs = q.toString();
+  return request<VisitAlert[]>(`/api/alerts${qs ? `?${qs}` : ""}`);
+}
+
+export function acknowledgeAlert(alertId: number): Promise<VisitAlert> {
+  return request<VisitAlert>(`/api/alerts/${alertId}/ack`, { method: "POST" });
 }

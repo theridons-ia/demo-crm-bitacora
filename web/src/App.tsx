@@ -5,13 +5,14 @@ import { RequireRole } from "./auth/RequireRole";
 import { RoleHomeRedirect } from "./auth/RoleHomeRedirect";
 import { SellerShell } from "./layout/SellerShell";
 import { SupervisorShell } from "./layout/SupervisorShell";
+import { AlertsInboxPage } from "./pages/AlertsInboxPage";
 import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { RouteDayPage } from "./pages/RouteDayPage";
 import { SalesPage } from "./pages/SalesPage";
 import { SupervisorHomePage } from "./pages/SupervisorHomePage";
-import { RouteDayPage } from "./pages/RouteDayPage";
 import { VisitsPage } from "./pages/VisitsPage";
 
 export default function App() {
@@ -62,16 +63,7 @@ export default function App() {
             <Route index element={<Navigate to="hoy" replace />} />
             <Route path="hoy" element={<SupervisorHomePage />} />
             <Route path="ruta" element={<RouteDayPage />} />
-            <Route
-              path="alertas"
-              element={
-                <PlaceholderPage
-                  title="Alertas"
-                  nextSf="SF-2.3"
-                  blurb="Inbox de alertas GPS / foto para el equipo."
-                />
-              }
-            />
+            <Route path="alertas" element={<AlertsInboxPage />} />
             <Route
               path="catalogo"
               element={

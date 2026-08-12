@@ -5,7 +5,19 @@ from decimal import Decimal
 from app.auth import hash_password
 from app.database import SessionLocal, engine
 from app.ensure_schema import ensure_schema
-from app.models import Client, Product, Supplier, User, UserRole
+from app.models import (
+    AlertSeverity,
+    AlertType,
+    Client,
+    Product,
+    SaleResult,
+    Supplier,
+    User,
+    UserRole,
+    Visit,
+    VisitAlert,
+    VisitStatus,
+)
 
 
 def run() -> None:
@@ -168,9 +180,52 @@ def run() -> None:
                     )
                 )
 
+        if db.query(VisitAlert).count() == 0:
+            marina = db.query(User).filter(User.email == "marina@bitacora.local").first()
+            client = db.query(Client).order_by(Client.id.asc()).first()
+            if marina and client:
+                demo_visit = Visit(
+                    seller_id=marina.id,
+                    client_id=client.id,
+                    status=VisitStatus.completada,
+                    result=SaleResult.sin_venta,
+                    description="Visita demo para alertas SF-2.3",
+                    gps_skipped=True,
+                    gps_skip_reason="Sin señal en el PDV",
+                )
+                db.add(demo_visit)
+                db.flush()
+                db.add_all(
+                    [
+                        VisitAlert(
+                            visit_id=demo_visit.id,
+                            seller_id=marina.id,
+                            alert_type=AlertType.gps_skipped,
+                            severity=AlertSeverity.warning,
+                            message="GPS omitido al cerrar visita (demo)",
+                        ),
+                        VisitAlert(
+                            visit_id=demo_visit.id,
+                            seller_id=marina.id,
+                            alert_type=AlertType.photo_only,
+                            severity=AlertSeverity.info,
+                            message="Cierre solo con foto de evidencia (demo)",
+                        ),
+                        VisitAlert(
+                            visit_id=demo_visit.id,
+                            seller_id=marina.id,
+                            alert_type=AlertType.gps_far,
+                            severity=AlertSeverity.critical,
+                            message="Cierre a más de 250 m del pin del PDV (demo)",
+                            meta_json='{"distance_m": 412}',
+                        ),
+                    ]
+                )
+
         db.commit()
         print("Seed OK")
         print(f"Clientes: {db.query(Client).count()} · Proveedores: {db.query(Supplier).count()} · Productos: {db.query(Product).count()}")
+        print(f"Alertas: {db.query(VisitAlert).count()}")
         print("Usuarios: marina / carlos / supervisor / admin @bitacora.local")
         print("Password: demo1234")
     finally:

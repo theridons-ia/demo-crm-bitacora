@@ -1,5 +1,26 @@
 # Fase 2 — Supervisor
 
+## SF-2.3 — Inbox de alertas
+
+### Objetivo
+Supervisor ve alertas de evidencia (GPS omitido, lejos del PDV, solo foto, precisión baja) y puede marcarlas como vistas.
+
+### Qué se hizo
+- `GET /api/alerts?unacked_only=` con vendedor/cliente en la respuesta.
+- `POST /api/alerts/{id}/ack` (supervisor/admin).
+- UI `/sup/alertas` con filtro Pendientes / Todas.
+- Seed demo de 3 alertas si la tabla está vacía.
+
+### Cómo verificar
+1. Login supervisor → **Alertas**.
+2. Debe haber pendientes (seed) o créalas cerrando una visita con GPS omitido + foto.
+3. **Marcar vista** → desaparece de Pendientes; sigue en Todas.
+
+### Siguiente
+**SF-2.4** — Visibilidad de catálogo por vendedor.
+
+---
+
 ## SF-2.2 — Ruta del día
 
 ### Objetivo

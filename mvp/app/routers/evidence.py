@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 
-from ..auth import get_current_user
+from ..auth import get_current_user, require_supervisor
 from ..database import get_db
 from ..models import User, UserRole, Visit, VisitAlert, VisitGpsPoint, VisitStatus
 from ..schemas import VisitAlertOut, VisitGpsPointCreate, VisitGpsPointOut
@@ -18,6 +18,31 @@ def _get_visit_for_user(db: Session, visit_id: int, user: User) -> Visit:
     if user.role == UserRole.vendedor and visit.seller_id != user.id:
         raise HTTPException(status_code=403, detail="No puedes ver visitas de otro vendedor")
     return visit
+
+
+def _alert_out(alert: VisitAlert) -> VisitAlertOut:
+    client = alert.visit.client if alert.visit else None
+    return VisitAlertOut(
+        id=alert.id,
+        visit_id=alert.visit_id,
+        seller_id=alert.seller_id,
+        alert_type=alert.alert_type,
+        severity=alert.severity,
+        message=alert.message,
+        meta_json=alert.meta_json,
+        acknowledged_at=alert.acknowledged_at,
+        created_at=alert.created_at,
+        seller_name=alert.seller.full_name if alert.seller else None,
+        client_name=client.name if client else None,
+        client_id=client.id if client else None,
+    )
+
+
+def _alerts_query(db: Session):
+    return db.query(VisitAlert).options(
+        joinedload(VisitAlert.seller),
+        joinedload(VisitAlert.visit).joinedload(Visit.client),
+    )
 
 
 @router.post("/api/visits/{visit_id}/gps-points", response_model=VisitGpsPointOut)
@@ -65,9 +90,30 @@ def list_gps_points(
 def list_alerts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    unacked_only: bool = Query(default=False),
 ):
     """Inbox de alertas (supervisor ve todas; vendedor solo las suyas)."""
-    query = db.query(VisitAlert).order_by(VisitAlert.created_at.desc())
+    query = _alerts_query(db).order_by(VisitAlert.created_at.desc())
     if current_user.role == UserRole.vendedor:
         query = query.filter(VisitAlert.seller_id == current_user.id)
-    return query.limit(100).all()
+    if unacked_only:
+        query = query.filter(VisitAlert.acknowledged_at.is_(None))
+    return [_alert_out(a) for a in query.limit(100).all()]
+
+
+@router.post("/api/alerts/{alert_id}/ack", response_model=VisitAlertOut)
+def acknowledge_alert(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    """Marca una alerta como vista (SF-2.3)."""
+    alert = _alerts_query(db).filter(VisitAlert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alerta no encontrada")
+    if alert.acknowledged_at is None:
+        alert.acknowledged_at = datetime.now(timezone.utc)
+        db.add(alert)
+        db.commit()
+        alert = _alerts_query(db).filter(VisitAlert.id == alert_id).one()
+    return _alert_out(alert)
