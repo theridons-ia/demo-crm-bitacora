@@ -176,10 +176,15 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
         <div className="field">
           <span className="field-label">Ubicación en mapa (PDV)</span>
           <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
-            Toca el mapa o usa el GPS estando en el local. El pin verde es el cliente.
+            Toca el mapa o usa el GPS estando en el local. El pin fucsia lleva el nombre del cliente.
           </p>
           <div className="client-pick-map-wrap">
-            <ClientLocationPicker latitude={latitude} longitude={longitude} onPick={onPick} />
+            <ClientLocationPicker
+              latitude={latitude}
+              longitude={longitude}
+              label={form.name.trim() || "PDV"}
+              onPick={onPick}
+            />
           </div>
           <div className="visit-actions" style={{ marginTop: "0.65rem" }}>
             <Button type="button" variant="secondary" disabled={gpsBusy} onClick={useMyGps}>

@@ -1,7 +1,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
-import { clientPdvIcon } from "../lib/mapMarkers";
+import { clientPdvIconFor } from "../lib/mapMarkers";
 
 const DEFAULT_CENTER: L.LatLngExpression = [10.0647, -69.334];
 const DEFAULT_ZOOM = 13;
@@ -9,11 +9,13 @@ const DEFAULT_ZOOM = 13;
 type Props = {
   latitude: number | null;
   longitude: number | null;
+  /** Nombre del cliente para la etiqueta del pin. */
+  label?: string;
   onPick: (lat: number, lng: number) => void;
 };
 
 /** Mapa para fijar el pin del PDV (tocar o arrastrar marcador). */
-export function ClientLocationPicker({ latitude, longitude, onPick }: Props) {
+export function ClientLocationPicker({ latitude, longitude, label, onPick }: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -55,19 +57,22 @@ export function ClientLocationPicker({ latitude, longitude, onPick }: Props) {
     }
 
     const ll: L.LatLngExpression = [latitude, longitude];
+    const icon = clientPdvIconFor(label || "PDV");
+    const popupText = `${label?.trim() || "PDV"} · arrastra o toca el mapa`;
+
     if (!markerRef.current) {
-      markerRef.current = L.marker(ll, { icon: clientPdvIcon, draggable: true })
-        .addTo(map)
-        .bindPopup("PDV · arrastra o toca el mapa");
+      markerRef.current = L.marker(ll, { icon, draggable: true }).addTo(map).bindPopup(popupText);
       markerRef.current.on("dragend", () => {
         const pos = markerRef.current?.getLatLng();
         if (pos) onPickRef.current(pos.lat, pos.lng);
       });
     } else {
       markerRef.current.setLatLng(ll);
+      markerRef.current.setIcon(icon);
+      markerRef.current.bindPopup(popupText);
     }
     map.setView(ll, Math.max(map.getZoom(), 15));
-  }, [latitude, longitude]);
+  }, [latitude, longitude, label]);
 
   return <div ref={mapEl} className="client-pick-map" role="application" aria-label="Mapa ubicación PDV" />;
 }

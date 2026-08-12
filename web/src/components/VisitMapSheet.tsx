@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./Button";
 import { ApiError, fetchVisitGpsPoints } from "../lib/api";
-import { clientPdvIcon, trailIconForSource } from "../lib/mapMarkers";
+import { clientPdvIconFor, trailIconForSource } from "../lib/mapMarkers";
 import type { Visit, VisitGpsPoint } from "../lib/types";
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -33,7 +33,7 @@ function visitFallbackPoints(visit: Visit): VisitGpsPoint[] {
   ];
 }
 
-/** Mapa Leaflet: PDV (verde) + trail del vendedor (SF-1.10 / SF-1.11). */
+/** Mapa Leaflet: PDV (fucsia + nombre) + trail del vendedor. */
 export function VisitMapSheet({ visit, open, onClose }: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -98,10 +98,10 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       if (Number.isFinite(clat) && Number.isFinite(clng)) {
         const ll: L.LatLngExpression = [clat, clng];
         bounds.push(ll);
-        L.marker(ll, { icon: clientPdvIcon })
+        L.marker(ll, { icon: clientPdvIconFor(client.name) })
           .addTo(map)
           .bindPopup(
-            `<strong>PDV · ${client.name}</strong>${
+            `<strong>${client.name}</strong>${
               client.address ? `<br/><small>${client.address}</small>` : ""
             }`,
           );
@@ -176,7 +176,7 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
 
       <div className="map-legend" aria-hidden>
         <span>
-          <i className="map-marker-store map-marker-store-legend" /> PDV
+          <i className="map-marker-store map-marker-store-legend" /> Cliente (PDV)
         </span>
         <span>
           <i className="map-marker-dot map-marker-dot-start" /> Inicio
