@@ -176,7 +176,7 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
 
       <div className="map-legend" aria-hidden>
         <span>
-          <i className="map-marker-emoji map-marker-emoji-legend">🏪</i> PDV
+          <i className="map-marker-store map-marker-store-legend" /> PDV
         </span>
         <span>
           <i className="map-marker-dot map-marker-dot-start" /> Inicio
