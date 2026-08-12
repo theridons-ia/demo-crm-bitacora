@@ -4,6 +4,12 @@ import { TextField } from "./TextField";
 import { ApiError, closeVisit, fetchProducts, type VisitCloseInput } from "../lib/api";
 import { getCurrentPosition, GPS_ACCURACY_WARN_M } from "../lib/gps";
 import { fileToCompressedDataUrl } from "../lib/imageEvidence";
+import { newLocalUuid, removeLocalVisit } from "../lib/offlineDb";
+import {
+  enqueueCloseVisit,
+  enqueueOfflineVisitSync,
+  getCachedProducts,
+} from "../lib/offlineQueue";
 import type { CurrencyCode, Product, Visit } from "../lib/types";
 
 type Props = {
@@ -14,6 +20,10 @@ type Props = {
 };
 
 type QtyMap = Record<number, number>;
+
+function isLocalPendingVisit(visit: Visit): boolean {
+  return visit.id < 0 || Boolean(visit.local_uuid?.startsWith("local-"));
+}
 
 export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -34,18 +44,22 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
     if (!open) return;
     let cancelled = false;
     setLoadingProducts(true);
-    fetchProducts()
-      .then((data) => {
-        if (!cancelled) setProducts(data);
-      })
-      .catch((err) => {
+    (async () => {
+      try {
+        const data = navigator.onLine ? await fetchProducts() : await getCachedProducts();
+        if (!cancelled) setProducts(data.length ? data : await getCachedProducts());
+      } catch {
+        const cached = await getCachedProducts();
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "No se pudo cargar inventario");
+          setProducts(cached);
+          if (!cached.length) {
+            setError("Sin inventario en cache. Conéctate una vez para sincronizar catálogo.");
+          }
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingProducts(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -176,17 +190,83 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
             product_id: line.product.id,
             quantity: line.quantity,
           })),
+          local_uuid: newLocalUuid("sale"),
+          created_offline: !navigator.onLine,
         };
       }
 
-      const updated = await closeVisit(visit.id, payload);
+      const finished: Visit = {
+        ...visit,
+        status: "completada",
+        result: payload.result,
+        description: payload.description ?? visit.description,
+        latitude:
+          payload.latitude != null ? String(payload.latitude) : visit.latitude,
+        longitude:
+          payload.longitude != null ? String(payload.longitude) : visit.longitude,
+        gps_accuracy_m:
+          payload.gps_accuracy_m != null
+            ? String(payload.gps_accuracy_m)
+            : visit.gps_accuracy_m,
+        gps_offline: Boolean(payload.gps_offline),
+      };
+
+      const offlineOrLocal = !navigator.onLine || isLocalPendingVisit(visit);
+
+      if (offlineOrLocal && isLocalPendingVisit(visit) && visit.local_uuid) {
+        await enqueueOfflineVisitSync({
+          local_uuid: visit.local_uuid,
+          client_id: visit.client_id,
+          description: payload.description,
+          result: payload.result,
+          latitude: payload.latitude ?? null,
+          longitude: payload.longitude ?? null,
+          gps_accuracy_m: payload.gps_accuracy_m ?? null,
+          gps_captured_at: payload.gps_captured_at ?? new Date().toISOString(),
+          visited_at: new Date().toISOString(),
+          gps_skipped: payload.gps_skipped ?? false,
+          gps_skip_reason: payload.gps_skip_reason ?? null,
+          photo_evidence: payload.photo_evidence ?? null,
+          sale: payload.sale
+            ? {
+                ...payload.sale,
+                created_offline: true,
+              }
+            : null,
+        });
+        await removeLocalVisit(visit.local_uuid);
+      } else if (!navigator.onLine) {
+        await enqueueCloseVisit(visit.id, payload);
+      } else {
+        try {
+          const updated = await closeVisit(visit.id, payload);
+          setQty({});
+          setNotes("");
+          setMode("sin_venta");
+          setSkipGps(false);
+          setSkipReason("Sin señal / GPS no disponible");
+          setPhotoDataUrl(null);
+          onClosed(updated);
+          onClose();
+          return;
+        } catch (err) {
+          if (err instanceof ApiError && err.status >= 500) throw err;
+          // Red caída a mitad: encolar
+          if (!navigator.onLine || (err instanceof TypeError)) {
+            await enqueueCloseVisit(visit.id, payload);
+          } else {
+            throw err;
+          }
+        }
+      }
+
       setQty({});
       setNotes("");
       setMode("sin_venta");
       setSkipGps(false);
       setSkipReason("Sin señal / GPS no disponible");
       setPhotoDataUrl(null);
-      onClosed(updated);
+      onClosed(finished);
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cerrar la visita");

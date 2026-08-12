@@ -62,6 +62,9 @@ def sync_offline_visits(
             gps_captured_at=item.gps_captured_at or now,
             sale_in=item.sale,
             seller_id=current_user.id,
+            gps_skipped=item.gps_skipped,
+            gps_skip_reason=item.gps_skip_reason,
+            photo_evidence=item.photo_evidence,
         )
         accepted_ids.append(visit.id)
 

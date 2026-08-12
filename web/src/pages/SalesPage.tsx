@@ -10,6 +10,12 @@ import {
   fetchSales,
   type SaleCreateInput,
 } from "../lib/api";
+import { newLocalUuid } from "../lib/offlineDb";
+import {
+  enqueueCreateSale,
+  getCachedClients,
+  getCachedProducts,
+} from "../lib/offlineQueue";
 import type { Client, CurrencyCode, Product, Sale, SaleOrigin } from "../lib/types";
 
 type QtyMap = Record<number, number>;
@@ -55,6 +61,12 @@ export function SalesPage() {
   function reload() {
     setLoading(true);
     setError(null);
+    if (!navigator.onLine) {
+      setSales([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     fetchSales()
       .then(setSales)
       .catch((err) => {
@@ -71,22 +83,36 @@ export function SalesPage() {
     if (!composing) return;
     let cancelled = false;
     setLoadingCatalog(true);
-    Promise.all([fetchClients(), fetchProducts()])
-      .then(([c, p]) => {
+    (async () => {
+      try {
+        const [c, p] = navigator.onLine
+          ? await Promise.all([fetchClients(), fetchProducts()])
+          : await Promise.all([getCachedClients(), getCachedProducts()]);
         if (!cancelled) {
           setClients(c);
           setProducts(p);
           if (c.length && clientId === "") setClientId(c[0].id);
+          if (!c.length || !p.length) {
+            setFormError("Catálogo incompleto en cache. Conéctate para sincronizar.");
+          }
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) {
-          setFormError(err instanceof ApiError ? err.message : "No se pudo cargar catálogo");
+          const [c, p] = await Promise.all([getCachedClients(), getCachedProducts()]);
+          setClients(c);
+          setProducts(p);
+          setFormError(
+            c.length && p.length
+              ? null
+              : err instanceof ApiError
+                ? err.message
+                : "No se pudo cargar catálogo",
+          );
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingCatalog(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -131,10 +157,23 @@ export function SalesPage() {
       currency,
       notes: notes.trim() || null,
       items,
+      local_uuid: newLocalUuid("sale"),
+      created_offline: !navigator.onLine,
     };
 
     setSubmitting(true);
     try {
+      if (!navigator.onLine) {
+        await enqueueCreateSale(payload);
+        setQty({});
+        setNotes("");
+        setOrigin("mostrador");
+        setCurrency("USD");
+        setComposing(false);
+        setError(null);
+        setFormError(null);
+        return;
+      }
       const created = await createSale(payload);
       setSales((prev) => [created, ...prev]);
       setQty({});
@@ -143,6 +182,16 @@ export function SalesPage() {
       setCurrency("USD");
       setComposing(false);
     } catch (err) {
+      if (!navigator.onLine || err instanceof TypeError) {
+        try {
+          await enqueueCreateSale(payload);
+          setComposing(false);
+          setFormError(null);
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
       setFormError(err instanceof ApiError ? err.message : "No se pudo crear la venta");
     } finally {
       setSubmitting(false);

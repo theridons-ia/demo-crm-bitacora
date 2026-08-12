@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { ClientForm } from "../components/ClientForm";
 import { TextField } from "../components/TextField";
 import { ApiError, fetchClients } from "../lib/api";
+import { getCachedClients } from "../lib/offlineQueue";
 import type { Client } from "../lib/types";
 
 /** Inicio SF-1.2: cartera de clientes con búsqueda y alta. */
@@ -18,17 +19,21 @@ export function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchClients()
-      .then((data) => {
-        if (!cancelled) setClients(data);
-      })
-      .catch((err) => {
+    (async () => {
+      try {
+        const data = navigator.onLine ? await fetchClients() : await getCachedClients();
+        if (!cancelled) setClients(data.length ? data : await getCachedClients());
+      } catch (err) {
         if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "Error al cargar clientes");
-      })
-      .finally(() => {
+        const cached = await getCachedClients();
+        setClients(cached);
+        if (!cached.length) {
+          setError(err instanceof ApiError ? err.message : "Error al cargar clientes");
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };

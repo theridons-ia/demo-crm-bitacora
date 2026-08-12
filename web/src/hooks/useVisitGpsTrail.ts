@@ -13,7 +13,7 @@ export function useVisitGpsTrail(visitId: number | null, active: boolean) {
   const [tracking, setTracking] = useState(false);
 
   useEffect(() => {
-    if (!visitId || !active) {
+    if (!visitId || visitId < 0 || !active) {
       setTracking(false);
       return;
     }

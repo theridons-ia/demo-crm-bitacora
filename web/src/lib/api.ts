@@ -128,6 +128,7 @@ export type VisitCreateInput = {
   longitude?: number | null;
   gps_accuracy_m?: number | null;
   gps_offline?: boolean;
+  local_uuid?: string | null;
 };
 
 export function createVisit(payload: VisitCreateInput): Promise<Visit> {
@@ -171,6 +172,8 @@ export type VisitCloseInput = {
     is_credit?: boolean;
     notes?: string | null;
     items: { product_id: number; quantity: number }[];
+    local_uuid?: string | null;
+    created_offline?: boolean;
   } | null;
 };
 
@@ -227,6 +230,47 @@ export function postVisitGpsPoint(
   payload: GpsPointCreateInput,
 ): Promise<VisitGpsPoint> {
   return request<VisitGpsPoint>(`/api/visits/${visitId}/gps-points`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type OfflineVisitSyncPayload = {
+  local_uuid: string;
+  client_id: number;
+  description?: string | null;
+  result: SaleResult;
+  latitude?: number | null;
+  longitude?: number | null;
+  gps_accuracy_m?: number | null;
+  gps_captured_at?: string | null;
+  visited_at?: string | null;
+  gps_skipped?: boolean;
+  gps_skip_reason?: string | null;
+  photo_evidence?: string | null;
+  sale?: {
+    origin?: SaleOrigin;
+    currency?: CurrencyCode;
+    payment_method?: PaymentMethod;
+    is_credit?: boolean;
+    notes?: string | null;
+    items: { product_id: number; quantity: number }[];
+    local_uuid?: string | null;
+    created_offline?: boolean;
+  } | null;
+};
+
+export type SyncOfflineResponse = {
+  accepted: number;
+  visit_ids: number[];
+  message: string;
+};
+
+export function syncOfflineVisits(payload: {
+  visits: OfflineVisitSyncPayload[] | Record<string, unknown>[];
+}): Promise<SyncOfflineResponse> {
+  return request<SyncOfflineResponse>("/api/sync/offline-visits", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

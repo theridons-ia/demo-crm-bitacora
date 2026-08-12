@@ -51,7 +51,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | hecho |
 | **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | hecho |
 | **SF-1.8** | Orden sin visita | origen mostrador / online | hecho |
-| **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | pendiente |
+| **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | hecho |
 | **SF-1.10** | Mapa evidencia | Leaflet: puntos de una visita | pendiente |
 
 **Criterio “Fase 1 lista”:** un vendedor hace el día de campo offline-ish con evidencia GPS.
@@ -80,9 +80,17 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.1b** (top bar desktop vendedor).
+**Listo para commit / tu push:** **SF-1.9** (cola offline + cache catálogo).
 
-**Siguiente:** **SF-1.9** (offline cola) o **SF-1.10** (mapa evidencia).
+**Siguiente:** **SF-1.10** (mapa evidencia Leaflet).
+
+### Cómo verificar SF-1.9
+
+1. Entra online una vez (cachea clientes/productos).
+2. DevTools → Network → Offline.
+3. Visitas → Nueva (ahora) → queda local; Cerrar (± venta/foto) → entra a la cola.
+4. Ventas → Nueva offline → cola de venta mostrador/online.
+5. Vuelve online (o toca **Sincronizar**): la cola se vacía vía `/api/sync/offline-visits` y closes/sales.
 
 ### Cómo verificar SF-1.1b
 

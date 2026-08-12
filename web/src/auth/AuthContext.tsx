@@ -36,7 +36,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     fetchMe()
-      .then(setUser)
+      .then(async (me) => {
+        setUser(me);
+        try {
+          const { refreshCatalogCache } = await import("../lib/offlineQueue");
+          await refreshCatalogCache();
+        } catch {
+          /* cache best-effort */
+        }
+      })
       .catch(() => {
         clearToken();
         setUser(null);
@@ -49,6 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(access_token);
     const me = await fetchMe();
     setUser(me);
+    try {
+      const { refreshCatalogCache } = await import("../lib/offlineQueue");
+      await refreshCatalogCache();
+    } catch {
+      /* cache best-effort */
+    }
   }, []);
 
   const logout = useCallback(() => {

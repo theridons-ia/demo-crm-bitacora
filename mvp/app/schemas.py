@@ -248,6 +248,9 @@ class OfflineVisitSync(BaseModel):
     gps_accuracy_m: Decimal | None = None
     gps_captured_at: datetime | None = None
     visited_at: datetime | None = None
+    gps_skipped: bool = False
+    gps_skip_reason: str | None = None
+    photo_evidence: str | None = Field(default=None, max_length=600_000)
     sale: SaleIn | None = None
 
 

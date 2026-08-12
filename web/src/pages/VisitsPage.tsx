@@ -19,6 +19,13 @@ import {
   mapsUrl,
   setMockGpsEnabled,
 } from "../lib/gps";
+import {
+  listLocalVisits,
+  newLocalUuid,
+  saveLocalVisit,
+  type LocalPendingVisit,
+} from "../lib/offlineDb";
+import { getCachedClients } from "../lib/offlineQueue";
 import type { Client, Visit, VisitStatus } from "../lib/types";
 
 const statusLabel: Record<VisitStatus, string> = {
@@ -40,7 +47,40 @@ function formatCoords(visit: Visit): string | null {
   return `${Number(visit.latitude).toFixed(5)}, ${Number(visit.longitude).toFixed(5)}${acc}`;
 }
 
-/** SF-1.4/1.5: ciclo de visita + GPS inicio/cierre + trail en_curso. */
+function localVisitToVisit(local: LocalPendingVisit): Visit {
+  return {
+    id: -Math.abs(
+      Array.from(local.local_uuid).reduce((acc, ch) => acc + ch.charCodeAt(0), 0),
+    ),
+    seller_id: 0,
+    client_id: local.client_id,
+    status: "en_curso",
+    result: null,
+    description: local.description,
+    scheduled_date: null,
+    visited_at: local.created_at,
+    latitude: local.latitude != null ? String(local.latitude) : null,
+    longitude: local.longitude != null ? String(local.longitude) : null,
+    gps_accuracy_m: local.gps_accuracy_m != null ? String(local.gps_accuracy_m) : null,
+    gps_captured_at: local.created_at,
+    gps_offline: local.gps_offline,
+    local_uuid: local.local_uuid,
+    created_at: local.created_at,
+    client: {
+      id: local.client_id,
+      name: local.client_name,
+      rif: null,
+      ci: null,
+      state: null,
+      address: null,
+      phone: null,
+      notes: null,
+      is_active: true,
+    },
+  };
+}
+
+/** SF-1.4/1.5/1.9: ciclo de visita + GPS + offline local. */
 export function VisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -53,9 +93,23 @@ export function VisitsPage() {
   const [closingVisit, setClosingVisit] = useState<Visit | null>(null);
 
   const reload = useCallback(async () => {
-    const [v, c] = await Promise.all([fetchVisits(), fetchClients()]);
-    setVisits(v);
-    setClients(c);
+    const locals = (await listLocalVisits()).map(localVisitToVisit);
+    if (!navigator.onLine) {
+      const cached = await getCachedClients();
+      setClients(cached);
+      setVisits(locals);
+      return;
+    }
+    try {
+      const [v, c] = await Promise.all([fetchVisits(), fetchClients()]);
+      setVisits([...locals, ...v.filter((x) => !locals.some((l) => l.local_uuid && l.local_uuid === x.local_uuid))]);
+      setClients(c);
+    } catch (err) {
+      const cached = await getCachedClients();
+      setClients(cached);
+      setVisits(locals);
+      throw err;
+    }
   }, []);
 
   useEffect(() => {
@@ -386,6 +440,55 @@ function VisitForm({
         }
       }
 
+      if (!navigator.onLine) {
+        if (mode === "schedule") {
+          setError("Sin conexión: programa visitas cuando haya red. Ahora puedes iniciar una visita local.");
+          return;
+        }
+        const client = clients.find((c) => c.id === Number(clientId));
+        if (!client) {
+          setError("Cliente no disponible en cache offline");
+          return;
+        }
+        const local_uuid = newLocalUuid("local");
+        const created_at = new Date().toISOString();
+        await saveLocalVisit({
+          local_uuid,
+          client_id: client.id,
+          client_name: client.name,
+          description: description.trim() || null,
+          latitude: latitude ?? null,
+          longitude: longitude ?? null,
+          gps_accuracy_m: gps_accuracy_m ?? null,
+          gps_offline,
+          created_at,
+        });
+        const visit: Visit = {
+          id: -Math.abs(Array.from(local_uuid).reduce((acc, ch) => acc + ch.charCodeAt(0), 0)),
+          seller_id: 0,
+          client_id: client.id,
+          status: "en_curso",
+          result: null,
+          description: description.trim() || null,
+          scheduled_date: null,
+          visited_at: created_at,
+          latitude: latitude != null ? String(latitude) : null,
+          longitude: longitude != null ? String(longitude) : null,
+          gps_accuracy_m: gps_accuracy_m != null ? String(gps_accuracy_m) : null,
+          gps_captured_at: created_at,
+          gps_offline,
+          local_uuid,
+          created_at,
+          client,
+        };
+        setClientId("");
+        setDescription("");
+        setScheduledDate("");
+        setMode("now");
+        onCreated(visit, gpsNote ?? "Visita local: se sincronizará al cerrar (sin red)");
+        return;
+      }
+
       const visit = await createVisit({
         client_id: Number(clientId),
         status: mode === "now" ? "en_curso" : "programada",
@@ -395,6 +498,7 @@ function VisitForm({
         longitude: longitude ?? null,
         gps_accuracy_m: gps_accuracy_m ?? null,
         gps_offline,
+        local_uuid: newLocalUuid("visit"),
       });
       setClientId("");
       setDescription("");

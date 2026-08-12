@@ -1,6 +1,7 @@
 import { Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ApiError, fetchProducts } from "../lib/api";
+import { getCachedProducts } from "../lib/offlineQueue";
 import type { Product } from "../lib/types";
 
 /** Catálogo / stock visible para el vendedor (lectura). */
@@ -11,18 +12,21 @@ export function InventoryPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchProducts()
-      .then((data) => {
-        if (!cancelled) setProducts(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
+    (async () => {
+      try {
+        const data = navigator.onLine ? await fetchProducts() : await getCachedProducts();
+        if (!cancelled) setProducts(data.length ? data : await getCachedProducts());
+      } catch (err) {
+        if (cancelled) return;
+        const cached = await getCachedProducts();
+        setProducts(cached);
+        if (!cached.length) {
           setError(err instanceof ApiError ? err.message : "Error al cargar inventario");
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
