@@ -132,11 +132,13 @@ export function updateClient(clientId: number, payload: ClientCreateInput): Prom
 
 export function fetchVisits(params?: {
   scheduled_date?: string;
+  day?: string;
   seller_id?: number;
   status?: VisitStatus;
 }): Promise<Visit[]> {
   const q = new URLSearchParams();
   if (params?.scheduled_date) q.set("scheduled_date", params.scheduled_date);
+  if (params?.day) q.set("day", params.day);
   if (params?.seller_id != null) q.set("seller_id", String(params.seller_id));
   if (params?.status) q.set("status", params.status);
   const qs = q.toString();

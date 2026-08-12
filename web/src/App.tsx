@@ -14,6 +14,7 @@ import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { RouteDayPage } from "./pages/RouteDayPage";
 import { SalesPage } from "./pages/SalesPage";
 import { SupervisorHomePage } from "./pages/SupervisorHomePage";
+import { TeamMapPage } from "./pages/TeamMapPage";
 import { VisitsPage } from "./pages/VisitsPage";
 
 export default function App() {
@@ -66,16 +67,7 @@ export default function App() {
             <Route path="ruta" element={<RouteDayPage />} />
             <Route path="alertas" element={<AlertsInboxPage />} />
             <Route path="catalogo" element={<CatalogVisibilityPage />} />
-            <Route
-              path="mapa"
-              element={
-                <PlaceholderPage
-                  title="Mapa del equipo"
-                  nextSf="SF-2.5"
-                  blurb="Visitas del día en un mapa compartido."
-                />
-              }
-            />
+            <Route path="mapa" element={<TeamMapPage />} />
           </Route>
 
           <Route path="/clientes" element={<Navigate to="/app/inicio" replace />} />

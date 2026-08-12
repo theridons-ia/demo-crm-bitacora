@@ -78,3 +78,23 @@ export function trailIconForSource(source: string): L.DivIcon {
   if (source === "end") return sellerEndIcon;
   return sellerTrailIcon;
 }
+
+const STATUS_DOT: Record<string, string> = {
+  programada: "#71807b",
+  en_curso: "#f16b5f",
+  completada: "#18312f",
+  cancelada: "#c84b46",
+};
+
+/** Marcador de visita del equipo: punto de color por estado + iniciales vendedor. */
+export function teamVisitIcon(status: string, initials?: string | null): L.DivIcon {
+  const color = STATUS_DOT[status] ?? "#71807b";
+  const label = escapeHtml((initials || "?").slice(0, 2).toUpperCase());
+  return L.divIcon({
+    className: "map-marker map-marker-team",
+    html: `<span class="map-marker-team-pill" style="background:${color}" title="${escapeHtml(status)}">${label}</span>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -12],
+  });
+}

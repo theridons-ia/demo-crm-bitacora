@@ -28,7 +28,7 @@ const LINKS = [
     to: "/sup/mapa",
     title: "Mapa del equipo",
     blurb: "Visitas del día en un solo mapa.",
-    sf: "SF-2.5",
+    sf: "SF-2.5 · listo",
     icon: Map,
   },
 ] as const;

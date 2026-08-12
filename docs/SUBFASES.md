@@ -71,7 +71,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-2.2** | Ruta del día | Asignar / desasignar visitas planificadas | hecho |
 | **SF-2.3** | Alertas GPS/foto | Inbox de alertas | hecho |
 | **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | hecho |
-| **SF-2.5** | Mapa equipo | Visitas del día en mapa | pendiente |
+| **SF-2.5** | Mapa equipo | Visitas del día en mapa | hecho |
 
 ---
 
@@ -85,9 +85,14 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-2.4** (visibilidad catálogo).
+**Listo para commit / tu push:** **SF-2.5** (mapa del equipo) — **Fase 2 completa**.
 
-**Siguiente:** **SF-2.5** mapa del equipo. Contabo más adelante.
+**Siguiente:** Fase 3 (endurecer) o Contabo / `enrutas.cc` cuando digas.
+
+### Cómo verificar SF-2.5
+
+1. `supervisor@…` → Mapa del equipo → hoy.
+2. Ver PDVs + estados; filtrar vendedor.
 
 ### Cómo verificar SF-2.4
 

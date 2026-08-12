@@ -133,6 +133,21 @@ def run() -> None:
             else:
                 db.add(Client(**data))
 
+        # Pins demo para mapa del equipo (SF-2.5) si faltan
+        demo_pins = {
+            "Mercado San Rafael": (10.3397, -68.7425),
+            "Bodega La Esquina": (10.1621, -68.0075),
+            "Abastos El Río": (10.0731, -69.3220),
+            "Distribuciones Lara Sur": (10.0260, -69.2630),
+            "Kiosco Doña Carmen": (10.1602, -68.8950),
+            "Mayorista Puerto Cabello": (10.4731, -68.0125),
+        }
+        for name, (lat, lng) in demo_pins.items():
+            c = db.query(Client).filter(Client.name == name).first()
+            if c and c.latitude is None:
+                c.latitude = Decimal(str(lat))
+                c.longitude = Decimal(str(lng))
+
         demo_suppliers = [
             {
                 "name": "Distribuidora Central",

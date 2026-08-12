@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import Date, cast, or_
 from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_supervisor
@@ -25,6 +26,10 @@ def list_visits(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     scheduled_date: date | None = Query(default=None),
+    day: date | None = Query(
+        default=None,
+        description="Visitas del día: programadas ese día o visitadas ese día (SF-2.5)",
+    ),
     seller_id: int | None = Query(default=None),
     status: VisitStatus | None = Query(default=None),
 ):
@@ -33,7 +38,14 @@ def list_visits(
         query = query.filter(Visit.seller_id == current_user.id)
     elif seller_id is not None:
         query = query.filter(Visit.seller_id == seller_id)
-    if scheduled_date is not None:
+    if day is not None:
+        query = query.filter(
+            or_(
+                Visit.scheduled_date == day,
+                cast(Visit.visited_at, Date) == day,
+            )
+        )
+    elif scheduled_date is not None:
         query = query.filter(Visit.scheduled_date == scheduled_date)
     if status is not None:
         query = query.filter(Visit.status == status)

@@ -1,5 +1,25 @@
 # Fase 2 — Supervisor
 
+## SF-2.5 — Mapa del equipo
+
+### Objetivo
+Ver en un mapa las visitas del día (programadas o visitadas esa fecha), con PDV y estado del vendedor.
+
+### Qué se hizo
+- `GET /api/visits?day=YYYY-MM-DD` (programada ese día **o** `visited_at` ese día).
+- UI `/sup/mapa` con Leaflet, filtro fecha/vendedor, leyenda.
+- Seed: pins demo en clientes principales sin coordenadas.
+
+### Cómo verificar
+1. Supervisor → **Mapa del equipo** → fecha de hoy.
+2. Pins fucsia (PDV) + pastillas con iniciales (estado).
+3. Filtrar por Marina/Carlos; asignar ruta y refrescar.
+
+### Cierre Fase 2
+SF-2.1…2.5 listos. Siguiente: Fase 3 o deploy Contabo / `enrutas.cc`.
+
+---
+
 ## SF-2.4 — Visibilidad catálogo
 
 ### Objetivo
