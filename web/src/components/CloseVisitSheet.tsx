@@ -3,6 +3,7 @@ import { Button } from "./Button";
 import { TextField } from "./TextField";
 import { ApiError, closeVisit, fetchProducts, type VisitCloseInput } from "../lib/api";
 import { getCurrentPosition, GPS_ACCURACY_WARN_M } from "../lib/gps";
+import { fileToCompressedDataUrl } from "../lib/imageEvidence";
 import type { CurrencyCode, Product, Visit } from "../lib/types";
 
 type Props = {
@@ -14,8 +15,6 @@ type Props = {
 
 type QtyMap = Record<number, number>;
 
-const MAX_PHOTO_CHARS = 350_000;
-
 export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [mode, setMode] = useState<"sin_venta" | "con_venta">("sin_venta");
@@ -23,8 +22,9 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [notes, setNotes] = useState("");
   const [skipGps, setSkipGps] = useState(false);
-  const [skipReason, setSkipReason] = useState("");
+  const [skipReason, setSkipReason] = useState("Sin señal / GPS no disponible");
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [accuracyWarn, setAccuracyWarn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -78,22 +78,17 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
       setPhotoDataUrl(null);
       return;
     }
-    if (!file.type.startsWith("image/")) {
-      setError("La evidencia debe ser una imagen");
-      return;
+    setPhotoBusy(true);
+    setError(null);
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      setPhotoDataUrl(dataUrl);
+    } catch (err) {
+      setPhotoDataUrl(null);
+      setError(err instanceof Error ? err.message : "No se pudo leer la foto");
+    } finally {
+      setPhotoBusy(false);
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      if (result.length > MAX_PHOTO_CHARS) {
-        setError("La foto es muy pesada; prueba otra más liviana");
-        setPhotoDataUrl(null);
-        return;
-      }
-      setError(null);
-      setPhotoDataUrl(result);
-    };
-    reader.readAsDataURL(file);
   }
 
   async function onSubmit(event: FormEvent) {
@@ -106,11 +101,15 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
       return;
     }
     if (skipGps && !photoDataUrl) {
-      setError("Si omites el GPS, adjunta una foto del PDV");
+      setError("Si omites el GPS, espera a que diga «Foto lista» y vuelve a confirmar");
       return;
     }
     if (skipGps && !skipReason.trim()) {
       setError("Indica el motivo de omitir el GPS");
+      return;
+    }
+    if (photoBusy) {
+      setError("Espera a que termine de procesar la foto");
       return;
     }
 
@@ -185,7 +184,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
       setNotes("");
       setMode("sin_venta");
       setSkipGps(false);
-      setSkipReason("");
+      setSkipReason("Sin señal / GPS no disponible");
       setPhotoDataUrl(null);
       onClosed(updated);
       onClose();
@@ -334,7 +333,12 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
             capture="environment"
             onChange={onPhotoChange}
           />
-          {photoDataUrl ? <p className="muted small">Foto lista para enviar</p> : null}
+          {photoBusy ? <p className="muted small">Comprimiendo foto…</p> : null}
+          {photoDataUrl && !photoBusy ? (
+            <p className="gps-ok-note" style={{ marginTop: "0.5rem" }}>
+              Foto lista para enviar
+            </p>
+          ) : null}
         </div>
 
         <TextField
@@ -351,8 +355,8 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
           </p>
         ) : null}
 
-        <Button type="submit" variant="accent" block disabled={submitting}>
-          {submitting ? "Cerrando…" : "Confirmar cierre"}
+        <Button type="submit" variant="accent" block disabled={submitting || photoBusy}>
+          {submitting ? "Cerrando…" : photoBusy ? "Procesando foto…" : "Confirmar cierre"}
         </Button>
       </form>
     </div>

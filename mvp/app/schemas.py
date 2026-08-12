@@ -196,7 +196,7 @@ class VisitClose(BaseModel):
     gps_captured_at: datetime | None = None
     gps_skipped: bool = False
     gps_skip_reason: str | None = None
-    photo_evidence: str | None = Field(default=None, max_length=400_000)
+    photo_evidence: str | None = Field(default=None, max_length=600_000)
     sale: SaleIn | None = None
     local_uuid: str | None = None
 
