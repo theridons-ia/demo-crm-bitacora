@@ -650,3 +650,20 @@ a {
 .search-row .search-icon {
   display: none;
 }
+
+.visit-map-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.visit-map {
+  width: 100%;
+  height: min(62vh, 520px);
+  min-height: 280px;
+  background: var(--muted);
+  border-radius: inherit;
+}
+
+.leaflet-container {
+  font: inherit;
+}

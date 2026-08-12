@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "../components/Button";
 import { CloseVisitSheet } from "../components/CloseVisitSheet";
 import { TextField } from "../components/TextField";
+import { VisitMapSheet } from "../components/VisitMapSheet";
 import { useVisitGpsTrail } from "../hooks/useVisitGpsTrail";
 import {
   ApiError,
@@ -16,7 +17,6 @@ import {
   getCurrentPosition,
   isMockGpsEnabled,
   isSecureGeoContext,
-  mapsUrl,
   setMockGpsEnabled,
 } from "../lib/gps";
 import {
@@ -91,6 +91,7 @@ export function VisitsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [mockGps, setMockGps] = useState(() => isMockGpsEnabled());
   const [closingVisit, setClosingVisit] = useState<Visit | null>(null);
+  const [mapVisit, setMapVisit] = useState<Visit | null>(null);
 
   const reload = useCallback(async () => {
     const locals = (await listLocalVisits()).map(localVisitToVisit);
@@ -232,6 +233,7 @@ export function VisitsPage() {
           visit={visit}
           busy={busyId === visit.id}
           onClose={() => onCloseNoSale(visit.id)}
+          onMap={() => setMapVisit(visit)}
         />
       ))}
 
@@ -274,14 +276,7 @@ export function VisitsPage() {
                 {visit.result ? <p className="muted small">Resultado: {visit.result}</p> : null}
                 {coords ? (
                   <p className="muted small">
-                    <MapPin size={14} style={{ verticalAlign: "middle" }} /> {coords}{" "}
-                    <a
-                      href={mapsUrl(visit.latitude!, visit.longitude!)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Ver mapa
-                    </a>
+                    <MapPin size={14} style={{ verticalAlign: "middle" }} /> {coords}
                   </p>
                 ) : null}
 
@@ -304,6 +299,12 @@ export function VisitsPage() {
                     >
                       <Square size={16} />
                       Cerrar visita
+                    </Button>
+                  ) : null}
+                  {visit.id > 0 && (coords || visit.status !== "programada") ? (
+                    <Button variant="ghost" type="button" onClick={() => setMapVisit(visit)}>
+                      <MapPin size={16} />
+                      Ver trail
                     </Button>
                   ) : null}
                 </div>
@@ -335,6 +336,10 @@ export function VisitsPage() {
           }}
         />
       ) : null}
+
+      {mapVisit ? (
+        <VisitMapSheet visit={mapVisit} open onClose={() => setMapVisit(null)} />
+      ) : null}
     </>
   );
 }
@@ -343,10 +348,12 @@ function ActiveVisitCard({
   visit,
   busy,
   onClose,
+  onMap,
 }: {
   visit: Visit;
   busy: boolean;
   onClose: () => void;
+  onMap: () => void;
 }) {
   const { points, tracking, lastError } = useVisitGpsTrail(visit.id, true);
   const watchCount = points.filter((p) => p.source === "watch").length;
@@ -371,10 +378,8 @@ function ActiveVisitCard({
       </p>
       {last ? (
         <p className="muted small">
-          Último: {Number(last.latitude).toFixed(5)}, {Number(last.longitude).toFixed(5)} ·{" "}
-          <a href={mapsUrl(last.latitude, last.longitude)} target="_blank" rel="noreferrer">
-            Ver mapa
-          </a>
+          Último: {Number(last.latitude).toFixed(5)}, {Number(last.longitude).toFixed(5)}
+          {last.accuracy_m ? ` · ±${Number(last.accuracy_m).toFixed(0)} m` : ""}
         </p>
       ) : null}
       {lastError ? <p className="form-error">{lastError}</p> : null}
@@ -383,6 +388,12 @@ function ActiveVisitCard({
           <Square size={16} />
           Cerrar visita
         </Button>
+        {visit.id > 0 ? (
+          <Button variant="ghost" type="button" onClick={onMap}>
+            <MapPin size={16} />
+            Ver trail
+          </Button>
+        ) : null}
       </div>
     </section>
   );

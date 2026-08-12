@@ -52,7 +52,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | hecho |
 | **SF-1.8** | Orden sin visita | origen mostrador / online | hecho |
 | **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | hecho |
-| **SF-1.10** | Mapa evidencia | Leaflet: puntos de una visita | pendiente |
+| **SF-1.10** | Mapa evidencia | Leaflet: puntos de una visita | hecho |
 
 **Criterio “Fase 1 lista”:** un vendedor hace el día de campo offline-ish con evidencia GPS.
 
@@ -80,9 +80,17 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.9** (cola offline + cache catálogo).
+**Fase 1 vendedor:** SF-1.1 → 1.10 listos (salvo pulidos).
 
-**Siguiente:** **SF-1.10** (mapa evidencia Leaflet).
+**Listo para commit / tu push:** **SF-1.10** (mapa Leaflet del trail GPS).
+
+**Siguiente:** Fase 2 supervisor (**SF-2.1** layout) o pulidos PWA.
+
+### Cómo verificar SF-1.10
+
+1. Abre una visita con GPS (en curso o completada) → **Ver trail**.
+2. Debe mostrar marcadores (inicio / trail / cierre) y polilínea sobre OSM.
+3. Si no hay puntos en API pero la visita tiene lat/lng, muestra ese punto de respaldo.
 
 ### Cómo verificar SF-1.9
 
@@ -91,12 +99,6 @@ No mezclar varias SF en un solo commit si se puede evitar.
 3. Visitas → Nueva (ahora) → queda local; Cerrar (± venta/foto) → entra a la cola.
 4. Ventas → Nueva offline → cola de venta mostrador/online.
 5. Vuelve online (o toca **Sincronizar**): la cola se vacía vía `/api/sync/offline-visits` y closes/sales.
-
-### Cómo verificar SF-1.1b
-
-1. En desktop (≥768px): top bar con Inicio/Visitas/Ventas/Inventario/Resumen + Salir; sin barra inferior.
-2. En móvil (&lt;768px) o DevTools device mode: bottom nav como antes; sin top bar.
-3. Las mismas rutas siguen activas al navegar.
 
 ### Cómo verificar SF-1.8
 
