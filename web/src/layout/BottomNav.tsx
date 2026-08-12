@@ -1,19 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { ClipboardList, Home, Package, Search, ShoppingCart } from "lucide-react";
+import { SELLER_NAV_TABS } from "./sellerNav";
 
-const tabs = [
-  { to: "/app/inicio", label: "Inicio", icon: Home },
-  { to: "/app/visitas", label: "Visitas", icon: ClipboardList },
-  { to: "/app/ventas", label: "Ventas", icon: ShoppingCart },
-  { to: "/app/inventario", label: "Inventario", icon: Package },
-  { to: "/app/resumen", label: "Resumen", icon: Search },
-] as const;
-
-/** Barra inferior estilo export — siempre la misma en el área vendedor. */
+/** Barra inferior — visible solo en móvil (&lt;768px). */
 export function BottomNav() {
   return (
     <nav className="tabbar" aria-label="Navegación principal">
-      {tabs.map(({ to, label, icon: Icon }) => (
+      {SELLER_NAV_TABS.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}

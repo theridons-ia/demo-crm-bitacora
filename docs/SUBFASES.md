@@ -43,7 +43,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | ID | Objetivo | Entregable | Estado |
 |----|----------|------------|--------|
 | **SF-1.1** | Shell UX vendedor | Bottom nav + tokens; layout móvil | hecho |
-| **SF-1.1b** | Nav desktop vendedor | ≥768px: top bar (ocultar bottom nav); móvil sigue abajo | pendiente |
+| **SF-1.1b** | Nav desktop vendedor | ≥768px: top bar (ocultar bottom nav); móvil sigue abajo | hecho |
 | **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | hecho |
 | **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | hecho |
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | hecho |
@@ -80,9 +80,15 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.8** (venta sin visita: mostrador / online).
+**Listo para commit / tu push:** **SF-1.1b** (top bar desktop vendedor).
 
-**Siguiente:** **SF-1.1b** (nav desktop) o **SF-1.9** (offline cola) o **SF-1.10** (mapa).
+**Siguiente:** **SF-1.9** (offline cola) o **SF-1.10** (mapa evidencia).
+
+### Cómo verificar SF-1.1b
+
+1. En desktop (≥768px): top bar con Inicio/Visitas/Ventas/Inventario/Resumen + Salir; sin barra inferior.
+2. En móvil (&lt;768px) o DevTools device mode: bottom nav como antes; sin top bar.
+3. Las mismas rutas siguen activas al navegar.
 
 ### Cómo verificar SF-1.8
 
@@ -90,11 +96,4 @@ No mezclar varias SF en un solo commit si se puede evitar.
 2. En web → **Ventas** → **Nueva** → cliente + origen mostrador/online + productos → Confirmar.
 3. La venta aparece en la lista (sin visita) y el stock baja en Inventario.
 4. Las ventas al cerrar visita también listan aquí con origen `visita`.
-
-### Cómo verificar SF-1.6
-
-1. Reinicia uvicorn (columnas nuevas + alertas).
-2. Cierra visita con GPS real: si ±m &gt; 100, se crea alerta `gps_low_accuracy`.
-3. Marca «Omitir GPS» + motivo + foto → alerta `gps_skipped` / `photo_only`.
-4. `GET /api/alerts` en `/docs` para ver el inbox.
 

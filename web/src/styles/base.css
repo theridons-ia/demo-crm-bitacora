@@ -305,7 +305,7 @@ a {
   min-height: 40vh;
 }
 
-/* Bottom nav — portado del export */
+/* Bottom nav — portado del export (móvil) */
 .tabbar {
   position: fixed;
   left: 50%;
@@ -345,6 +345,116 @@ a {
   display: block;
   width: 20px;
   height: 20px;
+}
+
+/* Top bar — SF-1.1b (oculto en móvil) */
+.topbar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-max-width: 960px;
+  }
+
+  .app-shell-seller {
+    padding-bottom: calc(28px + var(--safe-bottom));
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: -6px 0 1.25rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 11rem;
+    flex-shrink: 0;
+  }
+
+  .topbar-mark {
+    width: 12px;
+    height: 36px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--accent), #18312f);
+    flex-shrink: 0;
+  }
+
+  .topbar-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.2;
+  }
+
+  .topbar-user {
+    margin: 0.1rem 0 0;
+  }
+
+  .topbar-nav {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: center;
+  }
+
+  .topbar-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: var(--radius-chip);
+    color: var(--muted-foreground);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .topbar-link:hover {
+    background: var(--secondary);
+    color: var(--primary);
+  }
+
+  .topbar-link.active {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .topbar-logout {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+    border-radius: var(--radius-chip);
+    padding: 0.45rem 0.7rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .topbar-logout:hover {
+    color: var(--destructive);
+    border-color: #e8b4b0;
+    background: #fde8e6;
+  }
 }
 
 @media (min-width: 900px) {
