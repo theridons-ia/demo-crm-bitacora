@@ -111,6 +111,10 @@ export type VisitCreateInput = {
   status?: VisitStatus;
   description?: string | null;
   scheduled_date?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  gps_accuracy_m?: number | null;
+  gps_offline?: boolean;
 };
 
 export function createVisit(payload: VisitCreateInput): Promise<Visit> {
@@ -121,13 +125,29 @@ export function createVisit(payload: VisitCreateInput): Promise<Visit> {
   });
 }
 
-export function startVisit(visitId: number): Promise<Visit> {
-  return request<Visit>(`/api/visits/${visitId}/start`, { method: "POST" });
+export type VisitStartInput = {
+  latitude?: number | null;
+  longitude?: number | null;
+  gps_accuracy_m?: number | null;
+  gps_offline?: boolean;
+};
+
+export function startVisit(visitId: number, payload: VisitStartInput = {}): Promise<Visit> {
+  return request<Visit>(`/api/visits/${visitId}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
 export type VisitCloseInput = {
   result: SaleResult;
   description?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  gps_accuracy_m?: number | null;
+  gps_offline?: boolean;
+  gps_captured_at?: string | null;
 };
 
 export function closeVisit(visitId: number, payload: VisitCloseInput): Promise<Visit> {

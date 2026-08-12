@@ -5,11 +5,15 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import Sale, User, Visit, VisitStatus
-from ..schemas import VisitClose, VisitCreate, VisitOut
+from ..models import GpsPointSource, Sale, User, Visit, VisitGpsPoint, VisitStatus
+from ..schemas import VisitClose, VisitCreate, VisitOut, VisitStart
 from ..services.visits import close_visit_with_optional_sale
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
+
+
+def _visit_query(db: Session):
+    return db.query(Visit).options(joinedload(Visit.client), joinedload(Visit.sale).joinedload(Sale.items))
 
 
 @router.get("", response_model=list[VisitOut])
@@ -56,22 +60,31 @@ def create_visit(
         local_uuid=payload.local_uuid,
     )
     db.add(visit)
+    db.flush()
+    if payload.latitude is not None and payload.longitude is not None:
+        db.add(
+            VisitGpsPoint(
+                visit_id=visit.id,
+                latitude=payload.latitude,
+                longitude=payload.longitude,
+                accuracy_m=payload.gps_accuracy_m,
+                captured_at=now,
+                source=GpsPointSource.start if payload.status == VisitStatus.en_curso else GpsPointSource.watch,
+            )
+        )
     db.commit()
-    return (
-        db.query(Visit)
-        .options(joinedload(Visit.client), joinedload(Visit.sale).joinedload(Sale.items))
-        .filter(Visit.id == visit.id)
-        .one()
-    )
+    return _visit_query(db).filter(Visit.id == visit.id).one()
 
 
 @router.post("/{visit_id}/start", response_model=VisitOut)
 def start_visit(
     visit_id: int,
+    payload: VisitStart | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Pasa una visita programada a en_curso (GPS se añade en SF-1.4)."""
+    """Pasa una visita programada a en_curso; opcionalmente guarda GPS de inicio."""
+    body = payload or VisitStart()
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
         raise HTTPException(status_code=404, detail="Visita no encontrada")
@@ -83,6 +96,22 @@ def start_visit(
     now = datetime.now(timezone.utc)
     visit.status = VisitStatus.en_curso
     visit.visited_at = now
+    if body.latitude is not None and body.longitude is not None:
+        visit.latitude = body.latitude
+        visit.longitude = body.longitude
+        visit.gps_accuracy_m = body.gps_accuracy_m
+        visit.gps_offline = body.gps_offline
+        visit.gps_captured_at = now
+        db.add(
+            VisitGpsPoint(
+                visit_id=visit.id,
+                latitude=body.latitude,
+                longitude=body.longitude,
+                accuracy_m=body.gps_accuracy_m,
+                captured_at=now,
+                source=GpsPointSource.start,
+            )
+        )
     db.add(visit)
     db.commit()
     return (

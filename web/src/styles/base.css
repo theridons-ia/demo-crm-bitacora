@@ -169,6 +169,22 @@ a {
   font-size: 0.9rem;
 }
 
+.visit-active-card {
+  margin-bottom: 1rem;
+  border-color: #f5b5ae;
+  background: linear-gradient(180deg, #fff7f5 0%, var(--card) 55%);
+}
+
+.visit-active-title {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.visit-item a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .input {
   min-height: 48px;
   padding: 0.65rem 0.9rem;

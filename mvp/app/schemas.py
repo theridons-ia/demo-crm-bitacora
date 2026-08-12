@@ -175,6 +175,13 @@ class VisitCreate(BaseModel):
     local_uuid: str | None = None
 
 
+class VisitStart(BaseModel):
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+    gps_accuracy_m: Decimal | None = None
+    gps_offline: bool = False
+
+
 class VisitClose(BaseModel):
     result: SaleResult
     description: str | None = None

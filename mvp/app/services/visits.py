@@ -3,7 +3,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from ..models import Product, Sale, SaleItem, SaleOrigin, SaleResult, Visit, VisitStatus
+from ..models import GpsPointSource, Product, Sale, SaleItem, SaleOrigin, SaleResult, Visit, VisitGpsPoint, VisitStatus
 from ..schemas import SaleIn
 
 
@@ -71,6 +71,18 @@ def close_visit_with_optional_sale(
     visit.gps_offline = gps_offline
     if gps_captured_at is not None:
         visit.gps_captured_at = gps_captured_at
+
+    if latitude is not None and longitude is not None:
+        db.add(
+            VisitGpsPoint(
+                visit_id=visit.id,
+                latitude=latitude,
+                longitude=longitude,
+                accuracy_m=gps_accuracy_m,
+                captured_at=gps_captured_at or visit.gps_captured_at,
+                source=GpsPointSource.end,
+            )
+        )
 
     needs_sale = result in (SaleResult.venta_parcial, SaleResult.venta_cerrada)
     if needs_sale:

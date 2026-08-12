@@ -46,7 +46,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.1b** | Nav desktop vendedor | ≥768px: top bar (ocultar bottom nav); móvil sigue abajo | pendiente |
 | **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | hecho |
 | **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | hecho |
-| **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | pendiente |
+| **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | hecho |
 | **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | pendiente |
 | **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | pendiente |
 | **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | pendiente |
@@ -80,13 +80,25 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.3** (ciclo de visitas).
+**Listo para commit / tu push:** **SF-1.4** (GPS al iniciar/cerrar).
 
-**Siguiente:** **SF-1.4** — GPS al iniciar/cerrar visita.
+**Siguiente:** **SF-1.5** (trail mientras `en_curso`) o pulir UI tipo PowerStreet / export.
 
-### Cómo verificar SF-1.3
+### GPS en el celular (importante)
 
-1. Reinicia uvicorn (nuevo endpoint `/start`).
-2. Tab **Visitas** → Nueva visita (Ahora o Programar).
-3. Programada → **Iniciar** → **Cerrar sin venta**.
+Los navegadores **bloquean** geolocalización si la página no es contexto seguro:
+
+| Cómo abres la app | ¿GPS? |
+|-------------------|-------|
+| `http://localhost:5173` en el PC | Sí (suele pedir permiso) |
+| `http://IP-del-servidor:5173` en el celular | **No** (HTTP inseguro) |
+| HTTPS (dominio / túnel ngrok / Caddy) | Sí |
+
+Mientras tanto: la visita **sigue** aunque falle el GPS (con aviso). Trail continuo = SF-1.5. Mapa embebido = SF-1.10.
+
+### Cómo verificar SF-1.4 (en el PC)
+
+1. Reinicia uvicorn.
+2. Visitas → Nueva → **Ahora + GPS** → acepta permiso del navegador.
+3. Debe mostrar coordenadas y enlace “Ver mapa”.
 

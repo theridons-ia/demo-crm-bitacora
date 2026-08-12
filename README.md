@@ -29,6 +29,9 @@ CRM de campo **Bitácora**: visitas con evidencia GPS, ventas/órdenes e inventa
 ## Arranque dual (API + Web)
 
 ```bash
+# Terminal 0 — Postgres (si no está)
+cd mvp && docker compose up -d
+
 # Terminal 1 — API
 cd mvp
 source .venv/bin/activate
@@ -39,9 +42,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8090
 export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"   # si usas nvm
 cd web
 npm install             # primera vez
-npm run dev
+npm run dev -- --host   # --host permite abrir desde otro dispositivo en la LAN
 ```
 
 - API + docs: http://localhost:8090/docs  
 - Web: http://localhost:5173  
 - Login demo: `marina@bitacora.local` / `demo1234`
+
+**GPS en el celular:** hace falta **HTTPS** (o `localhost`). Por `http://IP:5173` el navegador suele bloquear la ubicación; ver `docs/SUBFASES.md` (SF-1.4).
