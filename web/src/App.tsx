@@ -5,6 +5,7 @@ import { SellerShell } from "./layout/SellerShell";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { VisitsPage } from "./pages/VisitsPage";
 
 export default function App() {
   return (
@@ -22,16 +23,7 @@ export default function App() {
           >
             <Route index element={<Navigate to="inicio" replace />} />
             <Route path="inicio" element={<HomePage />} />
-            <Route
-              path="visitas"
-              element={
-                <PlaceholderPage
-                  title="Visitas"
-                  nextSf="SF-1.3"
-                  blurb="Ciclo programada → en curso → completada."
-                />
-              }
-            />
+            <Route path="visitas" element={<VisitsPage />} />
             <Route
               path="ventas"
               element={
