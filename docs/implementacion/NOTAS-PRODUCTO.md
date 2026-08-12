@@ -20,9 +20,7 @@ Decisiones y pendientes hablados en chat, para no perderlos.
 1. **Dirección escrita** (texto libre / referencias VE).
 2. **Pin en mapa** (`latitude` / `longitude`).
 
-**Hecho en SF-1.11:** UI de alta con mapa + GPS; pins distintos PDV vs vendedor en **Ver trail**.
-
-Pendiente opcional: editar pin de un cliente ya creado.
+**Hecho en SF-1.11 / SF-1.12:** UI de alta y **edición** con mapa + GPS; pins distintos PDV vs vendedor; ficha con mapa.
 
 ### Búsqueda por calle (OSM / Nominatim) en Venezuela
 
@@ -46,11 +44,32 @@ Pendiente opcional: editar pin de un cliente ya creado.
 
 ---
 
-## Próximos candidatos de implementación (doc + código)
+## Mapas: OSM vs Google
+
+### Situación
+- Hoy: **Leaflet + OpenStreetMap** (gratis; datos VE a veces desactualizados).
+- Google Maps: mejor basemap en VE, pero pay‑as‑you‑go + ToS (no cachear tiles; usar su JS API, no “pegar” tiles de Google en Leaflet).
+
+### Recomendación de producto
+1. **Piloto:** seguir con OSM + pins/direcciones propios.
+2. **Probar Google:** cuenta Google Cloud + facturación + API key + tope de presupuesto ($10–20).
+3. **En código:** flag `VITE_MAP_PROVIDER=osm|google` y adaptadores (no mezclar tiles de Google dentro de Leaflet: incumple ToS).
+4. No hace falta suscripción Starter ($100+); cupo gratis pay‑as‑you‑go suele bastar para ≤8 vendedores.
+
+### Pasos para probar Google (cuando quieras)
+1. [Google Cloud Console](https://console.cloud.google.com/) → proyecto nuevo.
+2. Activar **Maps JavaScript API** (y Geocoding solo si buscas direcciones).
+3. Credenciales → API key → restringir por HTTP referrer (`localhost:5173`, `enrutas.cc`, etc.).
+4. Presupuesto + alerta (ej. $10).
+5. Variable en `web/.env.local`: `VITE_GOOGLE_MAPS_API_KEY=…` y `VITE_MAP_PROVIDER=google`.
+6. Implementar adaptador Google en picker PDV + Ver trail.
+
+### Pendiente de código
+- Abstracción `MapProvider` (OSM / Google) detrás de `ClientLocationPicker` y `VisitMapSheet`.
 
 1. ~~Formulario cliente: dirección + mapa pin + GPS actual.~~ **SF-1.11**
 2. ~~En **Ver trail**: marcador PDV distinto del trail.~~ **SF-1.11**
-3. Editar ubicación de cliente existente.
+3. ~~Editar ubicación de cliente existente.~~ **SF-1.12**
 4. Fase 2 supervisor (layout, rutas del día, inbox alertas).
 5. Deploy Contabo + `enrutas.cc` + HTTPS.
 

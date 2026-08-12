@@ -78,6 +78,32 @@ class ClientOut(ORMModel):
     is_active: bool
 
 
+class ClientUpdate(BaseModel):
+    """Actualización de cliente (SF-1.12). Mismos campos que el alta."""
+
+    name: str = Field(min_length=2, max_length=180)
+    rif: str | None = Field(default=None, max_length=20)
+    ci: str | None = Field(default=None, max_length=20)
+    state: str | None = None
+    address: str | None = None
+    phone: str | None = None
+    notes: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+
+    @model_validator(mode="after")
+    def require_exactly_one_id(self):
+        rif = (self.rif or "").strip() or None
+        ci = (self.ci or "").strip() or None
+        self.rif = rif
+        self.ci = ci
+        if rif and ci:
+            raise ValueError("Usa RIF o CI, no ambos (un solo identificador)")
+        if not rif and not ci:
+            raise ValueError("Debes indicar RIF o CI")
+        return self
+
+
 class SupplierCreate(BaseModel):
     name: str = Field(min_length=2, max_length=180)
     rif: str | None = Field(default=None, max_length=20)

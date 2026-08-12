@@ -117,6 +117,14 @@ export function createClient(payload: ClientCreateInput): Promise<Client> {
   });
 }
 
+export function updateClient(clientId: number, payload: ClientCreateInput): Promise<Client> {
+  return request<Client>(`/api/clients/${clientId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchVisits(): Promise<Visit[]> {
   return request<Visit[]>("/api/visits");
 }

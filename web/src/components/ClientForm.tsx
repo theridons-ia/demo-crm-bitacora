@@ -1,16 +1,18 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { MapPin } from "lucide-react";
 import { Button } from "./Button";
 import { ClientLocationPicker } from "./ClientLocationPicker";
 import { TextField } from "./TextField";
-import { ApiError, createClient, type ClientCreateInput } from "../lib/api";
+import { ApiError, createClient, updateClient, type ClientCreateInput } from "../lib/api";
 import { getCurrentPosition } from "../lib/gps";
 import type { Client } from "../lib/types";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onCreated: (client: Client) => void;
+  /** Si viene, modo edición. */
+  initialClient?: Client | null;
+  onSaved: (client: Client) => void;
 };
 
 type IdType = "rif" | "ci";
@@ -24,8 +26,40 @@ const empty = {
   notes: "",
 };
 
-/** Alta de cliente VE: RIF o CI + dirección escrita + pin en mapa. */
-export function ClientForm({ open, onClose, onCreated }: Props) {
+function hydrate(client: Client | null | undefined) {
+  if (!client) {
+    return {
+      form: empty,
+      idType: "rif" as IdType,
+      latitude: null as number | null,
+      longitude: null as number | null,
+    };
+  }
+  const idType: IdType = client.ci && !client.rif ? "ci" : "rif";
+  return {
+    form: {
+      name: client.name,
+      idValue: (idType === "rif" ? client.rif : client.ci) || "",
+      state: client.state || "",
+      address: client.address || "",
+      phone: client.phone || "",
+      notes: client.notes || "",
+    },
+    idType,
+    latitude:
+      client.latitude != null && Number.isFinite(Number(client.latitude))
+        ? Number(client.latitude)
+        : null,
+    longitude:
+      client.longitude != null && Number.isFinite(Number(client.longitude))
+        ? Number(client.longitude)
+        : null,
+  };
+}
+
+/** Alta / edición de cliente VE: RIF o CI + dirección + pin. */
+export function ClientForm({ open, onClose, initialClient = null, onSaved }: Props) {
+  const editing = Boolean(initialClient?.id);
   const [form, setForm] = useState(empty);
   const [idType, setIdType] = useState<IdType>("rif");
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -33,6 +67,16 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
   const [gpsBusy, setGpsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = hydrate(initialClient);
+    setForm(h.form);
+    setIdType(h.idType);
+    setLatitude(h.latitude);
+    setLongitude(h.longitude);
+    setError(null);
+  }, [open, initialClient]);
 
   if (!open) return null;
 
@@ -86,15 +130,20 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
 
     setSubmitting(true);
     try {
-      const created = await createClient(payload);
-      setForm(empty);
-      setIdType("rif");
-      setLatitude(null);
-      setLongitude(null);
-      onCreated(created);
+      const saved =
+        editing && initialClient
+          ? await updateClient(initialClient.id, payload)
+          : await createClient(payload);
+      if (!editing) {
+        setForm(empty);
+        setIdType("rif");
+        setLatitude(null);
+        setLongitude(null);
+      }
+      onSaved(saved);
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo crear el cliente");
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar el cliente");
     } finally {
       setSubmitting(false);
     }
@@ -105,7 +154,7 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Clientes</p>
-          <h1 id="client-form-title">Nuevo cliente</h1>
+          <h1 id="client-form-title">{editing ? "Editar cliente" : "Nuevo cliente"}</h1>
           <p className="muted">RIF o CI · dirección escrita · pin del PDV en el mapa.</p>
         </div>
         <Button variant="ghost" type="button" onClick={onClose}>
@@ -236,7 +285,7 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
         ) : null}
 
         <Button type="submit" variant="accent" block disabled={submitting}>
-          {submitting ? "Guardando…" : "Guardar cliente"}
+          {submitting ? "Guardando…" : editing ? "Guardar cambios" : "Guardar cliente"}
         </Button>
       </form>
     </div>

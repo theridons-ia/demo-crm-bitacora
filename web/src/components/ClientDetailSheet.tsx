@@ -10,6 +10,7 @@ type Props = {
   client: Client;
   open: boolean;
   onClose: () => void;
+  onEdit: () => void;
 };
 
 function hasPdvPin(client: Client): boolean {
@@ -18,7 +19,7 @@ function hasPdvPin(client: Client): boolean {
 }
 
 /** Ficha de cliente: datos + mapa con pin PDV. */
-export function ClientDetailSheet({ client, open, onClose }: Props) {
+export function ClientDetailSheet({ client, open, onClose, onEdit }: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const pinned = hasPdvPin(client);
@@ -79,6 +80,9 @@ export function ClientDetailSheet({ client, open, onClose }: Props) {
       </header>
 
       <section className="card form-stack">
+        <Button type="button" variant="accent" block onClick={onEdit}>
+          Editar datos y pin
+        </Button>
         <div>
           <p className="field-label">Identificación</p>
           <p>
@@ -121,7 +125,8 @@ export function ClientDetailSheet({ client, open, onClose }: Props) {
             </>
           ) : (
             <p className="muted small">
-              Este cliente no tiene pin. Al editar (próximo) o crear de nuevo puedes fijar la ubicación.
+              Este cliente no tiene pin. Toca <strong>Editar datos y pin</strong> para fijar la
+              ubicación en el mapa.
             </p>
           )}
         </div>

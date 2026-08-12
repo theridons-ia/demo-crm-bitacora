@@ -285,6 +285,26 @@ Ver trail GPS de una visita sobre OpenStreetMap.
 
 ---
 
+## SF-1.12 — Editar cliente + pin
+
+### Objetivo
+Poder corregir datos y añadir/mover el pin PDV en clientes ya creados.
+
+### Qué se hizo
+- `PATCH /api/clients/{id}` con los mismos campos del alta.
+- Formulario en modo edición desde la ficha (**Editar datos y pin**).
+- Tras guardar, vuelve a la ficha actualizada.
+
+### Cómo
+| Pieza | Ruta |
+|-------|------|
+| API | `mvp/app/routers/clients.py`, `schemas.ClientUpdate` |
+| Form | `ClientForm` (`initialClient` / `onSaved`) |
+| Ficha | `ClientDetailSheet` → botón editar |
+| Cliente API web | `updateClient()` en `api.ts` |
+
+---
+
 ## SF-1.11 — Pin PDV en cliente + distinción en mapa
 
 ### Objetivo

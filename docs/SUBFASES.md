@@ -57,6 +57,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | hecho |
 | **SF-1.10** | Mapa evidencia | Leaflet: puntos de una visita | hecho |
 | **SF-1.11** | Pin PDV en cliente + mapa | Dirección + pin; PDV verde vs trail vendedor | hecho |
+| **SF-1.12** | Editar cliente + pin | PATCH cliente; ficha → editar datos/mapa | hecho |
 
 **Criterio “Fase 1 lista”:** un vendedor hace el día de campo offline-ish con evidencia GPS.
 
@@ -84,9 +85,15 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.11** (pin PDV en cliente + leyenda en mapa).
+**Listo para commit / tu push:** **SF-1.12** (editar cliente y pin desde la ficha).
 
-**Siguiente:** Fase 2 supervisor (**SF-2.1** layout) o deploy Contabo / `enrutas.cc`.
+**Siguiente:** Fase 2 supervisor (**SF-2.1**) o deploy Contabo / `enrutas.cc`.
+
+### Cómo verificar SF-1.12
+
+1. Inicio → toca un cliente «Sin pin» → **Editar datos y pin**.
+2. Fija ubicación en el mapa / GPS → Guardar cambios.
+3. La ficha debe mostrar el mapa y el badge pasa a **Con pin**.
 
 ### Cómo verificar SF-1.11
 

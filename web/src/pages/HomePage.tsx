@@ -24,6 +24,7 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
 
@@ -86,7 +87,14 @@ export function HomePage() {
         <p className="muted small" style={{ margin: "0 0 0.85rem" }}>
           {clients.length} cliente{clients.length === 1 ? "" : "s"} · los más recientes arriba
         </p>
-        <Button variant="accent" block onClick={() => setFormOpen(true)}>
+        <Button
+          variant="accent"
+          block
+          onClick={() => {
+            setEditingClient(null);
+            setFormOpen(true);
+          }}
+        >
           <Plus size={18} />
           Nuevo cliente
         </Button>
@@ -157,17 +165,32 @@ export function HomePage() {
 
       <ClientForm
         open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onCreated={(client) => {
+        initialClient={editingClient}
+        onClose={() => {
+          setFormOpen(false);
+          setEditingClient(null);
+        }}
+        onSaved={(client) => {
           setQuery("");
           setJustCreatedId(client.id);
-          setClients((prev) => [client, ...prev.filter((c) => c.id !== client.id)]);
+          setClients((prev) => {
+            const without = prev.filter((c) => c.id !== client.id);
+            return [client, ...without];
+          });
           setSelected(client);
         }}
       />
 
-      {selected ? (
-        <ClientDetailSheet client={selected} open onClose={() => setSelected(null)} />
+      {selected && !formOpen ? (
+        <ClientDetailSheet
+          client={selected}
+          open
+          onClose={() => setSelected(null)}
+          onEdit={() => {
+            setEditingClient(selected);
+            setFormOpen(true);
+          }}
+        />
       ) : null}
     </>
   );
