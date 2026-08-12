@@ -6,6 +6,7 @@ import { RoleHomeRedirect } from "./auth/RoleHomeRedirect";
 import { SellerShell } from "./layout/SellerShell";
 import { SupervisorShell } from "./layout/SupervisorShell";
 import { AlertsInboxPage } from "./pages/AlertsInboxPage";
+import { CatalogVisibilityPage } from "./pages/CatalogVisibilityPage";
 import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -64,16 +65,7 @@ export default function App() {
             <Route path="hoy" element={<SupervisorHomePage />} />
             <Route path="ruta" element={<RouteDayPage />} />
             <Route path="alertas" element={<AlertsInboxPage />} />
-            <Route
-              path="catalogo"
-              element={
-                <PlaceholderPage
-                  title="Catálogo por vendedor"
-                  nextSf="SF-2.4"
-                  blurb="Qué productos ve y puede vender cada vendedor."
-                />
-              }
-            />
+            <Route path="catalogo" element={<CatalogVisibilityPage />} />
             <Route
               path="mapa"
               element={

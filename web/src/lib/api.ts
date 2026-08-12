@@ -232,6 +232,27 @@ export function fetchProducts(): Promise<Product[]> {
   return request<Product[]>("/api/products");
 }
 
+export type CatalogVisibility = {
+  seller_id: number;
+  unrestricted: boolean;
+  product_ids: number[];
+};
+
+export function fetchCatalogVisibility(sellerId: number): Promise<CatalogVisibility> {
+  return request<CatalogVisibility>(`/api/sellers/${sellerId}/catalog-visibility`);
+}
+
+export function updateCatalogVisibility(
+  sellerId: number,
+  payload: { unrestricted: boolean; product_ids: number[] },
+): Promise<CatalogVisibility> {
+  return request<CatalogVisibility>(`/api/sellers/${sellerId}/catalog-visibility`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchSales(): Promise<Sale[]> {
   return request<Sale[]>("/api/sales");
 }

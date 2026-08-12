@@ -1,5 +1,29 @@
 # Fase 2 — Supervisor
 
+## SF-2.4 — Visibilidad catálogo
+
+### Objetivo
+Definir qué productos ve (y puede vender) cada vendedor. Stock sigue siendo global.
+
+### Qué se hizo
+- Tabla `seller_product_visibility` (allowlist).
+- Sin filas = catálogo completo; con filas = solo esos productos.
+- `GET/PUT /api/sellers/{id}/catalog-visibility`.
+- `GET /api/products` filtra para vendedor.
+- UI `/sup/catalogo`.
+- Seed: Carlos restringido a COLA1, AGUA600, MALTALATA; Marina sin restricción.
+
+### Cómo verificar
+1. Supervisor → Catálogo → Carlos: 3 productos; Guardar.
+2. Login `carlos@bitacora.local` → Inventario: solo esos 3.
+3. Marina → Inventario: todos.
+4. «Permitir todos» en Carlos restaura catálogo completo.
+
+### Siguiente
+**SF-2.5** — Mapa del equipo.
+
+---
+
 ## SF-2.3 — Inbox de alertas
 
 ### Objetivo

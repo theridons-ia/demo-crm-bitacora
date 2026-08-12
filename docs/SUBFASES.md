@@ -70,7 +70,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-2.1** | Layout supervisor | Sidebar o top nav tablet/desktop (sin bottom nav) | hecho |
 | **SF-2.2** | Ruta del día | Asignar / desasignar visitas planificadas | hecho |
 | **SF-2.3** | Alertas GPS/foto | Inbox de alertas | hecho |
-| **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | pendiente |
+| **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | hecho |
 | **SF-2.5** | Mapa equipo | Visitas del día en mapa | pendiente |
 
 ---
@@ -85,9 +85,14 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-2.3** (inbox de alertas).
+**Listo para commit / tu push:** **SF-2.4** (visibilidad catálogo).
 
-**Siguiente:** **SF-2.4** visibilidad catálogo. Contabo más adelante.
+**Siguiente:** **SF-2.5** mapa del equipo. Contabo más adelante.
+
+### Cómo verificar SF-2.4
+
+1. Supervisor → Catálogo → Carlos con subconjunto / Marina completa.
+2. Login Carlos → Inventario filtrado; Marina ve todo.
 
 ### Cómo verificar SF-2.3
 

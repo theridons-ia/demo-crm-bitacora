@@ -154,6 +154,19 @@ class ProductOut(ORMModel):
     is_active: bool
 
 
+class CatalogVisibilityOut(BaseModel):
+    seller_id: int
+    unrestricted: bool
+    product_ids: list[int]
+
+
+class CatalogVisibilityUpdate(BaseModel):
+    """Si unrestricted=True, el vendedor ve todo el catálogo (se borran filas)."""
+
+    unrestricted: bool = False
+    product_ids: list[int] = Field(default_factory=list)
+
+
 class SaleItemIn(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)

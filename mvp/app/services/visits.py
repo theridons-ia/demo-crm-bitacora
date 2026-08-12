@@ -13,12 +13,14 @@ from ..models import (
     SaleItem,
     SaleOrigin,
     SaleResult,
+    User,
     Visit,
     VisitAlert,
     VisitGpsPoint,
     VisitStatus,
 )
 from ..schemas import SaleIn
+from .catalog_visibility import assert_seller_can_use_products
 
 # Umbrales evidencia (metros)
 GPS_ACCURACY_WARN_M = Decimal("100")
@@ -207,6 +209,9 @@ def close_visit_with_optional_sale(
     if needs_sale:
         if not sale_in or not sale_in.items:
             raise HTTPException(status_code=400, detail="Debes indicar productos para una venta")
+        seller = db.query(User).filter(User.id == seller_id).first()
+        if seller:
+            assert_seller_can_use_products(db, seller, [line.product_id for line in sale_in.items])
         total, items = apply_sale_to_inventory(db, sale_in)
         sale = Sale(
             visit_id=visit.id,

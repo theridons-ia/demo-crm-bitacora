@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..models import Client, Sale, SaleOrigin, User, UserRole
 from ..schemas import SaleCreate, SaleIn
+from .catalog_visibility import assert_seller_can_use_products
 from .visits import apply_sale_to_inventory
 
 
@@ -16,6 +17,8 @@ def create_sale_without_visit(db: Session, payload: SaleCreate, *, seller: User)
         )
     if not payload.items:
         raise HTTPException(status_code=400, detail="La venta requiere al menos un producto")
+
+    assert_seller_can_use_products(db, seller, [line.product_id for line in payload.items])
 
     client = db.query(Client).filter(Client.id == payload.client_id, Client.is_active.is_(True)).first()
     if not client:

@@ -149,6 +149,24 @@ class Product(Base):
     sale_items: Mapped[list["SaleItem"]] = relationship(back_populates="product")
 
 
+class SellerProductVisibility(Base):
+    """Allowlist de productos que un vendedor puede ver/vender (SF-2.4).
+
+    Sin filas para un vendedor = ve todo el catálogo activo.
+    Con filas = solo esos product_id.
+    """
+
+    __tablename__ = "seller_product_visibility"
+    __table_args__ = (
+        UniqueConstraint("seller_id", "product_id", name="uq_seller_product_visibility"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Visit(Base):
     __tablename__ = "visits"
 

@@ -21,7 +21,7 @@ const LINKS = [
     to: "/sup/catalogo",
     title: "Visibilidad catálogo",
     blurb: "Qué productos ve cada vendedor.",
-    sf: "SF-2.4",
+    sf: "SF-2.4 · listo",
     icon: Package,
   },
   {

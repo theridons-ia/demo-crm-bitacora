@@ -11,6 +11,7 @@ from app.models import (
     Client,
     Product,
     SaleResult,
+    SellerProductVisibility,
     Supplier,
     User,
     UserRole,
@@ -221,6 +222,23 @@ def run() -> None:
                         ),
                     ]
                 )
+
+        carlos = db.query(User).filter(User.email == "carlos@bitacora.local").first()
+        if (
+            carlos
+            and db.query(SellerProductVisibility)
+            .filter(SellerProductVisibility.seller_id == carlos.id)
+            .count()
+            == 0
+        ):
+            # Demo SF-2.4: Carlos solo ve un subconjunto; Marina sigue con catálogo completo
+            subset = (
+                db.query(Product)
+                .filter(Product.sku.in_(["COLA1", "AGUA600", "MALTALATA"]))
+                .all()
+            )
+            for p in subset:
+                db.add(SellerProductVisibility(seller_id=carlos.id, product_id=p.id))
 
         db.commit()
         print("Seed OK")
