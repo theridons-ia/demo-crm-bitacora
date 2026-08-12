@@ -34,9 +34,33 @@ Abre la URL que imprima Vite (normalmente `http://localhost:5173`).
 
 | Comando | Qué hace |
 |---------|----------|
-| `npm run dev` | Servidor de desarrollo |
+| `npm run dev` | HTTP en localhost |
+| `npm run dev:host` | HTTP accesible en la LAN |
+| `npm run dev:https` | **HTTPS** en LAN (para GPS en el celular) |
 | `npm run build` | Build producción en `dist/` |
 | `npm run preview` | Sirve el build |
+
+## HTTPS local (GPS en el celular)
+
+1. Deja la **API** corriendo (`uvicorn` en `:8090`).
+2. Para el front anterior (Ctrl+C) y arranca:
+
+```bash
+cd web
+export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"
+npm run dev:https
+```
+
+3. Vite mostrará algo como `https://192.168.x.x:5173/`.
+4. En el celular (misma Wi‑Fi), abre esa URL **https**.
+5. El navegador avisará “certificado no confiable” → **Avanzado → Continuar** (es normal en local).
+6. Login y prueba Visitas + GPS (pide permiso de ubicación).
+
+Notas:
+
+- El proxy `/api` sigue yendo a `http://127.0.0.1:8090` en el servidor; el celular solo habla con Vite por HTTPS.
+- Si no carga, revisa firewall del PC (puerto 5173).
+- En el PC también puedes usar `https://localhost:5173`.
 
 ## Estructura
 
