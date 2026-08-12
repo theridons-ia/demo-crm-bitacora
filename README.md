@@ -16,6 +16,8 @@ CRM de campo **Bitácora**: visitas con evidencia GPS, ventas/órdenes e inventa
 | Doc | Contenido |
 |-----|-----------|
 | [docs/SUBFASES.md](docs/SUBFASES.md) | Checkpoints SF-x.y |
+| [docs/implementacion/](docs/implementacion/README.md) | Qué se hizo y cómo (por fase) |
+| [docs/ARRANQUE_LOCAL.md](docs/ARRANQUE_LOCAL.md) | Cómo levantar API + web y verificar |
 | [docs/DECISIONES_Y_ROADMAP.md](docs/DECISIONES_Y_ROADMAP.md) | Decisiones de producto + GPS |
 | [docs/REFERENCIA_POWERSTREET.md](docs/REFERENCIA_POWERSTREET.md) | Referencia competitiva PowerStreet Mobile |
 | [mvp/README.md](mvp/README.md) | API |
@@ -27,6 +29,8 @@ CRM de campo **Bitácora**: visitas con evidencia GPS, ventas/órdenes e inventa
 2. **Tú** haces `git push` / `git pull`.  
 
 ## Arranque dual (API + Web)
+
+**Guía detallada (apagón / checklist / verificación):** [docs/ARRANQUE_LOCAL.md](docs/ARRANQUE_LOCAL.md)
 
 ```bash
 # Terminal 0 — Postgres (si no está)
@@ -43,6 +47,7 @@ export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"   # si usas nvm
 cd web
 npm install             # primera vez
 npm run dev -- --host   # --host permite abrir desde otro dispositivo en la LAN
+# GPS en celular: npm run dev:https
 ```
 
 - API + docs: http://localhost:8090/docs  
