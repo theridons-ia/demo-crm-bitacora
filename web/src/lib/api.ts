@@ -1,5 +1,5 @@
 import { clearToken, getToken } from "./authStorage";
-import type { Client, SaleResult, TokenResponse, User, Visit, VisitStatus } from "./types";
+import type { Client, SaleResult, TokenResponse, User, Visit, VisitGpsPoint, VisitStatus } from "./types";
 
 /**
  * Base del API.
@@ -152,6 +152,29 @@ export type VisitCloseInput = {
 
 export function closeVisit(visitId: number, payload: VisitCloseInput): Promise<Visit> {
   return request<Visit>(`/api/visits/${visitId}/close`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchVisitGpsPoints(visitId: number): Promise<VisitGpsPoint[]> {
+  return request<VisitGpsPoint[]>(`/api/visits/${visitId}/gps-points`);
+}
+
+export type GpsPointCreateInput = {
+  latitude: number;
+  longitude: number;
+  accuracy_m?: number | null;
+  captured_at?: string | null;
+  source?: "start" | "watch" | "end";
+};
+
+export function postVisitGpsPoint(
+  visitId: number,
+  payload: GpsPointCreateInput,
+): Promise<VisitGpsPoint> {
+  return request<VisitGpsPoint>(`/api/visits/${visitId}/gps-points`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

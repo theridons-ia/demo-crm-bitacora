@@ -47,7 +47,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | hecho |
 | **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | hecho |
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | hecho |
-| **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | pendiente |
+| **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | hecho |
 | **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | pendiente |
 | **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | pendiente |
 | **SF-1.8** | Orden sin visita | origen mostrador / online | pendiente |
@@ -80,24 +80,14 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.4** (GPS al iniciar/cerrar).
+**Listo para commit / tu push:** **SF-1.5** (trail GPS en visita `en_curso`).
 
-**Siguiente:** **SF-1.5** (trail mientras `en_curso`) o pulir UI tipo PowerStreet / export.
+**Siguiente:** **SF-1.6** (skip GPS + foto + alerta lejos) o **SF-1.7** (venta en visita).
 
-### GPS en entornos de prueba (sin HTTPS de producción)
+### Cómo verificar SF-1.5
 
-| Método | Cómo | GPS real |
-|--------|------|----------|
-| **localhost en el PC** | http://localhost:5173 | Sí |
-| **GPS de prueba** | En Visitas → «Activar GPS de prueba» (solo `npm run dev`) | Simulado (Lara) |
-| **HTTPS local** | `cd web && npm run dev:https` → aceptar cert en el celular | Sí (aviso del navegador) |
-| **Túnel** | ngrok / Cloudflare Tunnel hacia `:5173` | Sí |
-
-Chrome (avanzado): flag `unsafely-treat-insecure-origin-as-secure` con tu `http://IP:5173` — solo para labs.
-
-### Cómo verificar SF-1.4 (en el PC)
-
-1. Reinicia uvicorn.
-2. Visitas → Nueva → **Ahora + GPS** → acepta permiso del navegador.
-3. Debe mostrar coordenadas y enlace “Ver mapa”.
+1. Activa **GPS de prueba** (si no hay HTTPS).
+2. Inicia una visita → tarjeta «en curso» muestra **Trail activo**.
+3. En ~12 s (mock) o ~45 s (GPS real) sube puntos `watch`.
+4. En `/docs` → `GET /api/visits/{id}/gps-points` para ver el trail.
 

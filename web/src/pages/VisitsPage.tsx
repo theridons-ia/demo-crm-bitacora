@@ -1,7 +1,8 @@
-import { ClipboardList, MapPin, Play, Plus, Square } from "lucide-react";
+import { ClipboardList, MapPin, Play, Plus, Radio, Square } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { useVisitGpsTrail } from "../hooks/useVisitGpsTrail";
 import {
   ApiError,
   closeVisit,
@@ -10,7 +11,14 @@ import {
   fetchVisits,
   startVisit,
 } from "../lib/api";
-import { getCurrentPosition, isMockGpsEnabled, isSecureGeoContext, mapsUrl, setMockGpsEnabled, canUseMockGps } from "../lib/gps";
+import {
+  canUseMockGps,
+  getCurrentPosition,
+  isMockGpsEnabled,
+  isSecureGeoContext,
+  mapsUrl,
+  setMockGpsEnabled,
+} from "../lib/gps";
 import type { Client, Visit, VisitStatus } from "../lib/types";
 
 const statusLabel: Record<VisitStatus, string> = {
@@ -32,7 +40,7 @@ function formatCoords(visit: Visit): string | null {
   return `${Number(visit.latitude).toFixed(5)}, ${Number(visit.longitude).toFixed(5)}${acc}`;
 }
 
-/** SF-1.4: ciclo de visita + GPS al iniciar/cerrar (trail continuo = SF-1.5). */
+/** SF-1.4/1.5: ciclo de visita + GPS inicio/cierre + trail en_curso. */
 export function VisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -183,27 +191,12 @@ export function VisitsPage() {
       {error ? <p className="form-error">{error}</p> : null}
 
       {active.map((visit) => (
-        <section key={visit.id} className="card visit-active-card">
-          <p className="eyebrow">Visita en curso</p>
-          <h2 className="visit-active-title">{clientIdLabel(visit.client, visit.client_id)}</h2>
-          {formatCoords(visit) ? (
-            <p className="muted small">
-              <MapPin size={14} style={{ verticalAlign: "middle" }} /> {formatCoords(visit)}
-            </p>
-          ) : (
-            <p className="muted small">Sin coordenada de inicio aún</p>
-          )}
-          <div className="visit-actions">
-            <Button
-              variant="secondary"
-              disabled={busyId === visit.id}
-              onClick={() => onCloseNoSale(visit.id)}
-            >
-              <Square size={16} />
-              Cerrar sin venta
-            </Button>
-          </div>
-        </section>
+        <ActiveVisitCard
+          key={visit.id}
+          visit={visit}
+          busy={busyId === visit.id}
+          onClose={() => onCloseNoSale(visit.id)}
+        />
       ))}
 
       <section className="card" style={{ marginBottom: "1rem" }}>
@@ -295,6 +288,55 @@ export function VisitsPage() {
         }}
       />
     </>
+  );
+}
+
+function ActiveVisitCard({
+  visit,
+  busy,
+  onClose,
+}: {
+  visit: Visit;
+  busy: boolean;
+  onClose: () => void;
+}) {
+  const { points, tracking, lastError } = useVisitGpsTrail(visit.id, true);
+  const watchCount = points.filter((p) => p.source === "watch").length;
+  const last = points.length ? points[points.length - 1] : null;
+
+  return (
+    <section className="card visit-active-card">
+      <p className="eyebrow">Visita en curso</p>
+      <h2 className="visit-active-title">{clientIdLabel(visit.client, visit.client_id)}</h2>
+      {formatCoords(visit) ? (
+        <p className="muted small">
+          <MapPin size={14} style={{ verticalAlign: "middle" }} /> Inicio: {formatCoords(visit)}
+        </p>
+      ) : (
+        <p className="muted small">Sin coordenada de inicio aún</p>
+      )}
+      <p className="trail-status">
+        <Radio size={14} />{" "}
+        {tracking
+          ? `Trail activo · ${points.length} punto(s) (${watchCount} en movimiento)`
+          : "Trail detenido"}
+      </p>
+      {last ? (
+        <p className="muted small">
+          Último: {Number(last.latitude).toFixed(5)}, {Number(last.longitude).toFixed(5)} ·{" "}
+          <a href={mapsUrl(last.latitude, last.longitude)} target="_blank" rel="noreferrer">
+            Ver mapa
+          </a>
+        </p>
+      ) : null}
+      {lastError ? <p className="form-error">{lastError}</p> : null}
+      <div className="visit-actions">
+        <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Square size={16} />
+          {busy ? "Cerrando…" : "Cerrar + GPS"}
+        </Button>
+      </div>
+    </section>
   );
 }
 

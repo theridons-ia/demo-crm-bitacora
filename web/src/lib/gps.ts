@@ -124,3 +124,68 @@ export function getCurrentPosition(timeoutMs = 15000): Promise<GeoResult> {
 export function mapsUrl(lat: string | number, lng: string | number): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
 }
+
+export type WatchHandle = { stop: () => void };
+
+/**
+ * Trail ligero mientras la visita está en curso.
+ * - Real: watchPosition del navegador (filtramos por tiempo mínimo).
+ * - Mock: intervalo con jitter (útil sin HTTPS).
+ */
+export function watchPositionTrail(
+  onFix: (fix: GeoFix) => void,
+  options?: { minIntervalMs?: number },
+): WatchHandle {
+  const minIntervalMs = options?.minIntervalMs ?? (isMockGpsEnabled() ? 12_000 : 45_000);
+  let lastSentAt = 0;
+  let stopped = false;
+
+  const emit = (result: GeoResult) => {
+    if (stopped || !result.ok) return;
+    const now = Date.now();
+    if (now - lastSentAt < minIntervalMs) return;
+    lastSentAt = now;
+    onFix(result.fix);
+  };
+
+  if (isMockGpsEnabled()) {
+    // Primera muestra pronto para ver el trail en demos
+    emit(mockCurrentPosition());
+    const id = window.setInterval(() => {
+      emit(mockCurrentPosition());
+    }, Math.max(5_000, minIntervalMs));
+    return {
+      stop: () => {
+        stopped = true;
+        window.clearInterval(id);
+      },
+    };
+  }
+
+  if (!isGeolocationAvailable() || !isSecureGeoContext()) {
+    return { stop: () => undefined };
+  }
+
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      emit({
+        ok: true,
+        fix: {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy_m: pos.coords.accuracy ?? null,
+          captured_at: new Date(pos.timestamp).toISOString(),
+        },
+      });
+    },
+    () => undefined,
+    { enableHighAccuracy: true, maximumAge: 15_000, timeout: 20_000 },
+  );
+
+  return {
+    stop: () => {
+      stopped = true;
+      navigator.geolocation.clearWatch(watchId);
+    },
+  };
+}

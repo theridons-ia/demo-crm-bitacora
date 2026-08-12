@@ -46,6 +46,18 @@ export type Visit = {
   client: Client | null;
 };
 
+export type GpsPointSource = "start" | "watch" | "end";
+
+export type VisitGpsPoint = {
+  id: number;
+  visit_id: number;
+  latitude: string;
+  longitude: string;
+  accuracy_m: string | null;
+  captured_at: string;
+  source: GpsPointSource;
+};
+
 export type TokenResponse = {
   access_token: string;
   token_type: string;
