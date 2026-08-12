@@ -65,6 +65,34 @@ def create_visit(
     )
 
 
+@router.post("/{visit_id}/start", response_model=VisitOut)
+def start_visit(
+    visit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Pasa una visita programada a en_curso (GPS se añade en SF-1.4)."""
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visita no encontrada")
+    if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes iniciar visitas de otro vendedor")
+    if visit.status != VisitStatus.programada:
+        raise HTTPException(status_code=400, detail="Solo se pueden iniciar visitas programadas")
+
+    now = datetime.now(timezone.utc)
+    visit.status = VisitStatus.en_curso
+    visit.visited_at = now
+    db.add(visit)
+    db.commit()
+    return (
+        db.query(Visit)
+        .options(joinedload(Visit.client), joinedload(Visit.sale).joinedload(Sale.items))
+        .filter(Visit.id == visit_id)
+        .one()
+    )
+
+
 @router.post("/{visit_id}/close", response_model=VisitOut)
 def close_visit(
     visit_id: int,

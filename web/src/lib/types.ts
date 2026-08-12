@@ -24,6 +24,28 @@ export type Client = {
   is_active: boolean;
 };
 
+export type VisitStatus = "programada" | "en_curso" | "completada" | "cancelada";
+export type SaleResult = "sin_venta" | "venta_parcial" | "venta_cerrada";
+
+export type Visit = {
+  id: number;
+  seller_id: number;
+  client_id: number;
+  status: VisitStatus;
+  result: SaleResult | null;
+  description: string | null;
+  scheduled_date: string | null;
+  visited_at: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  gps_accuracy_m: string | null;
+  gps_captured_at: string | null;
+  gps_offline: boolean;
+  local_uuid: string | null;
+  created_at: string;
+  client: Client | null;
+};
+
 export type TokenResponse = {
   access_token: string;
   token_type: string;

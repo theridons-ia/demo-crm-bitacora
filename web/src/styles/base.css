@@ -124,6 +124,51 @@ a {
   color: var(--primary-foreground);
 }
 
+.visit-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.status-pill {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.status-programada {
+  background: #e8f0ec;
+  color: var(--primary);
+}
+
+.status-en_curso {
+  background: var(--evidence-bg, #ffe2d7);
+  color: var(--accent);
+}
+
+.status-completada {
+  background: var(--secondary);
+  color: var(--primary);
+}
+
+.visit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.visit-actions .btn {
+  min-height: 40px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.9rem;
+}
+
 .input {
   min-height: 48px;
   padding: 0.65rem 0.9rem;

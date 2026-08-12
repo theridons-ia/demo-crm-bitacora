@@ -45,7 +45,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.1** | Shell UX vendedor | Bottom nav + tokens; layout móvil | hecho |
 | **SF-1.1b** | Nav desktop vendedor | ≥768px: top bar (ocultar bottom nav); móvil sigue abajo | pendiente |
 | **SF-1.2** | Clientes CRUD mínimo | Lista/alta alineada al export | hecho |
-| **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | pendiente |
+| **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | hecho |
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | pendiente |
 | **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | pendiente |
 | **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | pendiente |
@@ -80,13 +80,13 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.2** (alta de clientes + búsqueda). También hay commits locales previos si no pusheaste (docs PowerStreet).
+**Listo para commit / tu push:** **SF-1.3** (ciclo de visitas).
 
-**Siguiente:** **SF-1.1b** (nav desktop) o **SF-1.3** (ciclo de visitas) — recomendado **SF-1.3** para valor de campo.
+**Siguiente:** **SF-1.4** — GPS al iniciar/cerrar visita.
 
-### Cómo verificar SF-1.2
+### Cómo verificar SF-1.3
 
-1. API + `npm run dev`
-2. Login → Inicio → **Nuevo cliente** (elige RIF **o** CI)
-3. Buscar por nombre/RIF/CI
+1. Reinicia uvicorn (nuevo endpoint `/start`).
+2. Tab **Visitas** → Nueva visita (Ahora o Programar).
+3. Programada → **Iniciar** → **Cerrar sin venta**.
 

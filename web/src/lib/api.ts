@@ -1,5 +1,5 @@
 import { clearToken, getToken } from "./authStorage";
-import type { Client, TokenResponse, User } from "./types";
+import type { Client, SaleResult, TokenResponse, User, Visit, VisitStatus } from "./types";
 
 /**
  * Base del API.
@@ -96,6 +96,42 @@ export type ClientCreateInput = {
 
 export function createClient(payload: ClientCreateInput): Promise<Client> {
   return request<Client>("/api/clients", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchVisits(): Promise<Visit[]> {
+  return request<Visit[]>("/api/visits");
+}
+
+export type VisitCreateInput = {
+  client_id: number;
+  status?: VisitStatus;
+  description?: string | null;
+  scheduled_date?: string | null;
+};
+
+export function createVisit(payload: VisitCreateInput): Promise<Visit> {
+  return request<Visit>("/api/visits", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function startVisit(visitId: number): Promise<Visit> {
+  return request<Visit>(`/api/visits/${visitId}/start`, { method: "POST" });
+}
+
+export type VisitCloseInput = {
+  result: SaleResult;
+  description?: string | null;
+};
+
+export function closeVisit(visitId: number, payload: VisitCloseInput): Promise<Visit> {
+  return request<Visit>(`/api/visits/${visitId}/close`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
