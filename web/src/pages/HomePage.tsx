@@ -2,6 +2,7 @@ import { LogOut, MapPin, Plus, Search, Store, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
+import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
 import { TextField } from "../components/TextField";
 import { ApiError, fetchClients } from "../lib/api";
@@ -24,6 +25,7 @@ export function HomePage() {
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Client | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,35 +116,39 @@ export function HomePage() {
             const pinned = hasPdvPin(client);
             const highlight = justCreatedId === client.id;
             return (
-              <li
-                key={client.id}
-                className={`client-item${highlight ? " client-item-new" : ""}`}
-              >
-                <div className="client-item-head">
-                  <div>
-                    <strong>{client.name}</strong>
-                    {client.state ? <span className="muted"> · {client.state}</span> : null}
+              <li key={client.id} className={`client-item${highlight ? " client-item-new" : ""}`}>
+                <button
+                  type="button"
+                  className="client-item-btn"
+                  onClick={() => setSelected(client)}
+                >
+                  <div className="client-item-head">
+                    <div>
+                      <strong>{client.name}</strong>
+                      {client.state ? <span className="muted"> · {client.state}</span> : null}
+                    </div>
+                    {pinned ? (
+                      <span className="client-pin-badge" title="Tiene ubicación en mapa">
+                        <Store size={14} aria-hidden />
+                        Con pin
+                      </span>
+                    ) : (
+                      <span className="client-pin-badge muted-badge">Sin pin</span>
+                    )}
                   </div>
-                  {pinned ? (
-                    <span className="client-pin-badge" title="Tiene ubicación en mapa">
-                      <Store size={14} aria-hidden />
-                      Con pin
-                    </span>
-                  ) : (
-                    <span className="client-pin-badge muted-badge">Sin pin</span>
-                  )}
-                </div>
-                <p className="muted small">
-                  {client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "Sin identificación"}
-                </p>
-                {client.address ? <p className="muted small">{client.address}</p> : null}
-                {pinned ? (
                   <p className="muted small">
-                    <MapPin size={14} style={{ verticalAlign: "middle" }} />{" "}
-                    {Number(client.latitude).toFixed(5)}, {Number(client.longitude).toFixed(5)}
+                    {client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "Sin identificación"}
                   </p>
-                ) : null}
-                {client.phone ? <p className="muted small">{client.phone}</p> : null}
+                  {client.address ? <p className="muted small">{client.address}</p> : null}
+                  {pinned ? (
+                    <p className="muted small">
+                      <MapPin size={14} style={{ verticalAlign: "middle" }} />{" "}
+                      {Number(client.latitude).toFixed(5)}, {Number(client.longitude).toFixed(5)}
+                    </p>
+                  ) : null}
+                  {client.phone ? <p className="muted small">{client.phone}</p> : null}
+                  <p className="client-item-hint">Toca para ver ficha y mapa</p>
+                </button>
               </li>
             );
           })}
@@ -156,8 +162,13 @@ export function HomePage() {
           setQuery("");
           setJustCreatedId(client.id);
           setClients((prev) => [client, ...prev.filter((c) => c.id !== client.id)]);
+          setSelected(client);
         }}
       />
+
+      {selected ? (
+        <ClientDetailSheet client={selected} open onClose={() => setSelected(null)} />
+      ) : null}
     </>
   );
 }

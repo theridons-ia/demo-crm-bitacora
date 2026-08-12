@@ -601,13 +601,51 @@ a {
 }
 
 .client-item {
-  padding: 0.75rem 0;
+  padding: 0;
   border-top: 1px solid var(--border);
 }
 
 .client-item:first-of-type {
   border-top: none;
-  padding-top: 0;
+}
+
+.client-item-btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.75rem 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-chip);
+}
+
+.client-item-btn:hover,
+.client-item-btn:focus-visible {
+  background: var(--secondary);
+  outline: none;
+}
+
+.client-item-new .client-item-btn {
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.client-item-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.client-detail-map {
+  width: 100%;
+  height: min(50vh, 360px);
+  min-height: 220px;
+  background: var(--muted);
 }
 
 .client-item-head {
