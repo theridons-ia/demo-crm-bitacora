@@ -48,7 +48,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.3** | Visitas ciclo de vida | programada → en_curso → completada | hecho |
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | hecho |
 | **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | hecho |
-| **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | pendiente |
+| **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | hecho |
 | **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | hecho |
 | **SF-1.8** | Orden sin visita | origen mostrador / online | pendiente |
 | **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | pendiente |
@@ -80,13 +80,14 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.7** (venta al cerrar visita + inventario).
+**Listo para commit / tu push:** **SF-1.6** (GPS impreciso / omitido + foto + alertas).
 
-**Siguiente:** **SF-1.8** (venta sin visita) o **SF-1.6** (foto / alertas GPS).
+**Siguiente:** **SF-1.8** (venta sin visita) o **SF-1.1b** (nav desktop).
 
-### Cómo verificar SF-1.7
+### Cómo verificar SF-1.6
 
-1. Visitas → visita en curso → **Cerrar visita**.
-2. **Con venta** → productos +/− · USD o Bs → confirmar.
-3. Revisa **Inventario**: el stock bajó.
+1. Reinicia uvicorn (columnas nuevas + alertas).
+2. Cierra visita con GPS real: si ±m &gt; 100, se crea alerta `gps_low_accuracy`.
+3. Marca «Omitir GPS» + motivo + foto → alerta `gps_skipped` / `photo_only`.
+4. `GET /api/alerts` en `/docs` para ver el inbox.
 

@@ -129,7 +129,12 @@ def close_visit(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    visit = (
+        db.query(Visit)
+        .options(joinedload(Visit.client))
+        .filter(Visit.id == visit_id)
+        .first()
+    )
     if not visit:
         raise HTTPException(status_code=404, detail="Visita no encontrada")
     if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
@@ -148,6 +153,9 @@ def close_visit(
         gps_captured_at=payload.gps_captured_at or now,
         sale_in=payload.sale,
         seller_id=current_user.id,
+        gps_skipped=payload.gps_skipped,
+        gps_skip_reason=payload.gps_skip_reason,
+        photo_evidence=payload.photo_evidence,
     )
     return (
         db.query(Visit)

@@ -121,6 +121,8 @@ export function getCurrentPosition(timeoutMs = 15000): Promise<GeoResult> {
   });
 }
 
+export const GPS_ACCURACY_WARN_M = 100;
+
 export function mapsUrl(lat: string | number, lng: string | number): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
 }

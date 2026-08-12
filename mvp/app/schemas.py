@@ -48,6 +48,8 @@ class ClientCreate(BaseModel):
     address: str | None = None
     phone: str | None = None
     notes: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
 
     @model_validator(mode="after")
     def require_exactly_one_id(self):
@@ -71,6 +73,8 @@ class ClientOut(ORMModel):
     address: str | None = None
     phone: str | None = None
     notes: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
     is_active: bool
 
 
@@ -190,6 +194,9 @@ class VisitClose(BaseModel):
     gps_accuracy_m: Decimal | None = None
     gps_offline: bool = False
     gps_captured_at: datetime | None = None
+    gps_skipped: bool = False
+    gps_skip_reason: str | None = None
+    photo_evidence: str | None = Field(default=None, max_length=400_000)
     sale: SaleIn | None = None
     local_uuid: str | None = None
 
@@ -208,6 +215,9 @@ class VisitOut(ORMModel):
     gps_accuracy_m: Decimal | None
     gps_captured_at: datetime | None
     gps_offline: bool
+    gps_skipped: bool = False
+    gps_skip_reason: str | None = None
+    photo_evidence: str | None = None
     local_uuid: str | None
     created_at: datetime
     client: ClientOut | None = None

@@ -74,6 +74,7 @@ class AlertType(str, enum.Enum):
     gps_far = "gps_far"
     photo_only = "photo_only"
     gps_skipped = "gps_skipped"
+    gps_low_accuracy = "gps_low_accuracy"
 
 
 class AlertSeverity(str, enum.Enum):
@@ -110,6 +111,8 @@ class Client(Base):
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -162,6 +165,9 @@ class Visit(Base):
     gps_accuracy_m: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     gps_captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     gps_offline: Mapped[bool] = mapped_column(Boolean, default=False)
+    gps_skipped: Mapped[bool] = mapped_column(Boolean, default=False)
+    gps_skip_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    photo_evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     client_synced: Mapped[bool] = mapped_column(Boolean, default=True)
     local_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

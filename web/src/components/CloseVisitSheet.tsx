@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Button } from "./Button";
 import { TextField } from "./TextField";
 import { ApiError, closeVisit, fetchProducts, type VisitCloseInput } from "../lib/api";
-import { getCurrentPosition } from "../lib/gps";
+import { getCurrentPosition, GPS_ACCURACY_WARN_M } from "../lib/gps";
 import type { CurrencyCode, Product, Visit } from "../lib/types";
 
 type Props = {
@@ -14,12 +14,18 @@ type Props = {
 
 type QtyMap = Record<number, number>;
 
+const MAX_PHOTO_CHARS = 350_000;
+
 export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [mode, setMode] = useState<"sin_venta" | "con_venta">("sin_venta");
   const [qty, setQty] = useState<QtyMap>({});
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [notes, setNotes] = useState("");
+  const [skipGps, setSkipGps] = useState(false);
+  const [skipReason, setSkipReason] = useState("");
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [accuracyWarn, setAccuracyWarn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -66,28 +72,95 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
     setQty((prev) => ({ ...prev, [productId]: next }));
   }
 
+  async function onPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setPhotoDataUrl(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setError("La evidencia debe ser una imagen");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      if (result.length > MAX_PHOTO_CHARS) {
+        setError("La foto es muy pesada; prueba otra más liviana");
+        setPhotoDataUrl(null);
+        return;
+      }
+      setError(null);
+      setPhotoDataUrl(result);
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setAccuracyWarn(null);
 
     if (mode === "con_venta" && lines.length === 0) {
       setError("Agrega al menos un producto o cierra sin venta");
       return;
     }
+    if (skipGps && !photoDataUrl) {
+      setError("Si omites el GPS, adjunta una foto del PDV");
+      return;
+    }
+    if (skipGps && !skipReason.trim()) {
+      setError("Indica el motivo de omitir el GPS");
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const geo = await getCurrentPosition();
-      const gpsFields =
-        geo.ok
-          ? {
-              latitude: geo.fix.latitude,
-              longitude: geo.fix.longitude,
-              gps_accuracy_m: geo.fix.accuracy_m,
-              gps_offline: false,
-              gps_captured_at: geo.fix.captured_at,
-            }
-          : { gps_offline: true };
+      let gpsFields: Partial<VisitCloseInput> = { gps_offline: true, gps_skipped: true };
+
+      if (!skipGps) {
+        const geo = await getCurrentPosition();
+        if (geo.ok) {
+          const acc = geo.fix.accuracy_m;
+          if (acc != null && acc > GPS_ACCURACY_WARN_M) {
+            setAccuracyWarn(
+              `GPS poco preciso (±${Math.round(acc)} m). Se guardará con alerta para el supervisor. En el diálogo del sistema elige «Precise» si puedes.`,
+            );
+          }
+          gpsFields = {
+            latitude: geo.fix.latitude,
+            longitude: geo.fix.longitude,
+            gps_accuracy_m: geo.fix.accuracy_m,
+            gps_offline: false,
+            gps_captured_at: geo.fix.captured_at,
+            gps_skipped: false,
+          };
+        } else {
+          // Falló GPS: exigir foto como skip
+          if (!photoDataUrl) {
+            setError(`${geo.reason}. Adjunta foto o activa GPS de prueba / HTTPS.`);
+            setSubmitting(false);
+            return;
+          }
+          gpsFields = {
+            gps_offline: true,
+            gps_skipped: true,
+            gps_skip_reason: skipReason.trim() || geo.reason,
+            photo_evidence: photoDataUrl,
+          };
+        }
+      } else {
+        gpsFields = {
+          gps_offline: true,
+          gps_skipped: true,
+          gps_skip_reason: skipReason.trim(),
+          photo_evidence: photoDataUrl,
+        };
+      }
+
+      if (photoDataUrl && !gpsFields.photo_evidence) {
+        gpsFields.photo_evidence = photoDataUrl;
+      }
 
       const payload: VisitCloseInput = {
         result: mode === "sin_venta" ? "sin_venta" : "venta_cerrada",
@@ -111,6 +184,9 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
       setQty({});
       setNotes("");
       setMode("sin_venta");
+      setSkipGps(false);
+      setSkipReason("");
+      setPhotoDataUrl(null);
       onClosed(updated);
       onClose();
     } catch (err) {
@@ -128,7 +204,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
         <div>
           <p className="eyebrow">Cerrar visita</p>
           <h1 id="close-visit-title">{clientName}</h1>
-          <p className="muted">SF-1.7 — con o sin venta · GPS al confirmar</p>
+          <p className="muted">Venta opcional · GPS / foto de evidencia</p>
         </div>
         <Button variant="ghost" type="button" onClick={onClose}>
           Volver
@@ -176,9 +252,6 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
                   Bs (VES)
                 </button>
               </div>
-              <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-                Precios del catálogo están en USD; VES marca la moneda de liquidación (FX fino después).
-              </p>
             </div>
 
             {loadingProducts ? <p className="muted">Cargando productos…</p> : null}
@@ -226,6 +299,44 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
           </>
         ) : null}
 
+        <div className="field">
+          <span className="field-label">Evidencia GPS</span>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={skipGps}
+              onChange={(e) => setSkipGps(e.target.checked)}
+            />
+            Omitir GPS (requiere foto)
+          </label>
+          <p className="muted small">
+            En el celular elige ubicación <strong>precisa</strong> si el sistema lo pregunta.
+          </p>
+        </div>
+
+        {skipGps ? (
+          <TextField
+            id="skip-reason"
+            label="Motivo de omitir GPS"
+            value={skipReason}
+            onChange={(e) => setSkipReason(e.target.value)}
+            required
+          />
+        ) : null}
+
+        <div className="field">
+          <label htmlFor="visit-photo">Foto del PDV {skipGps ? "(obligatoria)" : "(opcional)"}</label>
+          <input
+            id="visit-photo"
+            className="input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onPhotoChange}
+          />
+          {photoDataUrl ? <p className="muted small">Foto lista para enviar</p> : null}
+        </div>
+
         <TextField
           id="close-notes"
           label="Nota"
@@ -233,6 +344,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
           onChange={(e) => setNotes(e.target.value)}
         />
 
+        {accuracyWarn ? <p className="gps-ok-note">{accuracyWarn}</p> : null}
         {error ? (
           <p className="form-error" role="alert">
             {error}
@@ -240,7 +352,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
         ) : null}
 
         <Button type="submit" variant="accent" block disabled={submitting}>
-          {submitting ? "Cerrando…" : mode === "con_venta" ? "Confirmar venta + GPS" : "Cerrar sin venta + GPS"}
+          {submitting ? "Cerrando…" : "Confirmar cierre"}
         </Button>
       </form>
     </div>

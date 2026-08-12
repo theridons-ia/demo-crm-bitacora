@@ -159,6 +159,9 @@ export type VisitCloseInput = {
   gps_accuracy_m?: number | null;
   gps_offline?: boolean;
   gps_captured_at?: string | null;
+  gps_skipped?: boolean;
+  gps_skip_reason?: string | null;
+  photo_evidence?: string | null;
   sale?: {
     origin?: "visita";
     currency?: CurrencyCode;

@@ -33,3 +33,8 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "clients", "ci", "VARCHAR(20)")
     _add_column_if_missing(engine, "suppliers", "rif", "VARCHAR(20)")
     _add_column_if_missing(engine, "suppliers", "ci", "VARCHAR(20)")
+    _add_column_if_missing(engine, "clients", "latitude", "NUMERIC(10,7)")
+    _add_column_if_missing(engine, "clients", "longitude", "NUMERIC(10,7)")
+    _add_column_if_missing(engine, "visits", "gps_skipped", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(engine, "visits", "gps_skip_reason", "VARCHAR(255)")
+    _add_column_if_missing(engine, "visits", "photo_evidence", "TEXT")
