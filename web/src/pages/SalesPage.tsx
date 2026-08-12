@@ -54,6 +54,7 @@ export function SalesPage() {
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [qty, setQty] = useState<QtyMap>({});
   const [notes, setNotes] = useState("");
+  const [isCredit, setIsCredit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
@@ -155,6 +156,8 @@ export function SalesPage() {
       client_id: clientId,
       origin,
       currency,
+      is_credit: isCredit,
+      payment_method: isCredit ? "credit" : "cash_usd",
       notes: notes.trim() || null,
       items,
       local_uuid: newLocalUuid("sale"),
@@ -167,6 +170,7 @@ export function SalesPage() {
         await enqueueCreateSale(payload);
         setQty({});
         setNotes("");
+        setIsCredit(false);
         setOrigin("mostrador");
         setCurrency("USD");
         setComposing(false);
@@ -178,6 +182,7 @@ export function SalesPage() {
       setSales((prev) => [created, ...prev]);
       setQty({});
       setNotes("");
+      setIsCredit(false);
       setOrigin("mostrador");
       setCurrency("USD");
       setComposing(false);
@@ -272,6 +277,15 @@ export function SalesPage() {
               </button>
             </div>
           </div>
+
+          <label className="credit-check">
+            <input
+              type="checkbox"
+              checked={isCredit}
+              onChange={(e) => setIsCredit(e.target.checked)}
+            />
+            <span>Venta a crédito (queda en cobranza del supervisor)</span>
+          </label>
 
           {loadingCatalog ? <p className="muted">Cargando productos…</p> : null}
 
@@ -378,6 +392,11 @@ export function SalesPage() {
                     · {ORIGIN_LABEL[sale.origin]}
                     {sale.visit_id ? ` · visita #${sale.visit_id}` : " · sin visita"}
                   </span>
+                  {sale.is_credit ? (
+                    <span className="status-pill status-warn" style={{ marginLeft: "0.4rem" }}>
+                      Crédito
+                    </span>
+                  ) : null}
                 </div>
                 <p className="muted small">
                   <ShoppingCart size={14} aria-hidden style={{ verticalAlign: "-2px" }} />{" "}

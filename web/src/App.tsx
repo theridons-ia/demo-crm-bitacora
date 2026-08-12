@@ -11,6 +11,7 @@ import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { ReceivablesPage } from "./pages/ReceivablesPage";
 import { RouteDayPage } from "./pages/RouteDayPage";
 import { SalesPage } from "./pages/SalesPage";
 import { SupervisorHomePage } from "./pages/SupervisorHomePage";
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="alertas" element={<AlertsInboxPage />} />
             <Route path="catalogo" element={<CatalogVisibilityPage />} />
             <Route path="inventario" element={<SupervisorStockPage />} />
+            <Route path="cobranza" element={<ReceivablesPage />} />
             <Route path="mapa" element={<TeamMapPage />} />
           </Route>
 

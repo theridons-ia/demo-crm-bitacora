@@ -9,7 +9,12 @@ from app.models import (
     AlertSeverity,
     AlertType,
     Client,
+    CurrencyCode,
+    PaymentMethod,
     Product,
+    Sale,
+    SaleItem,
+    SaleOrigin,
     SaleResult,
     SellerProductVisibility,
     Supplier,
@@ -254,6 +259,35 @@ def run() -> None:
             )
             for p in subset:
                 db.add(SellerProductVisibility(seller_id=carlos.id, product_id=p.id))
+
+        # Demo SF-3.2: una venta a crédito abierta
+        if db.query(Sale).filter(Sale.is_credit.is_(True)).count() == 0:
+            marina = db.query(User).filter(User.email == "marina@bitacora.local").first()
+            client = db.query(Client).order_by(Client.id.asc()).first()
+            product = db.query(Product).filter(Product.sku == "COLA1").first()
+            if marina and client and product and product.stock >= 2:
+                qty = 2
+                line = Decimal(product.price_usd) * qty
+                product.stock -= qty
+                sale = Sale(
+                    seller_id=marina.id,
+                    client_id=client.id,
+                    origin=SaleOrigin.mostrador,
+                    currency=CurrencyCode.USD,
+                    payment_method=PaymentMethod.credit,
+                    total_amount=line,
+                    is_credit=True,
+                    notes="Venta a crédito demo SF-3.2",
+                )
+                sale.items = [
+                    SaleItem(
+                        product_id=product.id,
+                        quantity=qty,
+                        unit_price=product.price_usd,
+                        line_total=line,
+                    )
+                ]
+                db.add(sale)
 
         db.commit()
         print("Seed OK")

@@ -238,6 +238,9 @@ class Sale(Base):
     seller: Mapped[User] = relationship(back_populates="sales")
     client: Mapped[Client] = relationship(back_populates="sales")
     items: Mapped[list["SaleItem"]] = relationship(back_populates="sale", cascade="all, delete-orphan")
+    payments: Mapped[list["SalePayment"]] = relationship(
+        back_populates="sale", cascade="all, delete-orphan"
+    )
 
 
 class SaleItem(Base):
@@ -253,6 +256,26 @@ class SaleItem(Base):
 
     sale: Mapped[Sale] = relationship(back_populates="items")
     product: Mapped[Product] = relationship(back_populates="sale_items")
+
+
+class SalePayment(Base):
+    """Abono a una venta a crédito (SF-3.2)."""
+
+    __tablename__ = "sale_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id"), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode), default=CurrencyCode.USD)
+    payment_method: Mapped[PaymentMethod] = mapped_column(
+        Enum(PaymentMethod), default=PaymentMethod.cash_usd
+    )
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    received_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    sale: Mapped[Sale] = relationship(back_populates="payments")
+    received_by: Mapped[User] = relationship()
 
 
 class VisitGpsPoint(Base):

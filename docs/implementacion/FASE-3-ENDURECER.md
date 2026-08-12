@@ -19,3 +19,22 @@ Que el **supervisor** registre **compras/ingresos** y **ajustes** de stock (el v
 
 ### Siguiente
 **SF-3.2** crédito/cobranza · **SF-3.3** FX diario · **SF-3.4** import Excel · Alembic formal cuando endurezcamos deploy.
+
+---
+
+## SF-3.2 — Crédito / cobranza
+
+### Objetivo
+Estado de cuenta básico: ventas `is_credit` + abonos hasta saldar.
+
+### Qué se hizo
+- Tabla `sale_payments`.
+- `GET /api/receivables`, `POST /api/receivables/{sale_id}/payments`.
+- UI `/sup/cobranza` (supervisor).
+- Checkbox «Venta a crédito» en Ventas (vendedor).
+- Seed: una CxC demo si no hay créditos.
+
+### Cómo verificar
+1. Marina → Ventas → Nueva → marcar crédito → confirmar.
+2. Supervisor → **Cobranza** → ver saldo → Registrar abono parcial/total.
+3. Con saldo 0 desaparece de «Con saldo».

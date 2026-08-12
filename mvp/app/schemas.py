@@ -254,6 +254,40 @@ class SaleOut(ORMModel):
     client: ClientOut | None = None
 
 
+class SalePaymentCreate(BaseModel):
+    amount: Decimal = Field(gt=0)
+    currency: CurrencyCode = CurrencyCode.USD
+    payment_method: PaymentMethod = PaymentMethod.cash_usd
+    notes: str | None = Field(default=None, max_length=255)
+
+
+class SalePaymentOut(ORMModel):
+    id: int
+    sale_id: int
+    amount: Decimal
+    currency: CurrencyCode
+    payment_method: PaymentMethod
+    notes: str | None
+    received_by_id: int
+    created_at: datetime
+    received_by_name: str | None = None
+
+
+class ReceivableOut(BaseModel):
+    sale_id: int
+    client_id: int
+    client_name: str | None = None
+    seller_id: int
+    seller_name: str | None = None
+    currency: CurrencyCode
+    total_amount: Decimal
+    paid_amount: Decimal
+    balance: Decimal
+    created_at: datetime
+    notes: str | None = None
+    payments: list[SalePaymentOut] = []
+
+
 class VisitCreate(BaseModel):
     client_id: int
     status: VisitStatus = VisitStatus.en_curso

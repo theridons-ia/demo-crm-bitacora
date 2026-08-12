@@ -3,7 +3,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Client, Sale, SaleOrigin, User, UserRole
+from ..models import Client, PaymentMethod, Sale, SaleOrigin, User, UserRole
 from ..schemas import SaleCreate, SaleIn
 from .catalog_visibility import assert_seller_can_use_products
 from .visits import apply_sale_to_inventory
@@ -36,13 +36,14 @@ def create_sale_without_visit(db: Session, payload: SaleCreate, *, seller: User)
 
     sale_in = SaleIn(**payload.model_dump(exclude={"client_id"}))
     total, items = apply_sale_to_inventory(db, sale_in)
+    payment_method = PaymentMethod.credit if payload.is_credit else payload.payment_method
     sale = Sale(
         visit_id=None,
         seller_id=seller.id,
         client_id=client.id,
         origin=payload.origin,
         currency=payload.currency,
-        payment_method=payload.payment_method,
+        payment_method=payment_method,
         total_amount=total,
         is_credit=payload.is_credit,
         notes=payload.notes,

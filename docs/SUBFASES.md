@@ -82,7 +82,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | ID | Objetivo | Entregable | Estado |
 |----|----------|------------|--------|
 | **SF-3.1** | Inventario e ingresos | Compras/ajustes stock (supervisor) | hecho |
-| **SF-3.2** | Crédito / cobranza | Estado de cuenta básico | pendiente |
+| **SF-3.2** | Crédito / cobranza | Estado de cuenta básico | hecho |
 | **SF-3.3** | FX diario | Tasa USD/VES del día | pendiente |
 | **SF-3.4** | Import Excel | Maestros clientes/productos | pendiente |
 | **SF-3.5** | Alembic formal | Migraciones DB (pre-prod) | pendiente |
@@ -93,9 +93,14 @@ Detalle: [`implementacion/FASE-3-ENDURECER.md`](implementacion/FASE-3-ENDURECER.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-3.1** (inventario e ingresos supervisor).
+**Listo para commit / tu push:** **SF-3.2** (crédito / cobranza).
 
-**Siguiente:** **SF-3.2** crédito/cobranza (o Contabo al final).
+**Siguiente:** **SF-3.3** FX diario (o Contabo al final).
+
+### Cómo verificar SF-3.2
+
+1. Vendedor → Ventas → «a crédito».
+2. Supervisor → Cobranza → abono parcial/total.
 
 ### Cómo verificar SF-3.1
 

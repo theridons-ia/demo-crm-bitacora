@@ -393,6 +393,54 @@ export function createStockMovement(payload: StockMovementInput): Promise<StockM
   });
 }
 
+export type Receivable = {
+  sale_id: number;
+  client_id: number;
+  client_name: string | null;
+  seller_id: number;
+  seller_name: string | null;
+  currency: string;
+  total_amount: string;
+  paid_amount: string;
+  balance: string;
+  created_at: string;
+  notes: string | null;
+  payments: {
+    id: number;
+    sale_id: number;
+    amount: string;
+    currency: string;
+    payment_method: string;
+    notes: string | null;
+    received_by_id: number;
+    created_at: string;
+    received_by_name: string | null;
+  }[];
+};
+
+export function fetchReceivables(params?: { open_only?: boolean }): Promise<Receivable[]> {
+  const q = new URLSearchParams();
+  if (params?.open_only === false) q.set("open_only", "false");
+  const qs = q.toString();
+  return request<Receivable[]>(`/api/receivables${qs ? `?${qs}` : ""}`);
+}
+
+export function registerReceivablePayment(
+  saleId: number,
+  payload: {
+    amount: number;
+    currency?: string;
+    payment_method?: string;
+    notes?: string | null;
+  },
+): Promise<Receivable> {
+  return request<Receivable>(`/api/receivables/${saleId}/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export type Supplier = {
   id: number;
   name: string;
