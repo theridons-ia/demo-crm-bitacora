@@ -5,6 +5,10 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { ApiError } from "../lib/api";
 
+function homeForRole(role: string): string {
+  return role === "vendedor" ? "/app/inicio" : "/sup/hoy";
+}
+
 export function LoginPage() {
   const { user, loading, login } = useAuth();
   const [email, setEmail] = useState("marina@bitacora.local");
@@ -13,7 +17,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && user) {
-    return <Navigate to="/app/inicio" replace />;
+    return <Navigate to={homeForRole(user.role)} replace />;
   }
 
   async function onSubmit(event: FormEvent) {
@@ -65,7 +69,8 @@ export function LoginPage() {
         </Button>
 
         <p className="muted hint">
-          Demo: <code>marina@bitacora.local</code> / <code>demo1234</code>
+          Vendedor: <code>marina@bitacora.local</code> · Supervisor:{" "}
+          <code>supervisor@bitacora.local</code> · pass <code>demo1234</code>
         </p>
       </form>
     </div>

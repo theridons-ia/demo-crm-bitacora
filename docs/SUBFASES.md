@@ -67,7 +67,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 | ID | Objetivo | Entregable | Estado |
 |----|----------|------------|--------|
-| **SF-2.1** | Layout supervisor | Sidebar o top nav tablet/desktop (sin bottom nav) | pendiente |
+| **SF-2.1** | Layout supervisor | Sidebar o top nav tablet/desktop (sin bottom nav) | hecho |
 | **SF-2.2** | Ruta del día | Asignar / desasignar visitas planificadas | pendiente |
 | **SF-2.3** | Alertas GPS/foto | Inbox de alertas | pendiente |
 | **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | pendiente |
@@ -85,9 +85,15 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.12** (editar cliente y pin desde la ficha).
+**Listo para commit / tu push:** **SF-2.1** (layout supervisor `/sup`).
 
-**Siguiente:** Fase 2 supervisor (**SF-2.1**) o deploy Contabo / `enrutas.cc`.
+**Siguiente:** **SF-2.2** ruta del día (asignar visitas). Contabo más adelante.
+
+### Cómo verificar SF-2.1
+
+1. Login `supervisor@bitacora.local` / `demo1234` → `/sup/hoy`.
+2. Sidebar (desktop) o nav horizontal (móvil); **sin** bottom nav de vendedor.
+3. Login `marina@…` → sigue `/app/inicio` con bottom/top nav de vendedor.
 
 ### Cómo verificar SF-1.12
 
