@@ -72,6 +72,8 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-2.3** | Alertas GPS/foto | Inbox de alertas | hecho |
 | **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | hecho |
 | **SF-2.5** | Mapa equipo | Visitas del día en mapa | hecho |
+| **SF-2.6** | Refresh visual UI | Tokens + DM Sans; Inicio/Hoy/Inventario estilo mock (móvil+desktop) | hecho |
+
 
 ---
 
@@ -85,9 +87,16 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-2.5** (mapa del equipo) — **Fase 2 completa**.
+**Listo para commit / tu push:** **SF-2.6** (refresh visual).
 
 **Siguiente:** Fase 3 (endurecer) o Contabo / `enrutas.cc` cuando digas.
+
+### Cómo verificar SF-2.6
+
+1. Login Marina → Inicio: hero verde, CTA coral, KPIs, cartera con avatar, próximas visitas.
+2. En móvil (&lt;768px): bottom nav; hero apilado; tipografía DM Sans (sin serif).
+3. Supervisor → Hoy: KPIs + pulso + alertas + acciones.
+4. Inventario: KPIs, filtros de estado, barras de stock.
 
 ### Cómo verificar SF-2.5
 

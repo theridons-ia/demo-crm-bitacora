@@ -37,9 +37,10 @@ export function LoginPage() {
   return (
     <div className="app-shell login-shell">
       <header className="login-header">
+        <span className="brand-mark" aria-hidden />
         <p className="eyebrow">Bitácora Campo</p>
-        <h1>Iniciar sesión</h1>
-        <p className="muted">SF-0.2 — conectamos el front con FastAPI (JWT).</p>
+        <h1 className="display-title">Entrar a la ruta.</h1>
+        <p className="muted">Vendedor y supervisor con la misma app · JWT + FastAPI.</p>
       </header>
 
       <form className="card login-card" onSubmit={onSubmit}>
@@ -64,7 +65,7 @@ export function LoginPage() {
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
 
-        <Button type="submit" variant="primary" block disabled={submitting}>
+        <Button type="submit" variant="accent" block disabled={submitting}>
           {submitting ? "Entrando…" : "Entrar"}
         </Button>
 

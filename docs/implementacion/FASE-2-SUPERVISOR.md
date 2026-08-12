@@ -1,5 +1,36 @@
 # Fase 2 — Supervisor
 
+## SF-2.6 — Refresh visual (móvil + desktop)
+
+### Objetivo
+Acercar la UI al mock de diseño (crema / verde campo / coral), **sin Fraunces**: tipografía **DM Sans** en todo. Mantener datos reales de la API.
+
+### Qué se hizo
+- Tokens actualizados (`tokens.css`) + fuente Google DM Sans.
+- Login, Inicio vendedor (hero + siguiente acción + KPIs + cartera + próximas).
+- Hoy supervisor (KPIs reales, pulso, preview alertas).
+- Inventario (KPIs, búsqueda, filtros disponible/bajo/agotado, barras).
+- Layouts responsive: móvil apilado; ≥768px hero/grid en 2 columnas.
+
+### Tipografía (decisión)
+- **No** usar Fraunces/serif en titulares (se percibe anticuada).
+- **DM Sans** para UI y títulos (`--font-display` = sans).
+
+### Archivos
+| Pieza | Ruta |
+|-------|------|
+| Tokens | `web/src/styles/tokens.css`, `base.css` (bloque SF-2.6) |
+| Fonts | `web/index.html` |
+| Inicio | `web/src/pages/HomePage.tsx` |
+| Supervisor | `web/src/pages/SupervisorHomePage.tsx` |
+| Inventario | `web/src/pages/InventoryPage.tsx` |
+| Login | `web/src/pages/LoginPage.tsx` |
+
+### Siguiente
+Fase 3 o deploy Contabo.
+
+---
+
 ## SF-2.5 — Mapa del equipo
 
 ### Objetivo

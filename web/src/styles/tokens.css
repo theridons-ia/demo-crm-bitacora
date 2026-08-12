@@ -1,33 +1,39 @@
-/* Design tokens — alineados a demo-crm-bitacora-export/styles.css */
+/* Design tokens — refresh SF-2.6 (mock campo + sans moderno, sin Fraunces) */
 :root {
-  --background: #f7f3ed;
-  --foreground: #18312f;
-  --card: #fffdfc;
-  --card-foreground: #18312f;
-  --primary: #18312f;
-  --primary-foreground: #fffdfc;
-  --secondary: #e8f0ec;
-  --secondary-foreground: #18312f;
-  --muted: #ece8e1;
-  --muted-foreground: #71807b;
-  --accent: #f16b5f;
-  --accent-foreground: #fffdfc;
-  --destructive: #c84b46;
-  --destructive-foreground: #fffdfc;
-  --border: #dadfd9;
-  --input: #dadfd9;
-  --progress: #f5c965;
-  --ring: #18312f;
+  --background: #f6f2eb;
+  --foreground: #243b36;
+  --card: #fffcf8;
+  --card-foreground: #243b36;
+  --primary: #2d4a42;
+  --primary-foreground: #f6f2eb;
+  --secondary: #e4ede8;
+  --secondary-foreground: #243b36;
+  --muted: #ece6dc;
+  --muted-foreground: #6b7a74;
+  --accent: #e87a5d;
+  --accent-foreground: #fffaf7;
+  --destructive: #c94d45;
+  --destructive-foreground: #fffaf7;
+  --border: #e2d9cc;
+  --input: #e2d9cc;
+  --progress: #e8b84a;
+  --ring: #2d4a42;
+  --success: #3d7a5c;
+  --success-soft: #e5f2ea;
+  --warning-soft: #fff3d6;
+  --danger-soft: #fde8e4;
 
-  --radius-sm: 14px;
-  --radius: 18px;
-  --radius-lg: 24px;
-  --radius-chip: 12px;
+  --radius-sm: 12px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-chip: 999px;
 
-  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
-  --shadow-card: 0 8px 24px rgba(24, 49, 47, 0.06);
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --shadow-card: 0 10px 28px rgba(36, 59, 54, 0.07);
+  --shadow-soft: 0 4px 14px rgba(36, 59, 54, 0.05);
 
-  --screen-pad: 20px;
+  --screen-pad: 18px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --app-max-width: 430px;
 }

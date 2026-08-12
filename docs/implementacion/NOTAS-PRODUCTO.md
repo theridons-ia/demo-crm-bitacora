@@ -4,7 +4,11 @@ Decisiones y pendientes hablados en chat, para no perderlos.
 
 ---
 
-## Marca y dominio
+## UI / tipografía (SF-2.6)
+
+- Referencia visual: mock Replit (supervisor / seller / inventory) — crema, verde, coral.
+- **Fraunces descartada** para titulares; usamos **DM Sans** en toda la app.
+- Refresh aplicado en login, inicio vendedor, hoy supervisor e inventario (móvil + desktop).
 
 - Nombre de producto en exploración: **EnRutas** (dejar de usar solo “Bitácora” en cara al cliente).
 - Dominio elegido para piloto: **`enrutas.cc`** (Namecheap; renovación ~$14/año aprox.).
