@@ -46,6 +46,26 @@ export type Visit = {
   client: Client | null;
 };
 
+export type Product = {
+  id: number;
+  sku: string;
+  name: string;
+  unit: string;
+  price_usd: string;
+  stock: number;
+  is_active: boolean;
+};
+
+export type CurrencyCode = "USD" | "VES" | "EUR";
+export type PaymentMethod =
+  | "cash_usd"
+  | "zelle"
+  | "usdt"
+  | "cash_ves"
+  | "transfer_ves"
+  | "cash_eur"
+  | "credit";
+
 export type GpsPointSource = "start" | "watch" | "end";
 
 export type VisitGpsPoint = {

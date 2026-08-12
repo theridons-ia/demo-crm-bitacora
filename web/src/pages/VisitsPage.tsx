@@ -1,11 +1,11 @@
 import { ClipboardList, MapPin, Play, Plus, Radio, Square } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "../components/Button";
+import { CloseVisitSheet } from "../components/CloseVisitSheet";
 import { TextField } from "../components/TextField";
 import { useVisitGpsTrail } from "../hooks/useVisitGpsTrail";
 import {
   ApiError,
-  closeVisit,
   createVisit,
   fetchClients,
   fetchVisits,
@@ -50,6 +50,7 @@ export function VisitsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [mockGps, setMockGps] = useState(() => isMockGpsEnabled());
+  const [closingVisit, setClosingVisit] = useState<Visit | null>(null);
 
   const reload = useCallback(async () => {
     const [v, c] = await Promise.all([fetchVisits(), fetchClients()]);
@@ -122,27 +123,8 @@ export function VisitsPage() {
   }
 
   async function onCloseNoSale(visitId: number) {
-    setBusyId(visitId);
-    setError(null);
-    setGpsNote(null);
-    try {
-      const gps = await captureGps();
-      if (gps.note) setGpsNote(`Cierre sin GPS: ${gps.note}`);
-      const updated = await closeVisit(visitId, {
-        result: "sin_venta",
-        description: "Cerrada sin venta",
-        latitude: gps.latitude ?? null,
-        longitude: gps.longitude ?? null,
-        gps_accuracy_m: gps.gps_accuracy_m ?? null,
-        gps_offline: Boolean(gps.gps_offline && !gps.latitude),
-        gps_captured_at: gps.gps_captured_at ?? null,
-      });
-      setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cerrar");
-    } finally {
-      setBusyId(null);
-    }
+    const visit = visits.find((v) => v.id === visitId);
+    if (visit) setClosingVisit(visit);
   }
 
   const active = visits.filter((v) => v.status === "en_curso");
@@ -267,7 +249,7 @@ export function VisitsPage() {
                       onClick={() => onCloseNoSale(visit.id)}
                     >
                       <Square size={16} />
-                      {busyId === visit.id ? "Cerrando…" : "Cerrar + GPS"}
+                      Cerrar visita
                     </Button>
                   ) : null}
                 </div>
@@ -287,6 +269,18 @@ export function VisitsPage() {
           if (note) setGpsNote(note);
         }}
       />
+
+      {closingVisit ? (
+        <CloseVisitSheet
+          visit={closingVisit}
+          open
+          onClose={() => setClosingVisit(null)}
+          onClosed={(updated) => {
+            setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+            setClosingVisit(null);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -333,7 +327,7 @@ function ActiveVisitCard({
       <div className="visit-actions">
         <Button variant="secondary" disabled={busy} onClick={onClose}>
           <Square size={16} />
-          {busy ? "Cerrando…" : "Cerrar + GPS"}
+          Cerrar visita
         </Button>
       </div>
     </section>

@@ -49,7 +49,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-1.4** | GPS inicio/cierre | `getCurrentPosition` + guardar en visita | hecho |
 | **SF-1.5** | Trail ligero `en_curso` | `watchPosition` + `VisitGpsPoint` | hecho |
 | **SF-1.6** | Skip GPS + foto + alerta lejos | Flujos §3 del roadmap | pendiente |
-| **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | pendiente |
+| **SF-1.7** | Orden desde visita | Venta ligada a visita (USD/VES) | hecho |
 | **SF-1.8** | Orden sin visita | origen mostrador / online | pendiente |
 | **SF-1.9** | Offline cola | IndexedDB + sync visita+venta; cache clientes/productos | pendiente |
 | **SF-1.10** | Mapa evidencia | Leaflet: puntos de una visita | pendiente |

@@ -3,6 +3,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { RequireAuth } from "./auth/RequireAuth";
 import { SellerShell } from "./layout/SellerShell";
 import { HomePage } from "./pages/HomePage";
+import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { VisitsPage } from "./pages/VisitsPage";
@@ -34,16 +35,7 @@ export default function App() {
                 />
               }
             />
-            <Route
-              path="inventario"
-              element={
-                <PlaceholderPage
-                  title="Inventario"
-                  nextSf="SF-1.2+"
-                  blurb="Catálogo y stock visible para el vendedor."
-                />
-              }
-            />
+            <Route path="inventario" element={<InventoryPage />} />
             <Route
               path="resumen"
               element={
