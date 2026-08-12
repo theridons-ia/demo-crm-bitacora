@@ -87,6 +87,6 @@ No mezclar varias SF en un solo commit si se puede evitar.
 ### Cómo verificar SF-1.2
 
 1. API + `npm run dev`
-2. Login → Inicio → **Nuevo cliente** (RIF y/o CI)
+2. Login → Inicio → **Nuevo cliente** (elige RIF **o** CI)
 3. Buscar por nombre/RIF/CI
 

@@ -50,13 +50,15 @@ class ClientCreate(BaseModel):
     notes: str | None = None
 
     @model_validator(mode="after")
-    def require_rif_or_ci(self):
+    def require_exactly_one_id(self):
         rif = (self.rif or "").strip() or None
         ci = (self.ci or "").strip() or None
         self.rif = rif
         self.ci = ci
+        if rif and ci:
+            raise ValueError("Usa RIF o CI, no ambos (un solo identificador)")
         if not rif and not ci:
-            raise ValueError("Debes indicar RIF y/o CI (identificación Venezuela)")
+            raise ValueError("Debes indicar RIF o CI")
         return self
 
 
@@ -81,13 +83,15 @@ class SupplierCreate(BaseModel):
     notes: str | None = None
 
     @model_validator(mode="after")
-    def require_rif_or_ci(self):
+    def require_exactly_one_id(self):
         rif = (self.rif or "").strip() or None
         ci = (self.ci or "").strip() or None
         self.rif = rif
         self.ci = ci
+        if rif and ci:
+            raise ValueError("Usa RIF o CI, no ambos (un solo identificador)")
         if not rif and not ci:
-            raise ValueError("Debes indicar RIF y/o CI (identificación Venezuela)")
+            raise ValueError("Debes indicar RIF o CI")
         return self
 
 

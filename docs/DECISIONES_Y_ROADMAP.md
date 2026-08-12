@@ -34,7 +34,7 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 | 10 | Momento | Empezar ya aunque la propuesta comercial no esté aprobada: base reutilizable y de aprendizaje. |
 | 11 | Backend | **FastAPI + PostgreSQL** (aprendizaje consciente; Theridon ya conoce Django/Postgres). |
 | 12 | Datos | Seed / datos de prueba hasta tener maestros reales. |
-| 13 | Identificación VE | **Clientes y proveedores** llevan identificación venezolana: **RIF** y/o **CI** (campos explícitos; al menos uno requerido en validación de negocio). |
+| 13 | Identificación VE | Clientes y proveedores: **un solo** identificador — **RIF** (jurídica) **o** **CI** (natural). Nunca ambos. |
 | 14 | Navegación responsive | **Móvil:** bottom nav (vendedor). **Tablet/desktop:** top bar o sidebar (no barra inferior tipo app). Misma app, shells distintos por ancho/rol — ver SF-1.1b / SF-2.1. |
 | 16 | Sin ERP (ahora) | El cliente **no tiene ERP** y no quiere integración en el arranque. Bitácora es el sistema de campo. Integración ERP queda **opcional a futuro** (API ya lo facilita). |
 

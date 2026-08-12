@@ -104,9 +104,7 @@ export function HomePage() {
                 {client.state ? <span className="muted"> · {client.state}</span> : null}
               </div>
               <p className="muted small">
-                {[client.rif ? `RIF ${client.rif}` : null, client.ci ? `CI ${client.ci}` : null]
-                  .filter(Boolean)
-                  .join(" · ") || "Sin RIF/CI"}
+                {client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "Sin identificación"}
               </p>
               {client.address ? <p className="muted small">{client.address}</p> : null}
               {client.phone ? <p className="muted small">{client.phone}</p> : null}

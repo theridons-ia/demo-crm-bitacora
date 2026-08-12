@@ -95,10 +95,33 @@ a {
   gap: 0.35rem;
 }
 
-.field label {
+.field label,
+.field-label {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--muted-foreground);
+}
+
+.id-type-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.chip {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .input {

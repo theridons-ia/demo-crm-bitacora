@@ -10,19 +10,21 @@ type Props = {
   onCreated: (client: Client) => void;
 };
 
+type IdType = "rif" | "ci";
+
 const empty = {
   name: "",
-  rif: "",
-  ci: "",
+  idValue: "",
   state: "",
   address: "",
   phone: "",
   notes: "",
 };
 
-/** Formulario de alta — RIF y/o CI obligatorios (validación también en API). */
+/** Alta de cliente VE: un solo identificador — RIF (jurídica) o CI (natural). */
 export function ClientForm({ open, onClose, onCreated }: Props) {
   const [form, setForm] = useState(empty);
+  const [idType, setIdType] = useState<IdType>("rif");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,17 +38,16 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
     event.preventDefault();
     setError(null);
 
-    const rif = form.rif.trim() || null;
-    const ci = form.ci.trim() || null;
-    if (!rif && !ci) {
-      setError("Debes indicar RIF y/o CI");
+    const idValue = form.idValue.trim();
+    if (!idValue) {
+      setError(idType === "rif" ? "Indica el RIF" : "Indica la CI");
       return;
     }
 
     const payload: ClientCreateInput = {
       name: form.name.trim(),
-      rif,
-      ci,
+      rif: idType === "rif" ? idValue : null,
+      ci: idType === "ci" ? idValue : null,
       state: form.state.trim() || null,
       address: form.address.trim() || null,
       phone: form.phone.trim() || null,
@@ -57,6 +58,7 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
     try {
       const created = await createClient(payload);
       setForm(empty);
+      setIdType("rif");
       onCreated(created);
       onClose();
     } catch (err) {
@@ -72,7 +74,7 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
         <div>
           <p className="eyebrow">Clientes</p>
           <h1 id="client-form-title">Nuevo cliente</h1>
-          <p className="muted">Identificación Venezuela: RIF y/o CI.</p>
+          <p className="muted">Un identificador: RIF (empresa) o CI (persona).</p>
         </div>
         <Button variant="ghost" type="button" onClick={onClose}>
           Cerrar
@@ -88,22 +90,42 @@ export function ClientForm({ open, onClose, onCreated }: Props) {
           required
           autoFocus
         />
-        <div className="form-row">
-          <TextField
-            id="client-rif"
-            label="RIF"
-            placeholder="J-12345678-9"
-            value={form.rif}
-            onChange={(e) => setField("rif", e.target.value)}
-          />
-          <TextField
-            id="client-ci"
-            label="CI"
-            placeholder="V-12345678"
-            value={form.ci}
-            onChange={(e) => setField("ci", e.target.value)}
-          />
+
+        <div className="field">
+          <span className="field-label">Tipo de identificación</span>
+          <div className="id-type-toggle" role="group" aria-label="Tipo de identificación">
+            <button
+              type="button"
+              className={idType === "rif" ? "chip active" : "chip"}
+              onClick={() => {
+                setIdType("rif");
+                setField("idValue", "");
+              }}
+            >
+              RIF
+            </button>
+            <button
+              type="button"
+              className={idType === "ci" ? "chip active" : "chip"}
+              onClick={() => {
+                setIdType("ci");
+                setField("idValue", "");
+              }}
+            >
+              CI
+            </button>
+          </div>
         </div>
+
+        <TextField
+          id="client-id"
+          label={idType === "rif" ? "RIF" : "Cédula de identidad"}
+          placeholder={idType === "rif" ? "J-12345678-9" : "V-12345678"}
+          value={form.idValue}
+          onChange={(e) => setField("idValue", e.target.value)}
+          required
+        />
+
         <TextField
           id="client-state"
           label="Estado"
