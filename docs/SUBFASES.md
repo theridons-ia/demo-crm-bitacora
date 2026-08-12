@@ -80,14 +80,13 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-1.5** (trail GPS en visita `en_curso`).
+**Listo para commit / tu push:** **SF-1.7** (venta al cerrar visita + inventario).
 
-**Siguiente:** **SF-1.6** (skip GPS + foto + alerta lejos) o **SF-1.7** (venta en visita).
+**Siguiente:** **SF-1.8** (venta sin visita) o **SF-1.6** (foto / alertas GPS).
 
-### Cómo verificar SF-1.5
+### Cómo verificar SF-1.7
 
-1. Activa **GPS de prueba** (si no hay HTTPS).
-2. Inicia una visita → tarjeta «en curso» muestra **Trail activo**.
-3. En ~12 s (mock) o ~45 s (GPS real) sube puntos `watch`.
-4. En `/docs` → `GET /api/visits/{id}/gps-points` para ver el trail.
+1. Visitas → visita en curso → **Cerrar visita**.
+2. **Con venta** → productos +/− · USD o Bs → confirmar.
+3. Revisa **Inventario**: el stock bajó.
 
