@@ -4,10 +4,10 @@ import L from "leaflet";
 
 export const clientPdvIcon = L.divIcon({
   className: "map-marker map-marker-pdv",
-  html: '<span class="map-marker-dot map-marker-dot-pdv" title="PDV"></span>',
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-  popupAnchor: [0, -12],
+  html: '<span class="map-marker-emoji" title="PDV" aria-hidden="true">🏪</span>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14],
 });
 
 export const sellerTrailIcon = L.divIcon({
