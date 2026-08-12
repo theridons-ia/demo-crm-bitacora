@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import get_settings
 from .database import engine
 from .ensure_schema import ensure_schema
-from .routers import auth, catalog, clients, evidence, sales, sync, visits
+from .routers import auth, catalog, clients, evidence, sales, sync, users, visits
 
 settings = get_settings()
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(clients.router)
 app.include_router(catalog.router)
 app.include_router(visits.router)

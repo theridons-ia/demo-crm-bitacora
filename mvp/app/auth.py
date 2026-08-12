@@ -62,3 +62,12 @@ def get_current_user(
     if not user:
         raise credentials_exception
     return user
+
+
+def require_supervisor(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role.value not in ("supervisor", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo supervisor o admin",
+        )
+    return current_user

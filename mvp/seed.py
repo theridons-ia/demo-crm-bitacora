@@ -41,6 +41,18 @@ def run() -> None:
                 ]
             )
 
+        if not db.query(User).filter(User.email == "carlos@bitacora.local").first():
+            db.add(
+                User(
+                    email="carlos@bitacora.local",
+                    full_name="Carlos Ruiz",
+                    hashed_password=hash_password("demo1234"),
+                    role=UserRole.vendedor,
+                    initials="CR",
+                    route_name="Ruta Este · Yaracuy",
+                )
+            )
+
         demo_clients = [
             {
                 "name": "Mercado San Rafael",
@@ -159,7 +171,7 @@ def run() -> None:
         db.commit()
         print("Seed OK")
         print(f"Clientes: {db.query(Client).count()} · Proveedores: {db.query(Supplier).count()} · Productos: {db.query(Product).count()}")
-        print("Usuarios: marina@bitacora.local / supervisor@bitacora.local / admin@bitacora.local")
+        print("Usuarios: marina / carlos / supervisor / admin @bitacora.local")
         print("Password: demo1234")
     finally:
         db.close()

@@ -241,6 +241,15 @@ class VisitClose(BaseModel):
     local_uuid: str | None = None
 
 
+class VisitAssign(BaseModel):
+    """Supervisor asigna visita planificada a un vendedor (SF-2.2)."""
+
+    seller_id: int
+    client_id: int
+    scheduled_date: date
+    description: str | None = None
+
+
 class VisitOut(ORMModel):
     id: int
     seller_id: int
@@ -261,6 +270,7 @@ class VisitOut(ORMModel):
     local_uuid: str | None
     created_at: datetime
     client: ClientOut | None = None
+    seller: UserOut | None = None
     sale: SaleOut | None = None
 
 

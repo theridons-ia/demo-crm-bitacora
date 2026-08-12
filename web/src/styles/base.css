@@ -1011,6 +1011,65 @@ a {
   font-weight: 600;
 }
 
+.section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--primary);
+}
+
+.route-filters {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.route-assign {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.1rem;
+}
+
+.route-assign-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.route-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.route-visit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.route-visit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.route-visit-name {
+  margin: 0;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+@media (min-width: 640px) {
+  .route-filters {
+    grid-template-columns: 1fr 1.4fr;
+  }
+}
+
 @media (min-width: 768px) {
   .app-shell-supervisor {
     grid-template-columns: 240px minmax(0, 1fr);

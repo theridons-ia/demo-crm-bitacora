@@ -46,6 +46,7 @@ export type Visit = {
   local_uuid: string | null;
   created_at: string;
   client: Client | null;
+  seller?: User | null;
 };
 
 export type Product = {

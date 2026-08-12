@@ -1,5 +1,37 @@
 # Fase 2 — Supervisor
 
+## SF-2.2 — Ruta del día
+
+### Objetivo
+Supervisor asigna visitas **programadas** a un vendedor/fecha y puede **desasignar** solo mientras sigan programadas (no borra historial `en_curso` / `completada`).
+
+### Qué se hizo
+- `GET /api/users/sellers` — lista vendedores.
+- `POST /api/visits/assign` — crea visita `programada`.
+- `DELETE /api/visits/{id}` — solo si `status=programada`.
+- Filtros en listado: `scheduled_date`, `seller_id`, `status`.
+- UI `/sup/ruta` con fecha, vendedor, asignar cliente, quitar de la ruta.
+- Seed: segundo vendedor `carlos@bitacora.local` / `demo1234`.
+
+### Cómo verificar
+1. Login supervisor → **Ruta del día**.
+2. Elige fecha de hoy + Marina (o Carlos).
+3. Asigna 2 clientes → aparecen en planificadas.
+4. Login Marina → Visitas: debe ver las programadas y poder **Iniciar**.
+5. Como supervisor, **Quitar** una programada; si ya está en curso, el API rechaza el delete.
+
+### Archivos
+| Pieza | Ruta |
+|-------|------|
+| API users | `mvp/app/routers/users.py` |
+| API visits | `mvp/app/routers/visits.py` |
+| UI | `web/src/pages/RouteDayPage.tsx` |
+
+### Siguiente
+**SF-2.3** — Inbox de alertas GPS/foto.
+
+---
+
 ## SF-2.1 — Layout supervisor
 
 ### Objetivo

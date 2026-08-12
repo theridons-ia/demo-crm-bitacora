@@ -11,6 +11,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { SalesPage } from "./pages/SalesPage";
 import { SupervisorHomePage } from "./pages/SupervisorHomePage";
+import { RouteDayPage } from "./pages/RouteDayPage";
 import { VisitsPage } from "./pages/VisitsPage";
 
 export default function App() {
@@ -60,16 +61,7 @@ export default function App() {
           >
             <Route index element={<Navigate to="hoy" replace />} />
             <Route path="hoy" element={<SupervisorHomePage />} />
-            <Route
-              path="ruta"
-              element={
-                <PlaceholderPage
-                  title="Ruta del día"
-                  nextSf="SF-2.2"
-                  blurb="Asignar y desasignar visitas planificadas sin borrar historial ejecutado."
-                />
-              }
-            />
+            <Route path="ruta" element={<RouteDayPage />} />
             <Route
               path="alertas"
               element={

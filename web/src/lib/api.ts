@@ -93,6 +93,10 @@ export function fetchMe(): Promise<User> {
   return request<User>("/api/auth/me");
 }
 
+export function fetchSellers(): Promise<User[]> {
+  return request<User[]>("/api/users/sellers");
+}
+
 export function fetchClients(): Promise<Client[]> {
   return request<Client[]>("/api/clients");
 }
@@ -125,8 +129,36 @@ export function updateClient(clientId: number, payload: ClientCreateInput): Prom
   });
 }
 
-export function fetchVisits(): Promise<Visit[]> {
-  return request<Visit[]>("/api/visits");
+export function fetchVisits(params?: {
+  scheduled_date?: string;
+  seller_id?: number;
+  status?: VisitStatus;
+}): Promise<Visit[]> {
+  const q = new URLSearchParams();
+  if (params?.scheduled_date) q.set("scheduled_date", params.scheduled_date);
+  if (params?.seller_id != null) q.set("seller_id", String(params.seller_id));
+  if (params?.status) q.set("status", params.status);
+  const qs = q.toString();
+  return request<Visit[]>(`/api/visits${qs ? `?${qs}` : ""}`);
+}
+
+export type VisitAssignInput = {
+  seller_id: number;
+  client_id: number;
+  scheduled_date: string;
+  description?: string | null;
+};
+
+export function assignVisit(payload: VisitAssignInput): Promise<Visit> {
+  return request<Visit>("/api/visits/assign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function unassignVisit(visitId: number): Promise<void> {
+  return request<void>(`/api/visits/${visitId}`, { method: "DELETE" });
 }
 
 export type VisitCreateInput = {

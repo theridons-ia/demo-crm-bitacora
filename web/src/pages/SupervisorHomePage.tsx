@@ -7,7 +7,7 @@ const LINKS = [
     to: "/sup/ruta",
     title: "Ruta del día",
     blurb: "Asignar y desasignar visitas planificadas.",
-    sf: "SF-2.2",
+    sf: "SF-2.2 · listo",
     icon: Route,
   },
   {
@@ -59,7 +59,9 @@ export function SupervisorHomePage() {
             <div>
               <h2 className="sup-home-title">{title}</h2>
               <p className="muted small">{blurb}</p>
-              <p className="sup-home-sf muted small">Pendiente · {sf}</p>
+              <p className="sup-home-sf muted small">
+                {sf.startsWith("SF-2.2") ? sf : `Pendiente · ${sf}`}
+              </p>
             </div>
           </Link>
         ))}
