@@ -84,17 +84,16 @@ No mezclar varias SF en un solo commit si se puede evitar.
 
 **Siguiente:** **SF-1.5** (trail mientras `en_curso`) o pulir UI tipo PowerStreet / export.
 
-### GPS en el celular (importante)
+### GPS en entornos de prueba (sin HTTPS de producción)
 
-Los navegadores **bloquean** geolocalización si la página no es contexto seguro:
+| Método | Cómo | GPS real |
+|--------|------|----------|
+| **localhost en el PC** | http://localhost:5173 | Sí |
+| **GPS de prueba** | En Visitas → «Activar GPS de prueba» (solo `npm run dev`) | Simulado (Lara) |
+| **HTTPS local** | `cd web && npm run dev:https` → aceptar cert en el celular | Sí (aviso del navegador) |
+| **Túnel** | ngrok / Cloudflare Tunnel hacia `:5173` | Sí |
 
-| Cómo abres la app | ¿GPS? |
-|-------------------|-------|
-| `http://localhost:5173` en el PC | Sí (suele pedir permiso) |
-| `http://IP-del-servidor:5173` en el celular | **No** (HTTP inseguro) |
-| HTTPS (dominio / túnel ngrok / Caddy) | Sí |
-
-Mientras tanto: la visita **sigue** aunque falle el GPS (con aviso). Trail continuo = SF-1.5. Mapa embebido = SF-1.10.
+Chrome (avanzado): flag `unsafely-treat-insecure-origin-as-secure` con tu `http://IP:5173` — solo para labs.
 
 ### Cómo verificar SF-1.4 (en el PC)
 

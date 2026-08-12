@@ -10,7 +10,7 @@ import {
   fetchVisits,
   startVisit,
 } from "../lib/api";
-import { getCurrentPosition, isSecureGeoContext, mapsUrl } from "../lib/gps";
+import { getCurrentPosition, isMockGpsEnabled, isSecureGeoContext, mapsUrl, setMockGpsEnabled, canUseMockGps } from "../lib/gps";
 import type { Client, Visit, VisitStatus } from "../lib/types";
 
 const statusLabel: Record<VisitStatus, string> = {
@@ -41,6 +41,7 @@ export function VisitsPage() {
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [mockGps, setMockGps] = useState(() => isMockGpsEnabled());
 
   const reload = useCallback(async () => {
     const [v, c] = await Promise.all([fetchVisits(), fetchClients()]);
@@ -51,9 +52,9 @@ export function VisitsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    if (!isSecureGeoContext()) {
+    if (!isSecureGeoContext() && !isMockGpsEnabled()) {
       setGpsNote(
-        "GPS bloqueado en este origen (hace falta HTTPS o localhost). En el PC con localhost suele funcionar; en el celular por IP http:// no.",
+        "Sin HTTPS el GPS real está bloqueado. Activa «GPS de prueba» para simular coordenadas (solo desarrollo).",
       );
     }
     reload()
@@ -148,7 +149,37 @@ export function VisitsPage() {
         </div>
       </header>
 
-      {gpsNote ? <p className="form-error">{gpsNote}</p> : null}
+      {canUseMockGps() ? (
+        <section className="card" style={{ marginBottom: "1rem" }}>
+          <div className="section-title" style={{ marginBottom: "0.5rem" }}>
+            <h2 style={{ margin: 0, fontSize: "1rem" }}>Pruebas GPS</h2>
+          </div>
+          <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
+            {isSecureGeoContext()
+              ? "Este origen permite GPS real. El modo prueba sirve para forzar coordenadas de Lara."
+              : "Este origen no es HTTPS: usa GPS de prueba o `npm run dev:https`."}
+          </p>
+          <Button
+            variant={mockGps ? "primary" : "secondary"}
+            block
+            type="button"
+            onClick={() => {
+              const next = !mockGps;
+              setMockGpsEnabled(next);
+              setMockGps(next);
+              setGpsNote(
+                next
+                  ? "GPS de prueba ON — coordenadas simuladas cerca de Barquisimeto."
+                  : "GPS de prueba OFF.",
+              );
+            }}
+          >
+            {mockGps ? "GPS de prueba: activado" : "Activar GPS de prueba"}
+          </Button>
+        </section>
+      ) : null}
+
+      {gpsNote ? <p className={mockGps ? "gps-ok-note" : "form-error"}>{gpsNote}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
       {active.map((visit) => (

@@ -185,6 +185,16 @@ a {
   font-weight: 600;
 }
 
+.gps-ok-note {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--secondary);
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
 .input {
   min-height: 48px;
   padding: 0.65rem 0.9rem;

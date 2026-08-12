@@ -1,15 +1,27 @@
 /**
  * Geolocalización del navegador (SF-1.4).
  *
- * Importante: en móviles, GPS suele exigir contexto seguro (HTTPS o localhost).
- * Abrir la app por http://IP-LAN:5173 desde el celular a menudo BLOQUEA el GPS.
+ * En móviles, GPS exige HTTPS o localhost. Para pruebas sin HTTPS:
+ * - localhost en el PC, o
+ * - modo "GPS de prueba" (coordenadas simuladas), o
+ * - `npm run dev:https` (certificado autofirmado).
  */
+
+const MOCK_KEY = "bitacora.dev_mock_gps";
+
+/** Punto demo cerca de Barquisimeto (Lara) — zona del seed. */
+export const DEMO_GPS_FIX = {
+  latitude: 10.0678,
+  longitude: -69.3474,
+  accuracy_m: 12,
+};
 
 export type GeoFix = {
   latitude: number;
   longitude: number;
   accuracy_m: number | null;
   captured_at: string;
+  mocked?: boolean;
 };
 
 export type GeoResult =
@@ -25,7 +37,47 @@ export function isSecureGeoContext(): boolean {
   return window.isSecureContext;
 }
 
+/** Solo en desarrollo (`import.meta.env.DEV`). */
+export function canUseMockGps(): boolean {
+  return Boolean(import.meta.env.DEV);
+}
+
+export function isMockGpsEnabled(): boolean {
+  if (!canUseMockGps() || typeof sessionStorage === "undefined") return false;
+  return sessionStorage.getItem(MOCK_KEY) === "1";
+}
+
+export function setMockGpsEnabled(enabled: boolean): void {
+  if (!canUseMockGps() || typeof sessionStorage === "undefined") return;
+  if (enabled) sessionStorage.setItem(MOCK_KEY, "1");
+  else sessionStorage.removeItem(MOCK_KEY);
+}
+
+export function mockCurrentPosition(
+  override?: Partial<typeof DEMO_GPS_FIX>,
+): GeoResult {
+  const latitude = override?.latitude ?? DEMO_GPS_FIX.latitude;
+  const longitude = override?.longitude ?? DEMO_GPS_FIX.longitude;
+  const accuracy_m = override?.accuracy_m ?? DEMO_GPS_FIX.accuracy_m;
+  // Pequeña variación para que inicio/cierre no sean idénticos
+  const jitter = (Math.random() - 0.5) * 0.0003;
+  return {
+    ok: true,
+    fix: {
+      latitude: latitude + jitter,
+      longitude: longitude + jitter,
+      accuracy_m,
+      captured_at: new Date().toISOString(),
+      mocked: true,
+    },
+  };
+}
+
 export function getCurrentPosition(timeoutMs = 15000): Promise<GeoResult> {
+  if (isMockGpsEnabled()) {
+    return Promise.resolve(mockCurrentPosition());
+  }
+
   if (!isGeolocationAvailable()) {
     return Promise.resolve({
       ok: false,
@@ -38,7 +90,7 @@ export function getCurrentPosition(timeoutMs = 15000): Promise<GeoResult> {
       ok: false,
       skipped: true,
       reason:
-        "El GPS requiere HTTPS (o localhost). Desde el celular por IP http://… el navegador lo bloquea.",
+        "GPS real requiere HTTPS o localhost. Activa «GPS de prueba» abajo, o usa npm run dev:https.",
     });
   }
 
