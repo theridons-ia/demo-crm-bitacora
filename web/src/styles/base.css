@@ -1845,6 +1845,11 @@ a {
   }
 }
 
+@media (min-width: 480px) {
+  .seller-logout-label {
+    display: inline;
+  }
+
   .kpi-row-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
