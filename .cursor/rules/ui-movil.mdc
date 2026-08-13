@@ -14,7 +14,7 @@ Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
 
 - Estado (punto / `LiveLed`) · nombre PDV · hora o estado · chevron.
 - Toda la fila es el tap → ficha. Sin lat/lng, GPS, Ver trail, ni 3 botones en la fila.
-- Agenda / abiertas: `scheduled_time` ASC. Hechas: fecha DESC.
+- Programadas: carrusel de fechas en la misma vista (`scheduled_time` ASC). Culminadas: fecha DESC.
 
 ## Chrome y FAB
 

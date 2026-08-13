@@ -39,9 +39,10 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 | 16 | Sin ERP (ahora) | El cliente **no tiene ERP** y no quiere integración en el arranque. Bitácora es el sistema de campo. Integración ERP queda **opcional a futuro** (API ya lo facilita). |
 | 17 | Orden del día | El **slice de hoy** de la ruta manda: `scheduled_time` ASC (si no hay hora, orden / secuencia). El mapa dibuja ese orden. Vecino más cercano no es el trazo oficial. |
 | 18 | Visitas vs Ruta vs Mapa | **Ruta** = plan de la semana (contenedor). **Visitas** = bitácora (hechos). **Mapa** = hoy de esa ruta. Cada parada es una `Visit`. No tres listados con reglas distintas. Hasta existir entidad `Route`, Fase 4 usa `Visit` del día como slice. |
-| 19 | Lista del día | Abiertas/agenda: mañana → tarde. Historial/Hechas: más reciente primero. |
+| 19 | Lista del día | Programadas/agenda: mañana → tarde. Historial/Culminadas: más reciente primero. |
 | 20 | Comprobante de pago | El vendedor elige **galería** (o chooser del OS). Cancelar la cámara no cierra la cotización. |
 | 21 | Código de ruta | Opcional y **corto** (`RUT-47`). Título humano: `Marina · 11–15 ago`. No folio de 9 dígitos (eso es OV). Se puede omitir en el piloto de 8 vendedores. |
+| 22 | Programadas vencidas | Siguen **abiertas** (no se cancelan solas). Aviso **Sin asistir** en la fila. En Hoy y Todas van arriba. El carrusel no retrocede 30 días vacíos: solo chips grises de días pasados **con** visitas. |
 
 ### Coherencia visual (no negociable en UI)
 

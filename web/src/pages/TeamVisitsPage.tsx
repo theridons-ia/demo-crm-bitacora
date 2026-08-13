@@ -100,7 +100,7 @@ export function TeamVisitsPage() {
           <div className="bar-list">
             <div>
               <div className="bar-item-top">
-                <span>Abiertas</span>
+                <span>Programadas</span>
                 <strong>{counts.open}</strong>
               </div>
               <div className="bar-track" aria-hidden>
@@ -114,7 +114,7 @@ export function TeamVisitsPage() {
             </div>
             <div>
               <div className="bar-item-top">
-                <span>Completadas</span>
+                <span>Culminadas</span>
                 <strong>{counts.done}</strong>
               </div>
               <div className="bar-track" aria-hidden>
@@ -172,7 +172,7 @@ export function TeamVisitsPage() {
               ["all", "Todas"],
               ["programada", "Programadas"],
               ["en_curso", "En curso"],
-              ["completada", "Completadas"],
+              ["completada", "Culminadas"],
             ] as const
           ).map(([id, label]) => (
             <button

@@ -1,12 +1,13 @@
-import { ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronRight } from "lucide-react";
 import { LiveLed } from "./LiveLed";
 import { formatAgendaDay, formatTime, todayISO } from "../lib/caracasTime";
+import { isVisitOverdue } from "../lib/visitOrder";
 import type { Visit, VisitStatus } from "../lib/types";
 
 const STATUS_LABEL: Record<VisitStatus, string> = {
   programada: "Programada",
   en_curso: "En curso",
-  completada: "Cerrada",
+  completada: "Culminada",
   cancelada: "Cancelada",
 };
 
@@ -39,7 +40,9 @@ function metaLabel(visit: Visit): string {
     return STATUS_LABEL.completada;
   }
   if (visit.status === "en_curso") return "Toca para continuar";
-  if (visit.status === "programada") return "Programada";
+  if (visit.status === "programada") {
+    return isVisitOverdue(visit, todayISO()) ? "Sin asistir" : "Programada";
+  }
   return STATUS_LABEL[visit.status];
 }
 
@@ -50,14 +53,21 @@ function metaLabel(visit: Visit): string {
 export function VisitRow({ visit, onClick, index }: Props) {
   const name = visit.client?.name ?? `Cliente #${visit.client_id}`;
   const live = visit.status === "en_curso";
+  const overdue = isVisitOverdue(visit, todayISO());
   const title = index != null ? `${index}. ${name}` : name;
 
   return (
     <li>
-      <button type="button" className={`visit-row is-${visit.status}`} onClick={onClick}>
+      <button
+        type="button"
+        className={`visit-row is-${visit.status}${overdue ? " is-overdue" : ""}`}
+        onClick={onClick}
+      >
         <span className="visit-row-status" aria-hidden>
           {live ? (
             <LiveLed showLabel={false} />
+          ) : overdue ? (
+            <AlertTriangle size={14} className="visit-row-warn" />
           ) : (
             <span className={`visit-row-dot is-${visit.status}`} />
           )}

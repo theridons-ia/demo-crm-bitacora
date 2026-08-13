@@ -92,7 +92,7 @@ export function SellerRouteMapPage() {
     );
   }, [visits]);
 
-  const listStops = useMemo(() => sortVisitsAgenda(visits), [visits]);
+  const listStops = useMemo(() => sortVisitsAgenda(visits, todayISO()), [visits]);
   const doneCount = ordered.filter((v) => v.status === "completada").length;
   const pendingCount = ordered.length - doneCount;
   const progressPct = ordered.length ? Math.round((doneCount / ordered.length) * 100) : 0;

@@ -4351,13 +4351,38 @@ button.ficha:focus-visible {
   gap: 0.35rem;
 }
 
+.chip-filter {
+  gap: 0.5rem;
+  min-height: 2.15rem;
+  padding: 0.22rem 0.32rem 0.22rem 0.78rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.chip-label {
+  line-height: 1;
+}
+
 .chip-count {
-  font-size: 0.72rem;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.38rem;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.68rem;
   font-weight: 800;
-  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  background: color-mix(in srgb, var(--primary) 8%, var(--muted));
+  color: var(--primary);
+  opacity: 1;
 }
 
 .chip.active .chip-count {
+  background: color-mix(in srgb, #fff 24%, transparent);
+  color: var(--primary-foreground);
   opacity: 1;
 }
 
@@ -6490,26 +6515,150 @@ canvas,
 
 /* ——— Agenda / calendario visitas ——— */
 .calendar-panel {
-  margin: 0.15rem 0 0.85rem;
+  margin: 0.15rem 0 0.7rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .week-strip {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 6px;
-  margin-bottom: 0.55rem;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0.4rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.week-strip::-webkit-scrollbar {
+  display: none;
 }
 
 .day-chip {
+  flex: 0 0 2.7rem;
+  width: 2.7rem;
+  min-height: 3.9rem;
   border: 1px solid var(--border);
   background: var(--card);
   border-radius: 14px;
   padding: 8px 4px;
   display: grid;
   gap: 2px;
+  align-content: center;
   justify-items: center;
   color: var(--muted-foreground);
   font: inherit;
+  cursor: pointer;
+}
+
+.day-chip.is-all {
+  flex-basis: 3.05rem;
+  width: 3.05rem;
+}
+
+.day-chip.is-today:not(.active):not(.has-stops) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.day-chip.has-stops,
+.day-chip.is-all.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.day-chip.has-stops strong,
+.day-chip.has-stops em,
+.day-chip.is-all.active strong,
+.day-chip.is-all.active em {
+  color: inherit;
+}
+
+.day-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 85%, #fff);
+}
+
+.day-chip.active strong,
+.day-chip.active em {
+  color: inherit;
+}
+
+.day-chip.is-past.has-stops {
+  background: color-mix(in srgb, var(--muted-foreground) 16%, var(--card));
+  border-color: color-mix(in srgb, var(--muted-foreground) 42%, var(--border));
+  color: var(--muted-foreground);
+}
+
+.day-chip.is-past.has-stops strong {
+  color: var(--foreground);
+}
+
+.day-chip.is-past.has-stops em {
+  color: var(--accent);
+}
+
+.day-chip.is-past.active {
+  background: color-mix(in srgb, var(--muted-foreground) 28%, var(--card));
+  border-color: color-mix(in srgb, var(--muted-foreground) 50%, var(--border));
+  color: var(--foreground);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 85%, #fff);
+}
+
+.day-chip.is-past.active strong,
+.day-chip.is-past.active em {
+  color: inherit;
+}
+
+.day-chip.is-past.active em {
+  color: var(--accent);
+}
+
+.day-chip.is-today {
+  margin-left: 2px;
+}
+
+.visit-overdue-note {
+  margin: 0 0 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.week-strip-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.week-strip-foot .muted {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week-strip-add {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.2rem 0.15rem;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -6529,17 +6678,6 @@ canvas,
   font-size: 11px;
   font-weight: 700;
   color: var(--accent);
-}
-
-.day-chip.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.day-chip.active strong,
-.day-chip.active em {
-  color: inherit;
 }
 
 .month-cal {
@@ -6819,6 +6957,19 @@ body.has-overlay .fab-root {
 }
 
 .visit-row.is-en_curso .visit-row-when {
+  color: var(--accent);
+}
+
+.visit-row.is-overdue {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
+.visit-row.is-overdue .visit-row-meta,
+.visit-row.is-overdue .visit-row-when {
+  color: var(--accent);
+}
+
+.visit-row-warn {
   color: var(--accent);
 }
 

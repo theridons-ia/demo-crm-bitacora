@@ -17,11 +17,23 @@ function historyStamp(visit: Visit): number {
   return Number.isNaN(ms) ? 0 : ms;
 }
 
-/** Abiertas / agenda: en curso primero, luego mañana → tarde. */
-export function sortVisitsAgenda(list: Visit[]): Visit[] {
+/** Programada con fecha Caracas ya pasada (no se inició ni se canceló). */
+export function isVisitOverdue(visit: Visit, today: string): boolean {
+  return visit.status === "programada" && Boolean(visit.scheduled_date) && visit.scheduled_date < today;
+}
+
+/** Abiertas / agenda: en curso, luego sin asistir (más reciente primero), luego mañana → tarde. */
+export function sortVisitsAgenda(list: Visit[], today?: string): Visit[] {
   return [...list].sort((a, b) => {
     if (a.status === "en_curso" && b.status !== "en_curso") return -1;
     if (b.status === "en_curso" && a.status !== "en_curso") return 1;
+    if (today) {
+      const ao = isVisitOverdue(a, today);
+      const bo = isVisitOverdue(b, today);
+      if (ao && !bo) return -1;
+      if (bo && !ao) return 1;
+      if (ao && bo) return scheduledStamp(b) - scheduledStamp(a);
+    }
     return scheduledStamp(a) - scheduledStamp(b);
   });
 }

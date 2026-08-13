@@ -602,6 +602,7 @@ def seed_rich_demo(db, users: dict[str, User], products: list[Product], supplier
 
 
 MARINA_TODAY_MARKER = "Ruta hoy ·"
+MARINA_OVERDUE_MARKER = "Sin asistir ·"
 
 
 def sync_marina_today_route(db, users: dict[str, User], products: list[Product]) -> None:
@@ -761,7 +762,41 @@ def sync_marina_today_route(db, users: dict[str, User], products: list[Product])
                 )
             )
 
-    print("Marina hoy: 6 visitas (3 cerradas + 3 pendientes)")
+    old_overdue = (
+        db.query(Visit)
+        .filter(
+            Visit.seller_id == marina.id,
+            Visit.description.isnot(None),
+            Visit.description.startswith(MARINA_OVERDUE_MARKER),
+        )
+        .all()
+    )
+    for v in old_overdue:
+        db.delete(v)
+    db.flush()
+
+    overdue_stops: list[tuple[str, date, time]] = [
+        ("Mercado San Rafael", yesterday, time(11, 0)),
+        ("Abasto Familia Pérez", yesterday - timedelta(days=2), time(9, 30)),
+    ]
+    for cname, d, t in overdue_stops:
+        c = _client_by_name(db, cname)
+        if not c:
+            print(f"  aviso: falta cliente {cname}")
+            continue
+        _assign(db, marina, c)
+        db.add(
+            Visit(
+                seller_id=marina.id,
+                client_id=c.id,
+                status=VisitStatus.programada,
+                description=f"{MARINA_OVERDUE_MARKER}{cname}",
+                scheduled_date=d,
+                scheduled_time=t,
+            )
+        )
+
+    print("Marina hoy: 6 visitas (3 cerradas + 3 pendientes) + 2 sin asistir")
 
 
 def _ensure_bank_accounts(db) -> dict[str, BankAccount]:

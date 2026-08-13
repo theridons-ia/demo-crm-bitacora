@@ -68,7 +68,7 @@ Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pant
 - **En curso:** componente `LiveLed` (punto coral parpadeante) en ficha, card activa, lista y agenda.
 - Al crear visita (ahora/programada): cerrar form y **abrir la ficha** de esa visita (`setDetailVisit`), no solo dejar el listado.
 - Cancelar visita: `POST /api/visits/{id}/cancel` desde la ficha (programada o en curso **sin OV**).
-- **Lista «Tus visitas»:** chips **Abiertas → Agenda → Hechas → Canceladas** (default Abiertas). En curso: LED en la misma fila (o un hero), no duplicar. **Abiertas/Agenda:** `scheduled_time` ASC (mañana→tarde). **Hechas:** más reciente primero. Ficha: avatar + nombre a la izquierda y fecha a la derecha. Sin GPS/Trail en la fila; clic abre la ficha. Pieza compartida: ver regla `ui-movil.mdc`.
+- **Lista de visitas:** chips **Programadas · Culminadas · Canceladas** (default Programadas). El carrusel de fechas vive **dentro** de Programadas (hoy por defecto; **Todas** para el backlog). En curso: LED en la misma fila. Orden horario ASC. **Culminadas:** más reciente primero. Ficha: nombre del PDV una sola vez. Sin GPS/Trail en la fila. Pieza: `VisitRow`.
 - **GPS de prueba (solo `npm run dev`):** toggle en el **header** (`GPS simular`). Simula estar **junto al PDV** (coords del cliente ± ~20 m) al iniciar, guardar GPS o cerrar. **No** genera un trail de puntos en movimiento. Al apagarlo, el muestreo continuo se detiene.
 - Mapa de evidencia (`VisitMapSheet`): PDV fucsia · Inicio negro · Trail coral · **Ahora** teal con etiqueta (posición actual, distinto del trail) · Cierre rojo.
 

@@ -55,7 +55,7 @@ Prompt mínimo al cambiar de modelo:
 4. **Ruta gráfica = ruta agendada.** Orden = `scheduled_time` (y si no hay hora, orden de asignación). Vecino más cercano es opcional y **aparte**, no el trazo oficial.
 5. **Tres lentes, una entidad `Visit`:** Ruta = hoy para asignar; Visitas = bitácora; Mapa = el mismo día en mapa. No tres listados distintos.
 6. **Foto de comprobante:** galería (sin `capture=`). Cancelar la cámara/picker **no** cierra el wizard ni borra la cotización.
-7. **Agenda del día:** mañana → tarde (`scheduled_time` ASC). “Más reciente primero” solo en **Hechas** / historial.
+7. **Agenda del día:** mañana → tarde (`scheduled_time` ASC). “Más reciente primero” solo en **Culminadas** / historial.
 8. **Un signo de moneda.** `Total` + `$ 13.57`, nunca `Total $ $ 13.57`.
 9. **Selects nativos de Android** no deben tapar el mapa ni la lista: usar `SelectField` / bottom sheet.
 10. Fechas en **es-VE**, no `08/13/2026`.
@@ -180,8 +180,10 @@ La misma fila en vendedor y, luego, supervisor.
 
 ### Qué se hizo
 - `VisitRow`: LED o punto · nombre PDV · hora o estado · chevron. Toda la fila abre la ficha.
-- Visitas: sin cards altas, coords, GPS, Iniciar / Ver trail / Cerrar en la fila. En curso va en **Abiertas** con LED (no hero duplicado).
-- Orden: Abiertas/Agenda `scheduled_time` ASC (en curso primero). Hechas/Canceladas por fecha DESC.
+- Visitas: sin cards altas, coords, GPS, Iniciar / Ver trail / Cerrar en la fila. En curso va en **Programadas** con LED (no hero duplicado).
+- Orden: Programadas `scheduled_time` ASC (en curso primero, **sin asistir** después). Culminadas/Canceladas por fecha DESC.
+- Chips: **Programadas · Culminadas · Canceladas**. El carrusel de fechas va **dentro** de Programadas (hoy / Todas).
+- Programadas **sin asistir** (fecha ya pasó): triángulo coral, meta «Sin asistir», arriba en Hoy y Todas. Carrusel: chips grises solo de días pasados con visitas (no 30 días vacíos hacia atrás).
 - Inicio (agenda) y Orden del día del mapa usan la misma fila. Tap abre ficha.
 - Ficha: título = estado (`En curso` / `Programada`…); el nombre del PDV solo en el bloque de identidad. **Cerrar ficha** vs **Cerrar visita** se quedan.
 - Supervisor reutiliza la fila en SF-4.8.
@@ -195,10 +197,10 @@ La misma fila en vendedor y, luego, supervisor.
 | Ficha | `VisitDetailSheet.tsx` (título) |
 
 ### Cómo probarlo
-1. Visitas chip **Abiertas**: ≥5 filas compactas. En curso con LED, no una card gorda arriba.
+1. Visitas chip **Programadas**: ≥5 filas compactas. En curso con LED, no una card gorda arriba.
 2. Tap abre ficha. **Iniciar** / GPS / trail viven en la ficha, no en la fila.
-3. Agenda: 12:00 encima de 14:00.
-4. Hechas: la más reciente primero.
+3. Programadas: carrusel de días; 12:00 encima de 14:00. Si hay vencidas: aviso coral, chips grises a la izquierda, listadas en Hoy.
+4. Culminadas: la más reciente primero.
 5. Inicio y Recorrido: misma fila; tap abre ficha.
 
 ---

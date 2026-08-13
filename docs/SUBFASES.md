@@ -137,9 +137,9 @@ Siguientes SF se abren al cerrar Fase 4: modelo `Route`, UI supervisor (tarjeta 
 
 ### Cómo verificar SF-4.3
 
-1. Visitas → **Abiertas**: filas compactas (LED · PDV · hora · chevron). Sin GPS ni 3 botones.
+1. Visitas → **Programadas**: filas compactas (LED · PDV · hora · chevron). Sin GPS ni 3 botones.
 2. Tap = ficha. Título de la ficha es el estado, no el nombre dos veces.
-3. 12:00 arriba de 14:00. Hechas: más reciente primero.
+3. 12:00 arriba de 14:00. Culminadas: más reciente primero. Vencidas: «Sin asistir» en Hoy y chips grises a la izquierda.
 4. Inicio y Recorrido: misma fila.
 
 ### Cómo verificar SF-4.2

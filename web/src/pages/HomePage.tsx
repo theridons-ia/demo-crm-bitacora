@@ -131,7 +131,7 @@ export function HomePage() {
   }, [sales, day]);
 
   const upcoming = useMemo(
-    () => sortVisitsAgenda(dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso")),
+    () => sortVisitsAgenda(dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso"), day),
     [dayVisits],
   );
   const agendaPreview = upcoming.slice(0, 3);

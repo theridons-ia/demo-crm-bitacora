@@ -8,7 +8,8 @@ import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
 import { VisitMapSheet } from "./VisitMapSheet";
 import { VisitSaleWizard } from "./VisitSaleWizard";
-import { formatDateTime } from "../lib/caracasTime";
+import { formatDateTime, todayISO } from "../lib/caracasTime";
+import { isVisitOverdue } from "../lib/visitOrder";
 import { ApiError, cancelVisit, pinVisitGps, startVisit } from "../lib/api";
 import { coordsFromClient, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
 import type { Visit, VisitStatus } from "../lib/types";
@@ -23,7 +24,7 @@ type Props = {
 const STATUS_LABEL: Record<VisitStatus, string> = {
   programada: "Programada",
   en_curso: "En curso",
-  completada: "Cerrada",
+  completada: "Culminada",
   cancelada: "Cancelada",
 };
 
@@ -73,6 +74,8 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
   const timeLabel =
     current.scheduled_time != null ? String(current.scheduled_time).slice(0, 5) : null;
   const live = current.status === "en_curso";
+  const overdue = isVisitOverdue(current, todayISO());
+  const statusTitle = overdue ? "Sin asistir" : live ? "En curso" : STATUS_LABEL[current.status];
   const sale = current.sale ?? null;
   const itemCount = sale?.items?.length ?? 0;
   const hasGps = current.latitude != null && current.longitude != null;
@@ -171,7 +174,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
         open={open && !overlayOpen}
         onClose={onClose}
         eyebrow="Visita"
-        title={live ? "En curso" : STATUS_LABEL[current.status]}
+        title={statusTitle}
         footer={
           <div className="side-sheet-actions visit-ficha-actions">
             <Button type="button" variant="ghost" onClick={onClose}>
@@ -226,7 +229,9 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
                 {current.client?.state ? ` · ${current.client.state}` : ""}
               </span>
             </div>
-            {live ? <LiveLed size="sm" /> : (
+            {live ? <LiveLed size="sm" /> : overdue ? (
+              <span className="badge badge-programada">Sin asistir</span>
+            ) : (
               <span className={`badge badge-${current.status}`}>{STATUS_LABEL[current.status]}</span>
             )}
           </div>
@@ -234,10 +239,14 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
           <div className={`visit-detail-hero ${heroClass}`.trim()}>
             <div className="visit-detail-hero-copy">
               <p className="eyebrow">Estado</p>
-              {live ? <LiveLed size="md" /> : <strong>{STATUS_LABEL[current.status]}</strong>}
-              {current.result ? (
+              {live ? <LiveLed size="md" /> : <strong>{statusTitle}</strong>}
+              {overdue ? (
                 <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-                  {current.result === "sin_venta" ? "Cerrada sin venta" : "Cerrada con venta"}
+                  La fecha ya pasó. Inicia ahora o cancélala.
+                </p>
+              ) : current.result ? (
+                <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                  {current.result === "sin_venta" ? "Culminada sin venta" : "Culminada con venta"}
                 </p>
               ) : live && !sale ? (
                 <p className="muted small" style={{ margin: "0.35rem 0 0" }}>

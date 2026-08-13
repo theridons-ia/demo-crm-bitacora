@@ -25,15 +25,14 @@ import {
 } from "../lib/offlineDb";
 import { getCachedClients } from "../lib/offlineQueue";
 import { formatAgendaDay, formatWeekdayShort } from "../lib/caracasTime";
-import { sortVisitsAgenda, sortVisitsHistory } from "../lib/visitOrder";
+import { isVisitOverdue, sortVisitsAgenda, sortVisitsHistory } from "../lib/visitOrder";
 import type { Client, Visit } from "../lib/types";
 
-type VisitFilter = "open" | "done" | "agenda" | "cancelada";
+type VisitFilter = "open" | "done" | "cancelada";
 
 const FILTER_CHIPS: { key: VisitFilter; label: string }[] = [
-  { key: "open", label: "Abiertas" },
-  { key: "agenda", label: "Agenda" },
-  { key: "done", label: "Hechas" },
+  { key: "open", label: "Programadas" },
+  { key: "done", label: "Culminadas" },
   { key: "cancelada", label: "Canceladas" },
 ];
 
@@ -88,7 +87,7 @@ export function VisitsPage() {
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"now" | "schedule">("now");
-  const [agendaDay, setAgendaDay] = useState(() => calendarTodayISO());
+  const [agendaDay, setAgendaDay] = useState<string | "all">(() => calendarTodayISO());
   const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
@@ -140,15 +139,15 @@ export function VisitsPage() {
     };
   }, [reload]);
 
+  const today = calendarTodayISO();
+
   const counts = useMemo(() => {
     const open = visits.filter((v) => v.status === "programada" || v.status === "en_curso");
     const done = visits.filter((v) => v.status === "completada");
-    const agenda = visits.filter((v) => v.status === "programada");
     const cancelled = visits.filter((v) => v.status === "cancelada");
     return {
       open: open.length,
       done: done.length,
-      agenda: agenda.length,
       cancelled: cancelled.length,
     };
   }, [visits]);
@@ -156,37 +155,64 @@ export function VisitsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const next = visits.filter((v) => {
-      if (filter === "open" && v.status !== "programada" && v.status !== "en_curso") return false;
-      if (filter === "done" && v.status !== "completada") return false;
-      if (filter === "agenda") {
-        if (v.status !== "programada") return false;
-        if (v.scheduled_date !== agendaDay) return false;
+      if (filter === "open") {
+        if (v.status !== "programada" && v.status !== "en_curso") return false;
+        if (agendaDay !== "all") {
+          if (v.status === "en_curso") {
+            if (agendaDay !== today) {
+              const onDay = v.scheduled_date ? v.scheduled_date === agendaDay : false;
+              if (!onDay) return false;
+            }
+          } else if (agendaDay === today && isVisitOverdue(v, today)) {
+            // Hoy también muestra las programadas que ya pasaron.
+          } else if (v.scheduled_date !== agendaDay) {
+            return false;
+          }
+        }
       }
+      if (filter === "done" && v.status !== "completada") return false;
       if (filter === "cancelada" && v.status !== "cancelada") return false;
       if (!q) return true;
       const blob = `${v.client?.name ?? ""} ${v.client?.rif ?? ""} ${v.client?.ci ?? ""} ${v.client?.address ?? ""} ${v.description ?? ""}`.toLowerCase();
       return blob.includes(q);
     });
     if (filter === "done" || filter === "cancelada") return sortVisitsHistory(next);
-    return sortVisitsAgenda(next);
-  }, [visits, filter, query, agendaDay]);
+    return sortVisitsAgenda(next, today);
+  }, [visits, filter, query, agendaDay, today]);
+
+  const overdueVisits = useMemo(
+    () => visits.filter((v) => isVisitOverdue(v, today)),
+    [visits, today],
+  );
+
+  const overdueDays = useMemo(() => {
+    const days = new Set<string>();
+    for (const v of overdueVisits) {
+      if (v.scheduled_date) days.add(v.scheduled_date);
+    }
+    return [...days].sort();
+  }, [overdueVisits]);
 
   const weekDays = useMemo(() => {
-    const start = addDaysISO(calendarTodayISO(), -1);
-    return Array.from({ length: 7 }, (_, i) => addDaysISO(start, i));
-  }, []);
+    return Array.from({ length: 30 }, (_, i) => addDaysISO(today, i));
+  }, [today]);
 
   const agendaCountByDay = useMemo(() => {
     const map = new Map<string, number>();
     for (const v of visits) {
-      if (v.status !== "programada" || !v.scheduled_date) continue;
-      map.set(v.scheduled_date, (map.get(v.scheduled_date) ?? 0) + 1);
+      if (v.status === "programada" && v.scheduled_date) {
+        map.set(v.scheduled_date, (map.get(v.scheduled_date) ?? 0) + 1);
+      } else if (v.status === "en_curso") {
+        const day = v.scheduled_date || today;
+        map.set(day, (map.get(day) ?? 0) + 1);
+      }
     }
     return map;
-  }, [visits]);
+  }, [visits, today]);
 
   function openSchedule(day?: string) {
-    if (day) setAgendaDay(day);
+    const pick = day && day !== "all" ? day : today;
+    setAgendaDay(pick);
     setFormMode("schedule");
     setFormOpen(true);
   }
@@ -205,9 +231,9 @@ export function VisitsPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Bitácora</p>
-          <h1 className="display-title">Tus visitas</h1>
+          <h1 className="display-title">Visitas</h1>
           <p className="muted">
-            {counts.open} abiertas · {counts.done} hechas · {counts.cancelled} canceladas
+            {counts.open} programadas · {counts.done} culminadas · {counts.cancelled} canceladas
           </p>
         </div>
         <Button
@@ -231,37 +257,37 @@ export function VisitsPage() {
       />
 
       <div className="chips-row" role="tablist" aria-label="Filtros">
-        {FILTER_CHIPS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            className={filter === key ? "chip active" : "chip"}
-            onClick={() => setFilter(key)}
-          >
-            {label}
-            <span className="chip-count">
-              {key === "open"
-                ? counts.open
-                : key === "agenda"
-                  ? counts.agenda
-                  : key === "done"
-                    ? counts.done
-                    : counts.cancelled}
-            </span>
-          </button>
-        ))}
+        {FILTER_CHIPS.map(({ key, label }) => {
+          const count = key === "open" ? counts.open : key === "done" ? counts.done : counts.cancelled;
+          return (
+            <button
+              key={key}
+              type="button"
+              className={filter === key ? "chip chip-filter active" : "chip chip-filter"}
+              role="tab"
+              aria-selected={filter === key}
+              aria-label={`${label}, ${count}`}
+              onClick={() => setFilter(key)}
+            >
+              <span className="chip-label">{label}</span>
+              <span className="chip-count">{count}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {filter === "agenda" ? (
-        <section className="calendar-panel" aria-label="Agenda semanal">
-          <div className="section-head" style={{ marginTop: 0 }}>
-            <h2 className="section-heading">Agenda</h2>
-            <button type="button" className="link-accent" onClick={() => openSchedule(agendaDay)}>
-              Programar
+      {filter === "open" ? (
+        <section className="calendar-panel" aria-label="Agenda">
+          <div className="week-strip" role="tablist" aria-label="Día">
+            <button
+              type="button"
+              className={agendaDay === "all" ? "day-chip is-all active" : "day-chip is-all"}
+              onClick={() => setAgendaDay("all")}
+            >
+              <span>Todas</span>
+              <strong>{counts.open}</strong>
             </button>
-          </div>
-          <div className="week-strip" role="tablist" aria-label="Días">
-            {weekDays.map((day) => {
+            {overdueDays.map((day) => {
               const d = Number(day.slice(8, 10));
               const label = formatWeekdayShort(day);
               const count = agendaCountByDay.get(day) ?? 0;
@@ -269,18 +295,84 @@ export function VisitsPage() {
                 <button
                   key={day}
                   type="button"
-                  className={day === agendaDay ? "day-chip active" : "day-chip"}
+                  className={[
+                    "day-chip",
+                    "is-past",
+                    "has-stops",
+                    day === agendaDay ? "active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   onClick={() => setAgendaDay(day)}
                 >
                   <span>{label}</span>
                   <strong>{d}</strong>
-                  <em>{count}</em>
+                  {count > 0 ? <em>{count}</em> : null}
+                </button>
+              );
+            })}
+            {weekDays.map((day) => {
+              const d = Number(day.slice(8, 10));
+              const label = formatWeekdayShort(day);
+              const count = agendaCountByDay.get(day) ?? 0;
+              const isToday = day === today;
+              const hasStops = count > 0;
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  className={[
+                    "day-chip",
+                    day === agendaDay ? "active" : "",
+                    hasStops ? "has-stops" : "",
+                    isToday ? "is-today" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => setAgendaDay(day)}
+                >
+                  <span>{label}</span>
+                  <strong>{d}</strong>
+                  {hasStops ? <em>{count}</em> : null}
                 </button>
               );
             })}
           </div>
-          <p className="muted small">Agenda · {formatAgendaDay(agendaDay)}</p>
+          <div className="week-strip-foot">
+            <p className="muted small">
+              {agendaDay === "all"
+                ? overdueVisits.length
+                  ? `Todas · ${overdueVisits.length} sin asistir`
+                  : "Todas las programadas"
+                : agendaDay === today
+                  ? overdueVisits.length
+                    ? `Hoy · ${overdueVisits.length} de días anteriores`
+                    : "Hoy"
+                  : agendaDay < today
+                    ? `Sin asistir · ${formatAgendaDay(agendaDay)}`
+                    : formatAgendaDay(agendaDay)}
+            </p>
+            <button
+              type="button"
+              className="week-strip-add"
+              onClick={() =>
+                openSchedule(agendaDay === "all" || agendaDay < today ? today : agendaDay)
+              }
+            >
+              Programar
+            </button>
+          </div>
         </section>
+      ) : null}
+
+      {filter === "open" &&
+      overdueVisits.length > 0 &&
+      (agendaDay === "all" || agendaDay === today) ? (
+        <p className="visit-overdue-note">
+          {overdueVisits.length === 1
+            ? "1 visita sin asistir de días anteriores."
+            : `${overdueVisits.length} visitas sin asistir de días anteriores.`}
+        </p>
       ) : null}
 
       {loading ? <p className="muted list-loading">Cargando…</p> : null}
@@ -292,13 +384,17 @@ export function VisitsPage() {
       </ul>
 
       {!loading && filtered.length === 0 ? (
-        <p className="muted">Sin coincidencias. Prueba otro filtro o crea una visita.</p>
+        <p className="muted">
+          {filter === "open" && agendaDay !== "all"
+            ? "Nada programado este día."
+            : "Sin coincidencias. Prueba otro filtro o crea una visita."}
+        </p>
       ) : null}
 
       <VisitForm
         open={formOpen}
         mode={formMode}
-        initialDate={agendaDay}
+        initialDate={agendaDay === "all" || agendaDay < today ? today : agendaDay}
         clients={clients}
         onClose={() => setFormOpen(false)}
         onCreated={(visit, note) => {
@@ -306,10 +402,11 @@ export function VisitsPage() {
           setFormOpen(false);
           setDetailVisit(visit);
           if (visit.status === "programada" && visit.scheduled_date) {
-            setFilter("agenda");
+            setFilter("open");
             setAgendaDay(visit.scheduled_date);
           } else if (visit.status === "en_curso") {
             setFilter("open");
+            setAgendaDay(today);
           }
           if (note) setGpsNote(note);
         }}
