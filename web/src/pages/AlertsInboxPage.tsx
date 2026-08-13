@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "../components/Button";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
+import { formatDateTime } from "../lib/caracasTime";
 import type { AlertSeverity, AlertType, VisitAlert } from "../lib/types";
 
 const TYPE_LABEL: Record<AlertType, string> = {
@@ -20,14 +21,7 @@ const SEVERITY_LABEL: Record<AlertSeverity, string> = {
 };
 
 function formatWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("es-VE", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso);
 }
 
 /** SF-2.3 — inbox de alertas GPS / foto para el supervisor. */

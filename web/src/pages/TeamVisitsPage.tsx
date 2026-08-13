@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListSearch } from "../components/ListSearch";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchSellers, fetchVisits } from "../lib/api";
+import { formatDateTimeLong } from "../lib/caracasTime";
 import type { User, Visit, VisitStatus } from "../lib/types";
 
 const statusLabel: Record<VisitStatus, string> = {
@@ -22,17 +23,7 @@ type StatusFilter = "all" | VisitStatus;
 
 function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleString("es-VE", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDateTimeLong(iso);
 }
 
 function visitIconTone(status: VisitStatus): string {

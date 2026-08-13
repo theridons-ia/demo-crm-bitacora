@@ -28,14 +28,25 @@ type Props = {
   hideCredit?: boolean;
 };
 
-const METHOD_OPTIONS: { id: PaymentMethod; label: string; cash?: boolean; icon: LucideIcon }[] = [
-  { id: "cash_usd", label: "Efectivo USD", cash: true, icon: Banknote },
-  { id: "cash_ves", label: "Efectivo Bs", cash: true, icon: Banknote },
-  { id: "pago_movil", label: "Pago móvil", icon: Smartphone },
-  { id: "transfer_ves", label: "Transferencia", icon: Landmark },
-  { id: "zelle", label: "Zelle", icon: Send },
-  { id: "usdt", label: "USDT", icon: CircleDollarSign },
+const METHOD_OPTIONS: {
+  id: PaymentMethod;
+  label: string;
+  cash?: boolean;
+  icon: LucideIcon;
+  currencies: CurrencyCode[];
+}[] = [
+  { id: "cash_usd", label: "Efectivo USD", cash: true, icon: Banknote, currencies: ["USD"] },
+  { id: "zelle", label: "Zelle", icon: Send, currencies: ["USD"] },
+  { id: "usdt", label: "USDT", icon: CircleDollarSign, currencies: ["USD"] },
+  { id: "cash_ves", label: "Efectivo Bs", cash: true, icon: Banknote, currencies: ["VES"] },
+  { id: "pago_movil", label: "Pago móvil", icon: Smartphone, currencies: ["VES"] },
+  { id: "transfer_ves", label: "Transferencia", icon: Landmark, currencies: ["VES"] },
 ];
+
+function methodsForCurrency(currency: CurrencyCode) {
+  const key: CurrencyCode = currency === "VES" ? "VES" : "USD";
+  return METHOD_OPTIONS.filter((m) => m.currencies.includes(key));
+}
 
 function methodMatchesAccount(method: PaymentMethod, account: BankAccount): boolean {
   if (method === "cash_usd" || method === "cash_ves" || method === "cash_eur") {
@@ -55,6 +66,7 @@ export function PaymentCapture({
   currency,
   disabled,
 }: Props) {
+  const visibleMethods = useMemo(() => methodsForCurrency(currency), [currency]);
   const filteredAccounts = useMemo(() => {
     return accounts.filter(
       (a) =>
@@ -65,6 +77,15 @@ export function PaymentCapture({
   }, [accounts, currency, value.payment_method]);
 
   const needsAccount = !METHOD_OPTIONS.find((m) => m.id === value.payment_method)?.cash;
+
+  useEffect(() => {
+    const allowed = visibleMethods.some((m) => m.id === value.payment_method);
+    if (!allowed) {
+      const fallback = currency === "VES" ? "cash_ves" : "cash_usd";
+      onChange({ ...value, payment_method: fallback, bank_account_id: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency, value.payment_method, visibleMethods]);
 
   useEffect(() => {
     if (!needsAccount) {
@@ -84,13 +105,17 @@ export function PaymentCapture({
   }, [needsAccount, value.payment_method, currency, filteredAccounts.length, value.bank_account_id]);
 
   const selected = filteredAccounts.find((a) => a.id === value.bank_account_id);
+  const emptyAccountHint =
+    needsAccount && !filteredAccounts.length
+      ? "No hay cuenta activa para este método. El supervisor la carga en Bancos, o elige otro medio."
+      : null;
 
   return (
     <div className="payment-capture">
       <div className="field">
         <span className="field-label">Forma de pago</span>
         <div className="pay-methods" role="group" aria-label="Forma de pago">
-          {METHOD_OPTIONS.map((opt) => {
+          {visibleMethods.map((opt) => {
             const Icon = opt.icon;
             const active = value.payment_method === opt.id;
             return (
@@ -109,11 +134,11 @@ export function PaymentCapture({
         </div>
       </div>
 
-      {needsAccount ? (
+      {needsAccount && filteredAccounts.length ? (
         <SelectField
           id="pay-account"
           label="Cuenta destino"
-          disabled={disabled || !filteredAccounts.length}
+          disabled={disabled}
           value={value.bank_account_id ?? ""}
           onChange={(e) =>
             onChange({
@@ -123,19 +148,21 @@ export function PaymentCapture({
           }
           hint={selected?.pay_hint || undefined}
         >
-          {!filteredAccounts.length ? (
-            <option value="">Sin cuentas para este método</option>
-          ) : null}
           {filteredAccounts.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}
-              {a.pay_hint ? ` · ${a.pay_hint}` : ""}
             </option>
           ))}
         </SelectField>
-      ) : (
+      ) : null}
+      {needsAccount && emptyAccountHint ? (
+        <p className="muted small pay-hint" role="status">
+          {emptyAccountHint}
+        </p>
+      ) : null}
+      {!needsAccount ? (
         <p className="muted small pay-hint">El efectivo se registra en caja {currency}.</p>
-      )}
+      ) : null}
 
       <TextField
         id="pay-ref"

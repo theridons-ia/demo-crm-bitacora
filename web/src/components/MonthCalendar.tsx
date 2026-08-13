@@ -1,16 +1,12 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
+import { formatAgendaDay, todayISO } from "../lib/caracasTime";
 
 type Props = {
   value: string;
   onChange: (isoDate: string) => void;
   min?: string;
 };
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function parseISO(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
@@ -28,7 +24,13 @@ export function MonthCalendar({ value, onChange, min = todayISO() }: Props) {
   const selected = value || todayISO();
   const [cursor, setCursor] = useState(() => parseISO(selected));
 
-  const monthLabel = cursor.toLocaleDateString("es-VE", { month: "long", year: "numeric" });
+  const monthLabel = new Date(
+    `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-15T12:00:00-04:00`,
+  ).toLocaleDateString("es-VE", {
+    timeZone: "America/Caracas",
+    month: "long",
+    year: "numeric",
+  });
 
   const cells = useMemo(() => {
     const year = cursor.getFullYear();
@@ -101,12 +103,4 @@ export function addDaysISO(iso: string, days: number): string {
   return toISO(d);
 }
 
-export function formatAgendaDay(iso: string): string {
-  return parseISO(iso).toLocaleDateString("es-VE", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-}
-
-export { todayISO as calendarTodayISO };
+export { formatAgendaDay, todayISO as calendarTodayISO };

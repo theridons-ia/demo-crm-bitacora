@@ -54,7 +54,7 @@ export function QuickAddFab() {
             type="button"
             className="fab-menu-item"
             role="menuitem"
-            onClick={() => go("/app/ventas")}
+            onClick={() => go("/app/ventas?nueva=1")}
           >
             <span className="fab-menu-icon" aria-hidden>
               <ShoppingCart size={18} />
@@ -68,7 +68,7 @@ export function QuickAddFab() {
             type="button"
             className="fab-menu-item"
             role="menuitem"
-            onClick={() => go("/app/inicio?nuevo=cliente")}
+            onClick={() => go("/app/clientes?nuevo=1")}
           >
             <span className="fab-menu-icon" aria-hidden>
               <Store size={18} />

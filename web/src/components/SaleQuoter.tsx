@@ -59,7 +59,6 @@ export function SaleQuoter({
   const fx = fxRate != null && fxRate > 0 ? fxRate : null;
   const subtotal = quoteLinesTotal(lines, products);
   const money = quoteMoney(subtotal, applyIva);
-  const moneyLabel = currency === "VES" ? "Bs" : "$";
 
   function updateLine(key: string, patch: Partial<QuoteLine>) {
     onChange(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -237,7 +236,7 @@ export function SaleQuoter({
               <strong>{applyIva ? amount(money.iva) : "—"}</strong>
             </div>
             <div className="is-total">
-              <span>Total {moneyLabel}</span>
+              <span>Total</span>
               <strong>{amount(money.total)}</strong>
             </div>
           </div>

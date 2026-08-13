@@ -95,11 +95,67 @@ Detalle: [`implementacion/FASE-3-ENDURECER.md`](implementacion/FASE-3-ENDURECER.
 
 ---
 
+## Fase 4 — Homogeneizar UI móvil
+
+Una SF por vez; revisar en el teléfono; documentar al cerrar. No toca APIs de visita/venta.
+
+Detalle y videos: [`implementacion/FASE-4-UI-MOVIL.md`](implementacion/FASE-4-UI-MOVIL.md)
+
+| ID | Objetivo | Entregable | Estado |
+|----|----------|------------|--------|
+| **SF-4.0** | Brújula UI | Este checkpoint + FASE-4 + reglas `ui-movil.mdc` | hecho |
+| **SF-4.1** | Quemaduras | Galería (no solo cámara); Cancelar picker no cierra wizard; `Total $` simple | hecho |
+| **SF-4.2** | Chrome + FAB | Fold usable; un solo `+`; FAB no tapa CTAs | hecho |
+| **SF-4.3** | Una fila de visita | `VisitRow` en agenda / Visitas / mapa | hecho |
+| **SF-4.4** | Inicio vendedor | Un progreso; agenda horaria; CTA mapa | pendiente |
+| **SF-4.5** | Mapa = agendado | Trazo y números = `scheduled_time`; seed del día limpio | pendiente |
+| **SF-4.6** | Wizard 1-2-3 | Nombres, footer, teclado, cuenta una vez | pendiente |
+| **SF-4.7** | Densidad catálogo | Inventario compacto; cliente una acción | pendiente |
+| **SF-4.8** | Supervisor móvil | Mismas piezas 4.3–4.5; Ruta/Visitas/Mapa = lentes | pendiente |
+
+**Criterio “Fase 4 lista”:** vendedor y supervisor en ~400px usan la misma fila, el mapa coincide con la agenda, y cotizar no se pierde al cancelar una foto.
+
+---
+
+## Fase 5 — Ruta semanal (después de 4.x)
+
+No mezclar con 4.3–4.8. Decisiones 4 / 17 / 18 / 21.
+
+| ID | Objetivo | Entregable | Estado |
+|----|----------|------------|--------|
+| **SF-5.0** | Brújula ruta semanal | [`implementacion/FASE-5-RUTA-SEMANAL.md`](implementacion/FASE-5-RUTA-SEMANAL.md) + §2.1 del roadmap | hecho (docs) |
+
+Siguientes SF se abren al cerrar Fase 4: modelo `Route`, UI supervisor (tarjeta por vendedor), UI vendedor (L–S + Sin día).
+
+---
+
 ## SF actual
 
-**Listo para commit / tu push:** **SF-2.8** (cartera, recorrido mapa, perfil, desempeño).
+**Listo para commit / tu push:** **SF-4.3** (`VisitRow`). Incluye 4.2 + hora Caracas + docs ruta semanal si aún no estaban en remoto.
 
-**Siguiente:** **SF-3.4** import Excel (o Contabo al final).
+**Siguiente:** **SF-4.4** Inicio vendedor. Luego 4.5 mapa = agendado.
+
+### Cómo verificar SF-4.3
+
+1. Visitas → **Abiertas**: filas compactas (LED · PDV · hora · chevron). Sin GPS ni 3 botones.
+2. Tap = ficha. Título de la ficha es el estado, no el nombre dos veces.
+3. 12:00 arriba de 14:00. Hechas: más reciente primero.
+4. Inicio y Recorrido: misma fila.
+
+### Cómo verificar SF-4.2
+
+1. Teléfono ~360–412 px: Visitas / Inventario / Clientes — se ve la lista sin eyebrow + párrafo encima del título.
+2. Un solo `+` (FAB). Al abrir un modal, el FAB desaparece.
+3. Chips `Canceladas` / `Agotado` en una fila (scroll si no caben).
+4. Relojes y “hoy” en hora Caracas (UTC−4), aunque el teléfono no esté en Venezuela.
+
+### Cómo verificar SF-4.1
+
+1. `marina@…` → Visitas → visita en curso → Registrar venta → paso 2.
+2. Comprobante: botones **Galería** y **Cámara**. Cancelar deja la cotización.
+3. Paso 1: un solo `$` en el total. Moneda Bs: solo Efectivo Bs, Pago móvil, Transferencia.
+
+Excel (SF-3.4) y Alembic (SF-3.5) siguen pendientes; no mezclarlos con esta fase visual.
 
 ### Cómo verificar SF-2.8
 

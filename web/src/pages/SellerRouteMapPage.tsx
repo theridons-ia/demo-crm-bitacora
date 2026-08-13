@@ -1,22 +1,20 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { ArrowLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
+import { VisitRow } from "../components/VisitRow";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchVisits } from "../lib/api";
+import { todayISO } from "../lib/caracasTime";
 import { teamVisitIcon } from "../lib/mapMarkers";
 import { orderDayRoute, type LatLng } from "../lib/routeOrder";
+import { sortVisitsAgenda } from "../lib/visitOrder";
 import type { Visit, VisitStatus } from "../lib/types";
 
 const DEFAULT_CENTER: LatLng = { lat: 10.07, lng: -69.32 };
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function stopCoords(v: Visit): LatLng | null {
   const lat = v.client?.latitude != null ? Number(v.client.latitude) : NaN;
@@ -94,6 +92,7 @@ export function SellerRouteMapPage() {
     );
   }, [visits]);
 
+  const listStops = useMemo(() => sortVisitsAgenda(visits), [visits]);
   const doneCount = ordered.filter((v) => v.status === "completada").length;
   const pendingCount = ordered.length - doneCount;
   const progressPct = ordered.length ? Math.round((doneCount / ordered.length) * 100) : 0;
@@ -207,36 +206,20 @@ export function SellerRouteMapPage() {
 
       <section className="card">
         <h2 className="section-heading">Orden del día</h2>
-        <p className="muted small" style={{ marginTop: 0 }}>
-          Toca una parada para ver detalle, iniciar o cerrar.
-        </p>
-        {loading ? <p className="muted">Cargando…</p> : null}
-        {!loading && ordered.length === 0 ? (
-          <p className="muted">No hay visitas con pin GPS para hoy.</p>
+        {loading ? <p className="muted list-loading">Cargando…</p> : null}
+        {!loading && listStops.length === 0 ? (
+          <p className="muted">No hay visitas para hoy.</p>
         ) : (
-          <ol className="upcoming-list">
-            {ordered.map((v, i) => (
-              <li key={v.id}>
-                <button
-                  type="button"
-                  className="upcoming-item upcoming-item-btn"
-                  onClick={() => setSelected(v)}
-                >
-                  <span className={`upcoming-dot status-dot-${v.status}`} aria-hidden />
-                  <div className="upcoming-item-copy">
-                    <p className="upcoming-name">
-                      {i + 1}. {v.client?.name ?? `Cliente #${v.client_id}`}
-                    </p>
-                    <p className="muted small">
-                      {STATUS_LABEL[v.status]}
-                      {v.client?.address ? ` · ${v.client.address}` : ""}
-                    </p>
-                  </div>
-                  <ChevronRight size={18} className="upcoming-chevron" aria-hidden />
-                </button>
-              </li>
+          <ul className="visit-row-list">
+            {listStops.map((v, i) => (
+              <VisitRow
+                key={v.id}
+                visit={v}
+                index={i + 1}
+                onClick={() => setSelected(v)}
+              />
             ))}
-          </ol>
+          </ul>
         )}
       </section>
 

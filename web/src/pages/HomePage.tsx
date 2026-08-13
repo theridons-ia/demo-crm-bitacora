@@ -17,25 +17,15 @@ import { Button } from "../components/Button";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
 import { MetricGrid, MetricTile } from "../components/MetricTile";
-import { LiveLed } from "../components/LiveLed";
 import { TextField } from "../components/TextField";
+import { VisitDetailSheet } from "../components/VisitDetailSheet";
+import { VisitRow } from "../components/VisitRow";
 import { PageWorkspace } from "../layout/PageWorkspace";
 import { ApiError, fetchClients, fetchSales, fetchVisits } from "../lib/api";
+import { formatLongDate, isSameCaracasDay, todayISO } from "../lib/caracasTime";
 import { getCachedClients } from "../lib/offlineQueue";
+import { sortVisitsAgenda } from "../lib/visitOrder";
 import type { Client, Sale, Visit, VisitStatus } from "../lib/types";
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function formatLongDate(d = new Date()): string {
-  return d.toLocaleDateString("es-VE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -52,23 +42,6 @@ function visitBadge(status: VisitStatus | null): { label: string; className: str
   return null;
 }
 
-function formatVisitTime(iso: string | null | undefined, scheduled: string | null | undefined): string {
-  if (iso) {
-    try {
-      return new Date(iso).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      /* fall through */
-    }
-  }
-  if (scheduled) return "Hoy";
-  return "—";
-}
-
-function isSameDay(iso: string | null | undefined, day: string): boolean {
-  if (!iso) return false;
-  return iso.slice(0, 10) === day;
-}
-
 /** Inicio vendedor — workspace con panel derecho al ras. */
 export function HomePage() {
   const { user } = useAuth();
@@ -82,6 +55,7 @@ export function HomePage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
+  const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const day = todayISO();
@@ -152,12 +126,12 @@ export function HomePage() {
 
   const salesToday = useMemo(() => {
     return sales
-      .filter((s) => isSameDay(s.created_at, day))
+      .filter((s) => isSameCaracasDay(s.created_at, day))
       .reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
   }, [sales, day]);
 
   const upcoming = useMemo(
-    () => dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso"),
+    () => sortVisitsAgenda(dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso")),
     [dayVisits],
   );
   const agendaPreview = upcoming.slice(0, 3);
@@ -255,22 +229,11 @@ export function HomePage() {
           {agendaPreview.length === 0 ? (
             <p className="muted">No hay visitas abiertas para hoy.</p>
           ) : (
-            <ol className="home-agenda-list">
+            <ul className="visit-row-list">
               {agendaPreview.map((v) => (
-                <li key={v.id}>
-                  <Link to="/app/visitas" className="home-agenda-stop">
-                    <span className="home-agenda-time">
-                      {formatVisitTime(v.visited_at ?? v.created_at, v.scheduled_date)}
-                    </span>
-                    <strong>{v.client?.name ?? `Cliente #${v.client_id}`}</strong>
-                    <span className="muted small">
-                      {v.status === "en_curso" ? <LiveLed /> : "Programada"}
-                      {v.client?.address ? ` · ${v.client.address}` : ""}
-                    </span>
-                  </Link>
-                </li>
+                <VisitRow key={v.id} visit={v} onClick={() => setDetailVisit(v)} />
               ))}
-            </ol>
+            </ul>
           )}
 
           <Link to="/app/ruta" className="btn btn-secondary">
@@ -382,6 +345,18 @@ export function HomePage() {
           onEdit={() => {
             setEditingClient(selected);
             setFormOpen(true);
+          }}
+        />
+      ) : null}
+
+      {detailVisit ? (
+        <VisitDetailSheet
+          visit={detailVisit}
+          open
+          onClose={() => setDetailVisit(null)}
+          onUpdated={(updated) => {
+            setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+            setDetailVisit(updated);
           }}
         />
       ) : null}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import {
   ApiError,
@@ -34,6 +34,7 @@ import { TextField } from "./TextField";
 import { WizardSteps } from "./WizardSteps";
 import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
+import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
 
 type Props = {
   visit: Visit;
@@ -68,18 +69,26 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const wasOpen = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      wasOpen.current = false;
+      return;
+    }
+    const justOpened = !wasOpen.current;
+    wasOpen.current = true;
     let cancelled = false;
-    setStep(0);
-    setLines([newQuoteLine()]);
-    setCurrency("USD");
-    setIsCredit(false);
-    setApplyIva(false);
-    setPayment(emptyPaymentCapture());
-    setNotes("");
-    setError(null);
+    if (justOpened) {
+      setStep(0);
+      setLines([newQuoteLine()]);
+      setCurrency("USD");
+      setIsCredit(false);
+      setApplyIva(false);
+      setPayment(emptyPaymentCapture());
+      setNotes("");
+      setError(null);
+    }
     setLoading(true);
     (async () => {
       try {
@@ -207,17 +216,22 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
     }
   }
 
+  function requestClose() {
+    if (shouldIgnoreOverlayClose()) return;
+    onClose();
+  }
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={requestClose}
       size="wide"
       eyebrow="Orden de venta"
       title={clientName}
       blurb="1 Productos · 2 Pago · 3 Resumen. La visita sigue abierta."
       footer={
         <div className="side-sheet-actions">
-          <Button type="button" variant="ghost" disabled={submitting} onClick={onClose}>
+          <Button type="button" variant="ghost" disabled={submitting} onClick={requestClose}>
             Cancelar
           </Button>
           {step > 0 ? (

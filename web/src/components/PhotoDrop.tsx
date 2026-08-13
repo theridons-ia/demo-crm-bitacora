@@ -1,6 +1,7 @@
-import { ImagePlus, Trash2 } from "lucide-react";
-import { useRef, useState, type ChangeEvent } from "react";
+import { Camera, Images, ImagePlus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { fileToCompressedDataUrl } from "../lib/imageEvidence";
+import { armFilePickerGuard, settleFilePickerGuard } from "../lib/overlayGuard";
 
 type Props = {
   id: string;
@@ -12,7 +13,9 @@ type Props = {
   disabled?: boolean;
 };
 
-/** Zona de foto en español. Nunca mostrar `<input type="file">` nativo. */
+type PhotoSource = "gallery" | "camera";
+
+/** Zona de foto en español. Galería y cámara son acciones distintas (Android no mezcla `capture`). */
 export function PhotoDrop({
   id,
   label,
@@ -22,12 +25,28 @@ export function PhotoDrop({
   onChange,
   disabled,
 }: Props) {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const settle = () => settleFilePickerGuard();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") settle();
+    };
+    window.addEventListener("focus", settle);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", settle);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    settleFilePickerGuard(true);
+    event.target.value = "";
     if (!file) return;
     setBusy(true);
     setError(null);
@@ -41,10 +60,18 @@ export function PhotoDrop({
     }
   }
 
+  function openPicker(source: PhotoSource) {
+    if (disabled || busy) return;
+    armFilePickerGuard();
+    const node = source === "camera" ? cameraRef.current : galleryRef.current;
+    node?.click();
+  }
+
   function clear() {
     onChange(null);
     setError(null);
-    if (fileRef.current) fileRef.current.value = "";
+    if (galleryRef.current) galleryRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
   }
 
   return (
@@ -70,13 +97,20 @@ export function PhotoDrop({
           </div>
         </div>
       ) : (
-        <label
-          className={disabled || busy ? "pay-photo-drop is-disabled" : "pay-photo-drop"}
-          htmlFor={id}
-        >
+        <div className={disabled || busy ? "pay-photo-drop is-disabled" : "pay-photo-drop"}>
           <input
-            ref={fileRef}
-            id={id}
+            ref={galleryRef}
+            id={`${id}-gallery`}
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            disabled={disabled || busy}
+            aria-labelledby={`${id}-label`}
+            onChange={(e) => void onFile(e)}
+          />
+          <input
+            ref={cameraRef}
+            id={`${id}-camera`}
             className="visually-hidden"
             type="file"
             accept="image/*"
@@ -88,7 +122,27 @@ export function PhotoDrop({
           <ImagePlus size={22} aria-hidden />
           <strong>{busy ? "Procesando foto…" : "Subir foto"}</strong>
           <span>{hint}</span>
-        </label>
+          <div className="pay-photo-sources" role="group" aria-label="Origen de la foto">
+            <button
+              type="button"
+              className="pay-photo-source"
+              disabled={disabled || busy}
+              onClick={() => openPicker("gallery")}
+            >
+              <Images size={16} aria-hidden />
+              Galería
+            </button>
+            <button
+              type="button"
+              className="pay-photo-source"
+              disabled={disabled || busy}
+              onClick={() => openPicker("camera")}
+            >
+              <Camera size={16} aria-hidden />
+              Cámara
+            </button>
+          </div>
+        </div>
       )}
       {error ? (
         <p className="form-error" role="alert">

@@ -1,4 +1,5 @@
-import type { PaymentMethod, Sale, SaleOrigin } from "../lib/types";
+import { formatDateTime } from "./caracasTime";
+import type { PaymentMethod, Sale, SaleOrigin } from "./types";
 
 export const SALE_ORIGIN_LABEL: Record<SaleOrigin, string> = {
   visita: "Visita",
@@ -18,16 +19,7 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 };
 
 export function formatSaleWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("es-VE", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso);
 }
 
 export function saleItemCount(sale: Sale): number {

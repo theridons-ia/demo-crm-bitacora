@@ -8,6 +8,7 @@ import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
 import { VisitMapSheet } from "./VisitMapSheet";
 import { VisitSaleWizard } from "./VisitSaleWizard";
+import { formatDateTime } from "../lib/caracasTime";
 import { ApiError, cancelVisit, pinVisitGps, startVisit } from "../lib/api";
 import { coordsFromClient, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
 import type { Visit, VisitStatus } from "../lib/types";
@@ -28,16 +29,7 @@ const STATUS_LABEL: Record<VisitStatus, string> = {
 
 function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("es-VE", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso);
 }
 
 function initials(name: string): string {
@@ -179,7 +171,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
         open={open && !overlayOpen}
         onClose={onClose}
         eyebrow="Visita"
-        title={clientName}
+        title={live ? "En curso" : STATUS_LABEL[current.status]}
         footer={
           <div className="side-sheet-actions visit-ficha-actions">
             <Button type="button" variant="ghost" onClick={onClose}>

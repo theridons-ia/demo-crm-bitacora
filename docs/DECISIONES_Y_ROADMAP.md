@@ -3,7 +3,7 @@
 Documento vivo. Actualizar cuando cambiemos una decisión de producto o técnica.
 
 **Estado:** pre-piloto / aprendizaje + base vendible  
-**Última actualización:** 2026-08-11  
+**Última actualización:** 2026-08-13  
 **Audiencia piloto esperada:** ≤ 8 vendedores · ≤ 3 supervisores
 
 ---
@@ -13,7 +13,7 @@ Documento vivo. Actualizar cuando cambiemos una decisión de producto o técnica
 App web/PWA para venta al mayor en campo (refrescos / camiones):
 
 - El **vendedor** registra visitas, evidencia GPS, y puede generar ventas/órdenes.
-- El **supervisor** asigna rutas del día, ve alertas (GPS lejano, sin GPS, foto de prueba) y no destruye historial al desasignar.
+- El **supervisor** asigna la **ruta de la semana** (quién visitar), puede fijar día/hora, ve alertas (GPS lejano, sin GPS, foto de prueba) y no destruye historial al desasignar.
 - Offline mínimo pero real: **cerrar visita + venta** sin red, con catálogo y clientes cacheados.
 
 No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
@@ -27,7 +27,7 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 | 1 | Origen de la venta | Una **venta/orden** tiene `origen`: `visita` \| `mostrador` \| `online`. Puede existir **sin visita**. Si hay visita, queda ligada. |
 | 2 | GPS | Toda visita debe poder asociar ubicación. Tracking continuo **ligero** mientras `en_curso` (ver §3). No hace falta 1 punto/segundo. |
 | 3 | Sin GPS / lejos | Advertencias, no bloqueo duro. Se puede **saltar** con justificación. Offline: permitir **foto de evidencia**. Si lejos del cliente → guardar punto de cierre + **alerta** (vendedor y supervisor). |
-| 4 | Rutas | Supervisor asigna **ruta del día** (visitas planificadas), puede desasignar/eliminar planificadas **sin borrar** historial de visitas ya ejecutadas. |
+| 4 | Rutas | **1 vendedor × 1 semana** (lunes→domingo Caracas). Supervisor asigna **quién** (PDVs). Vendedor ordena y pone día/hora. Supervisor **puede** fijar fecha/hora (candado). Desasignar planificadas **no borra** historial ya ejecutado. Ver §2.1. |
 | 5 | Inventario | Stock **global** único. Visibilidad de productos **filtrable por vendedor** (qué ve / qué puede vender). |
 | 6 | Moneda | Multimoneda desde el inicio práctico: **USD principal**, opción **VES (Bs.)**. (Tipos de cambio / liquidación se refinán en fases.) |
 | 7–9 | Plataforma | **PWA** (no Play Store). Offline crítico: visita+venta+GPS(+foto). También cache de **clientes e inventario** para vender offline. |
@@ -37,6 +37,11 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 | 13 | Identificación VE | Clientes y proveedores: **un solo** identificador — **RIF** (jurídica) **o** **CI** (natural). Nunca ambos. |
 | 14 | Navegación responsive | **Móvil:** bottom nav (vendedor). **Tablet/desktop:** top bar o sidebar (no barra inferior tipo app). Misma app, shells distintos por ancho/rol — ver SF-1.1b / SF-2.1. |
 | 16 | Sin ERP (ahora) | El cliente **no tiene ERP** y no quiere integración en el arranque. Bitácora es el sistema de campo. Integración ERP queda **opcional a futuro** (API ya lo facilita). |
+| 17 | Orden del día | El **slice de hoy** de la ruta manda: `scheduled_time` ASC (si no hay hora, orden / secuencia). El mapa dibuja ese orden. Vecino más cercano no es el trazo oficial. |
+| 18 | Visitas vs Ruta vs Mapa | **Ruta** = plan de la semana (contenedor). **Visitas** = bitácora (hechos). **Mapa** = hoy de esa ruta. Cada parada es una `Visit`. No tres listados con reglas distintas. Hasta existir entidad `Route`, Fase 4 usa `Visit` del día como slice. |
+| 19 | Lista del día | Abiertas/agenda: mañana → tarde. Historial/Hechas: más reciente primero. |
+| 20 | Comprobante de pago | El vendedor elige **galería** (o chooser del OS). Cancelar la cámara no cierra la cotización. |
+| 21 | Código de ruta | Opcional y **corto** (`RUT-47`). Título humano: `Marina · 11–15 ago`. No folio de 9 dígitos (eso es OV). Se puede omitir en el piloto de 8 vendedores. |
 
 ### Coherencia visual (no negociable en UI)
 
@@ -46,7 +51,60 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 - Mapas para ver evidencia GPS cuando haya coordenadas.
 - Responsive: **móvil (vendedor)**, **tablet/desktop (supervisor)**; pocos usuarios, pero multi-dispositivo real.
 
-Referencia visual: `demo-crm-bitacora-export/` (cream / verde oscuro / coral).
+Referencia visual: `demo-crm-bitacora-export/` (cream / verde oscuro / coral).  
+Homogeneización móvil: [`implementacion/FASE-4-UI-MOVIL.md`](implementacion/FASE-4-UI-MOVIL.md).  
+Ruta semanal (no mezclar con Fase 4): [`implementacion/FASE-5-RUTA-SEMANAL.md`](implementacion/FASE-5-RUTA-SEMANAL.md).
+
+### 2.1 Ruta semanal (cerrada 2026-08-13)
+
+Hoy en código **no hay entidad Ruta**: “ruta” es un filtro de visitas del día. Eso se siente como visitas sueltas. El modelo de producto es este.
+
+**Tres capas (no mezclar):**
+
+| Capa | Qué es | Hoy en código |
+|------|--------|----------------|
+| **Cartera** | PDVs que *le pertenecen* al vendedor | `seller_client_assignments` |
+| **Ruta** | Plan de **esta semana** de **un** vendedor | no existe (Fase 5) |
+| **Visita** | El hecho: llegar, GPS, OV, cerrar | `Visit` |
+
+Una ruta es un **conjunto de visitas-parada** con dueño y periodo: 1 vendedor + 1 semana (lunes Caracas → domingo) + N paradas. Se **planifica** la semana y se **ejecuta** el día.
+
+**Híbrido de roles**
+
+1. El supervisor manda el **quién** de la semana (cobertura). Mete PDVs de la cartera (o de todos) a la bolsa semanal.
+2. Esas paradas caen en **Sin día**, o en un día si él lo elige.
+3. El vendedor manda el **cuándo** y el **orden** de las paradas sin candado (reparte lun–sáb). Eso es armar la ruta.
+4. El supervisor **puede** fijar fecha y hora (**candado**). El vendedor no la mueve; puede pedir reprogramar.
+5. El vendedor **puede** agregar un extra de su cartera (segunda visita, PDV nuevo). Queda marcado origen vendedor.
+6. Quitar una parada mandatoria = desasignar (supervisor) o cancelar con motivo. No se borra historial `en_curso` / `completada`.
+
+Por qué este híbrido: si el vendedor inventa la semana solo, se cae la cobertura. Si el supervisor agenda hora por hora, el vendedor no reacciona a tráfico o PDV cerrado.
+
+**UI (cuando se implemente)**
+
+- Vendedor **Inicio:** progreso de la semana + paradas de **hoy**.
+- Vendedor **Ruta:** el plan semanal (columnas L–S + Sin día); el mapa es el trazo de **hoy**.
+- Vendedor **Visitas:** bitácora, no el planificador.
+- Supervisor **Ruta:** una tarjeta por vendedor (Marina 8/12), no un listado mezclado. Tap = su semana. Asignar = meter PDVs a esa semana, con día/hora/candado opcionales.
+- Supervisor **Visitas / Mapa:** hechos del equipo y mapa del día de un vendedor.
+
+**Qué no es**
+
+- Una Ruta por día (`RUT-lunes`, `RUT-martes`).
+- Código `RUT-004873345` como identidad (ruido de OV).
+- Implementar esto en SF-4.3–4.8. Fase 4 homogeneiza la **visita** y el mapa del **día** (slice compatible).
+
+```mermaid
+flowchart TB
+  cartera[Cartera: PDVs del vendedor]
+  ruta[Ruta de la semana]
+  dia[Hoy: orden y mapa]
+  visita[Visita: ejecutar]
+  cartera -->|"supervisor: quién"| ruta
+  ruta -->|"vendedor: día, hora, orden"| dia
+  dia --> visita
+  lock[Supervisor puede fijar día/hora] -.-> ruta
+```
 
 ---
 
@@ -219,7 +277,7 @@ Detalle de componentes se documentará en `web/` cuando exista (`DESIGN.md` o St
 - [ ] Vendedor: clientes, visitas (programada → en_curso → completada), GPS inicio/muestras/cierre
 - [ ] Venta desde visita + venta sin visita (mostrador/online)
 - [ ] Offline cola visita+venta; cache clientes/productos
-- [ ] Supervisor: ruta del día, asignar/desasignar, ver alertas GPS/foto
+- [x] Supervisor: asignar/desasignar visitas del día, ver alertas GPS/foto (SF-2.2; evolucionará a ruta semanal en Fase 5)
 - [ ] Mapa simple de evidencia por visita
 - [ ] USD / VES en orden (tipo de cambio simple configurable)
 
@@ -236,6 +294,14 @@ Detalle de componentes se documentará en `web/` cuando exista (`DESIGN.md` o St
 - [ ] Notificaciones / metas
 - [ ] Offline más agresivo
 - [ ] Capacitor solo si el GPS en background se vuelve requisito comercial
+
+### Fase 5 — Ruta semanal (después de Fase 4 UI)
+
+- [ ] Entidad `Route` (vendedor × semana Caracas) + paradas = `Visit`
+- [ ] Supervisor: asignar PDVs a la semana; candado día/hora opcional
+- [ ] Vendedor: ordenar y repartir días; extras de cartera
+- [ ] UI: tarjeta por vendedor; columnas L–S + Sin día; mapa = slice de hoy
+- Detalle: [`implementacion/FASE-5-RUTA-SEMANAL.md`](implementacion/FASE-5-RUTA-SEMANAL.md)
 
 ---
 

@@ -12,6 +12,7 @@ import {
 import { SideSheet } from "../components/SideSheet";
 import { TextField } from "../components/TextField";
 import { WorkspacePage } from "../layout/WorkspacePage";
+import { formatDateShort } from "../lib/caracasTime";
 import {
   ApiError,
   fetchBankAccounts,
@@ -261,7 +262,7 @@ export function ReceivablesPage() {
                     <p className="ficha-meta">
                       OV-{r.sale_id}
                       {r.seller_name ? ` · ${r.seller_name}` : ""}
-                      {` · ${new Date(r.created_at).toLocaleDateString("es-VE")}`}
+                      {` · ${formatDateShort(r.created_at)}`}
                     </p>
                     <p className="ficha-stats">
                       de ${Number(r.total_amount).toFixed(0)} · pagado $
@@ -325,7 +326,7 @@ export function ReceivablesPage() {
                     <strong className="small">Abono ${Number(p.amount).toFixed(2)}</strong>
                     <span className="muted small">
                       {p.received_by_name ?? "—"} ·{" "}
-                      {new Date(p.created_at).toLocaleDateString("es-VE")}
+                      {formatDateShort(p.created_at)}
                     </span>
                   </li>
                 ))}

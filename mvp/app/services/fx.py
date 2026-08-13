@@ -3,6 +3,8 @@
 from datetime import date
 from decimal import Decimal
 
+from ..timeutil import today_caracas
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
@@ -36,7 +38,7 @@ def get_latest_rate(db: Session, on_or_before: date | None = None) -> FxRate | N
 
 def resolve_usd_to_ves(db: Session, on_date: date | None = None) -> Decimal | None:
     """Tasa del día o la más reciente anterior (para liquidar VES)."""
-    day = on_date or date.today()
+    day = on_date or today_caracas()
     row = get_rate_for_date(db, day) or get_latest_rate(db, on_or_before=day)
     return Decimal(row.usd_to_ves) if row else None
 

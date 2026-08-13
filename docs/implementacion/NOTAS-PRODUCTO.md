@@ -11,6 +11,9 @@ Decisiones y pendientes hablados en chat, para no perderlos.
 - Marca en UI: **EnRutas** (logo SVG en `web/public/brand/enrutas-logo.svg`).
 - Consistencia SF-2.6b: logo en login/topbar/sidebar; sin doble «Salir» en desktop vendedor; marks de barra sustituidos por logo.
 
+- **Homogeneización móvil (2026-08-13):** plan por SF en [`FASE-4-UI-MOVIL.md`](./FASE-4-UI-MOVIL.md). Contrato: una fila de visita, chrome corto, mapa = hora agendada, foto desde galería. Regla Cursor: `.cursor/rules/ui-movil.mdc`.
+- **Ruta semanal (2026-08-13):** no es “visitas sueltas del día”. 1 vendedor × 1 semana; supervisor asigna PDVs; vendedor ordena días; candado opcional. Código corto `RUT-47`, no folio de 9 dígitos. Docs: [`FASE-5-RUTA-SEMANAL.md`](./FASE-5-RUTA-SEMANAL.md), decisiones 4/17/18/21. **No implementar hasta cerrar Fase 4.**
+
 - Nombre de producto en exploración: **EnRutas** (dejar de usar solo “Bitácora” en cara al cliente).
 - Dominio elegido para piloto: **`enrutas.cc`** (Namecheap; renovación ~$14/año aprox.).
 - Hosting orientado a **Contabo VPS** (no shared hosting: este stack es FastAPI + Postgres).
@@ -75,7 +78,7 @@ Decisiones y pendientes hablados en chat, para no perderlos.
 1. ~~Formulario cliente: dirección + mapa pin + GPS actual.~~ **SF-1.11**
 2. ~~En **Ver trail**: marcador PDV distinto del trail.~~ **SF-1.11**
 3. ~~Editar ubicación de cliente existente.~~ **SF-1.12**
-4. Fase 2 supervisor (layout, rutas del día, inbox alertas).
+4. Fase 2 supervisor (layout, rutas del día, inbox alertas). Evolución a **ruta semanal:** [`FASE-5-RUTA-SEMANAL.md`](./FASE-5-RUTA-SEMANAL.md).
 5. Deploy Contabo + `enrutas.cc` + HTTPS.
 
 Al implementar cada punto: actualizar `FASE-*.md` o crear sección nueva aquí + entrada en `SUBFASES.md`.

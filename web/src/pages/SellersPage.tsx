@@ -2,17 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchSales, fetchSellers, fetchVisits } from "../lib/api";
+import { isSameCaracasDay, todayISO } from "../lib/caracasTime";
 import type { Sale, User, Visit } from "../lib/types";
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function isSameDay(iso: string | null | undefined, day: string): boolean {
-  if (!iso) return false;
-  return iso.slice(0, 10) === day;
-}
 
 type SellerRow = {
   seller: User;
@@ -67,7 +58,7 @@ export function SellersPage() {
           (v) => v.status === "completada" && v.result && v.result !== "sin_venta",
         ).length;
         const sellerSales = sales.filter(
-          (s) => s.seller_id === seller.id && isSameDay(s.created_at, day),
+          (s) => s.seller_id === seller.id && isSameCaracasDay(s.created_at, day),
         );
         const salesTotal = sellerSales.reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
         return {

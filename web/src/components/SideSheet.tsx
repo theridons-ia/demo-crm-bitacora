@@ -1,8 +1,9 @@
 import { X } from "lucide-react";
-import { useId, type ReactNode } from "react";
+import { useCallback, useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
 import { useBodyScrollLock, useEscapeKey } from "../hooks/useOverlay";
+import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
 
 type Props = {
   open: boolean;
@@ -19,15 +20,19 @@ type Props = {
  * Portal a body + z-index alto (por encima de Leaflet).
  */
 export function SideSheet({ open, onClose, title, eyebrow, blurb, children, footer }: Props) {
+  const close = useCallback(() => {
+    if (shouldIgnoreOverlayClose()) return;
+    onClose();
+  }, [onClose]);
   useBodyScrollLock(open);
-  useEscapeKey(open, onClose);
+  useEscapeKey(open, close);
   const titleId = useId();
 
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
     <div className="side-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <button type="button" className="app-overlay-backdrop" aria-label="Cerrar" onClick={onClose} />
+      <button type="button" className="app-overlay-backdrop" aria-label="Cerrar" onClick={close} />
       <div className="side-sheet-panel">
         <div className="side-sheet-handle" aria-hidden />
         <header className="side-sheet-head">
@@ -38,7 +43,7 @@ export function SideSheet({ open, onClose, title, eyebrow, blurb, children, foot
             </h2>
             {blurb ? <p className="side-sheet-blurb">{blurb}</p> : null}
           </div>
-          <Button type="button" variant="ghost" onClick={onClose} aria-label="Cerrar">
+          <Button type="button" variant="ghost" onClick={close} aria-label="Cerrar">
             <X size={18} />
           </Button>
         </header>

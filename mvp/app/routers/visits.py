@@ -1,7 +1,7 @@
-from datetime import date, datetime, timezone
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Date, cast, or_
+from sqlalchemy import Date, cast, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_supervisor
@@ -11,6 +11,7 @@ from ..models import Client, GpsPointSource, Sale, User, UserRole, Visit, VisitG
 from ..schemas import SaleIn, SaleOut, VisitAssign, VisitCancel, VisitClose, VisitCreate, VisitOut, VisitStart
 from ..services.sales import create_sale_for_open_visit
 from ..services.visits import close_visit_with_optional_sale
+from ..timeutil import now_utc
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
@@ -48,7 +49,7 @@ def list_visits(
         query = query.filter(
             or_(
                 Visit.scheduled_date == day,
-                cast(Visit.visited_at, Date) == day,
+                cast(func.timezone("America/Caracas", Visit.visited_at), Date) == day,
             )
         )
     elif scheduled_date is not None:
@@ -127,7 +128,7 @@ def create_visit(
             # Alta de visita sobre cliente propio: lo mete en cartera
             assign_client_to_seller(db, current_user.id, payload.client_id)
 
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     visit = Visit(
         seller_id=current_user.id,
         client_id=payload.client_id,
@@ -177,7 +178,7 @@ def start_visit(
     if visit.status != VisitStatus.programada:
         raise HTTPException(status_code=400, detail="Solo se pueden iniciar visitas programadas")
 
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     visit.status = VisitStatus.en_curso
     visit.visited_at = now
     if body.latitude is not None and body.longitude is not None:
@@ -219,7 +220,7 @@ def pin_visit_gps(
     if payload.latitude is None or payload.longitude is None:
         raise HTTPException(status_code=400, detail="No hay coordenada para guardar")
 
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     had_fix = visit.latitude is not None and visit.longitude is not None
     visit.latitude = payload.latitude
     visit.longitude = payload.longitude
@@ -315,7 +316,7 @@ def close_visit(
     if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
         raise HTTPException(status_code=403, detail="No puedes cerrar visitas de otro vendedor")
 
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     close_visit_with_optional_sale(
         db,
         visit,

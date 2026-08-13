@@ -1,4 +1,4 @@
-import { Crosshair, MapPin } from "lucide-react";
+import { Clock, Crosshair, MapPin } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
@@ -9,6 +9,7 @@ import { ApiError, closeVisit, pinVisitGps, type VisitCloseInput } from "../lib/
 import { coordsFromClient, getCurrentPosition, GPS_ACCURACY_WARN_M } from "../lib/gps";
 import { removeLocalVisit } from "../lib/offlineDb";
 import { enqueueCloseVisit, enqueueOfflineVisitSync } from "../lib/offlineQueue";
+import { formatDateTime } from "../lib/caracasTime";
 import type { Visit } from "../lib/types";
 
 type Props = {
@@ -32,6 +33,23 @@ function visitHasGpsFix(visit: Visit): boolean {
   return Number.isFinite(lat) && Number.isFinite(lng);
 }
 
+function formatClock(iso: string | null | undefined): string {
+  return formatDateTime(iso);
+}
+
+function formatStay(startedIso: string, ended: Date): string {
+  const start = Date.parse(startedIso);
+  if (Number.isNaN(start)) return "—";
+  const ms = Math.max(0, ended.getTime() - start);
+  const totalMin = Math.round(ms / 60_000);
+  if (totalMin < 1) return "menos de 1 min";
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+
 function existingGpsFields(visit: Visit): Partial<VisitCloseInput> {
   return {
     latitude: Number(visit.latitude),
@@ -41,6 +59,31 @@ function existingGpsFields(visit: Visit): Partial<VisitCloseInput> {
     gps_captured_at: visit.gps_captured_at,
     gps_skipped: false,
   };
+}
+
+function CloseTimeSummary({ visit }: { visit: Visit }) {
+  const startedIso = visit.visited_at || visit.created_at;
+  const closingAt = new Date();
+  return (
+    <section className="visit-close-time" aria-label="Tiempo en el PDV">
+      <p className="eyebrow">
+        <Clock size={12} aria-hidden /> Tiempo en el PDV
+      </p>
+      <div className="visit-close-time-grid">
+        <div>
+          <span className="muted small">Hora iniciada</span>
+          <strong>{formatClock(startedIso)}</strong>
+        </div>
+        <div>
+          <span className="muted small">Hora de cierre</span>
+          <strong>{formatClock(closingAt.toISOString())}</strong>
+        </div>
+      </div>
+      <p className="visit-close-time-stay">
+        Duración <strong>{formatStay(startedIso, closingAt)}</strong>
+      </p>
+    </section>
+  );
 }
 
 /**
@@ -306,6 +349,7 @@ export function CloseVisitSheet({
         }
       >
         <div className="sheet-form-stack">
+          <CloseTimeSummary visit={draft} />
           <div className="visit-close-warn" role="status">
             <p className="eyebrow">Advertencia</p>
             <strong>No hay OV registrada</strong>
@@ -350,6 +394,8 @@ export function CloseVisitSheet({
       }
     >
       <form id="close-visit-form" className="sheet-form-stack" onSubmit={(e) => void onSubmit(e)}>
+        <CloseTimeSummary visit={draft} />
+
         {existingSale ? (
           <div className="visit-sale-confirmed" role="status">
             <div className="visit-sale-confirmed-copy">
@@ -433,7 +479,7 @@ export function CloseVisitSheet({
             <PhotoDrop
               id="visit-photo"
               label={skipGps ? "Foto del PDV (obligatoria)" : "Foto del PDV (si falla el GPS)"}
-              hint={skipGps ? "Obligatoria · JPG o PNG" : "Opcional · JPG o PNG"}
+              hint={skipGps ? "Obligatoria · galería o cámara · JPG o PNG" : "Opcional · galería o cámara · JPG o PNG"}
               readyHint="Evidencia de cierre"
               value={photoDataUrl}
               disabled={submitting}

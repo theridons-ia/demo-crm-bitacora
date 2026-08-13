@@ -1,35 +1,20 @@
-import {
-  MapPin,
-  Play,
-  Plus,
-  Radio,
-  Square,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
-import { CloseVisitSheet } from "../components/CloseVisitSheet";
 import { ListSearch } from "../components/ListSearch";
-import { LiveLed } from "../components/LiveLed";
-import {
-  MonthCalendar,
-  addDaysISO,
-  calendarTodayISO,
-  formatAgendaDay,
-} from "../components/MonthCalendar";
+import { MonthCalendar, addDaysISO, calendarTodayISO } from "../components/MonthCalendar";
 import { Modal } from "../components/Modal";
 import { FormStep } from "../components/SideSheet";
 import { SelectField, TextField } from "../components/TextField";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
-import { VisitMapSheet } from "../components/VisitMapSheet";
-import { useVisitGpsTrail } from "../hooks/useVisitGpsTrail";
+import { VisitRow } from "../components/VisitRow";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
   createVisit,
   fetchClients,
   fetchVisits,
-  startVisit,
 } from "../lib/api";
 import { coordsFromClient, getCurrentPosition } from "../lib/gps";
 import {
@@ -39,14 +24,9 @@ import {
   type LocalPendingVisit,
 } from "../lib/offlineDb";
 import { getCachedClients } from "../lib/offlineQueue";
-import type { Client, Visit, VisitStatus } from "../lib/types";
-
-const statusLabel: Record<VisitStatus, string> = {
-  programada: "Programada",
-  en_curso: "En curso",
-  completada: "Completada",
-  cancelada: "Cancelada",
-};
+import { formatAgendaDay, formatWeekdayShort } from "../lib/caracasTime";
+import { sortVisitsAgenda, sortVisitsHistory } from "../lib/visitOrder";
+import type { Client, Visit } from "../lib/types";
 
 type VisitFilter = "open" | "done" | "agenda" | "cancelada";
 
@@ -61,71 +41,6 @@ function clientIdLabel(client: Client | null | undefined, clientId: number): str
   if (!client) return `Cliente #${clientId}`;
   const id = client.rif ? client.rif : client.ci ? client.ci : "";
   return id ? `${client.name}` : client.name;
-}
-
-function clientIdMeta(client: Client | null | undefined): string {
-  if (!client) return "";
-  return client.rif ?? client.ci ?? "";
-}
-
-function formatCoords(visit: Visit): string | null {
-  if (visit.latitude == null || visit.longitude == null) return null;
-  const acc = visit.gps_accuracy_m ? ` · ±${Number(visit.gps_accuracy_m).toFixed(0)} m` : "";
-  return `${Number(visit.latitude).toFixed(5)}, ${Number(visit.longitude).toFixed(5)}${acc}`;
-}
-
-function formatWhen(iso: string | null | undefined): string {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleString("es-VE", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function formatScheduled(date: string, time: string | null | undefined): string {
-  const [y, m, d] = date.split("-").map(Number);
-  if (!y || !m || !d) return date;
-  const day = new Date(y, m - 1, d).toLocaleDateString("es-VE", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-  const t = time ? String(time).slice(0, 5) : "";
-  return t ? `${day}, ${t}` : day;
-}
-
-function visitWhenMs(visit: Visit): number {
-  if (visit.status === "programada" && visit.scheduled_date) {
-    const t = (visit.scheduled_time ? String(visit.scheduled_time) : "00:00").slice(0, 8);
-    const stamp = t.length === 5 ? `${visit.scheduled_date}T${t}:00` : `${visit.scheduled_date}T${t}`;
-    const ms = Date.parse(stamp);
-    if (!Number.isNaN(ms)) return ms;
-  }
-  const iso = visit.visited_at || visit.created_at;
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? 0 : ms;
-}
-
-function sortVisitsNewestFirst(list: Visit[]): Visit[] {
-  return [...list].sort((a, b) => {
-    if (a.status === "en_curso" && b.status !== "en_curso") return -1;
-    if (b.status === "en_curso" && a.status !== "en_curso") return 1;
-    return visitWhenMs(b) - visitWhenMs(a);
-  });
-}
-
-function clientInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
 function localVisitToVisit(local: LocalPendingVisit): Visit {
@@ -174,9 +89,6 @@ export function VisitsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"now" | "schedule">("now");
   const [agendaDay, setAgendaDay] = useState(() => calendarTodayISO());
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [closingVisit, setClosingVisit] = useState<Visit | null>(null);
-  const [mapVisit, setMapVisit] = useState<Visit | null>(null);
   const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
@@ -228,56 +140,6 @@ export function VisitsPage() {
     };
   }, [reload]);
 
-  async function captureGps(near?: { latitude: number; longitude: number } | null): Promise<{
-    latitude?: number;
-    longitude?: number;
-    gps_accuracy_m?: number;
-    gps_offline?: boolean;
-    gps_captured_at?: string;
-    note?: string;
-  }> {
-    const geo = await getCurrentPosition(15_000, near);
-    if (geo.ok) {
-      return {
-        latitude: geo.fix.latitude,
-        longitude: geo.fix.longitude,
-        gps_accuracy_m: geo.fix.accuracy_m ?? undefined,
-        gps_offline: false,
-        gps_captured_at: geo.fix.captured_at,
-      };
-    }
-    return { note: geo.reason, gps_offline: true };
-  }
-
-  async function onStart(visitId: number) {
-    setBusyId(visitId);
-    setError(null);
-    setGpsNote(null);
-    try {
-      const visit = visits.find((v) => v.id === visitId);
-      const gps = await captureGps(coordsFromClient(visit?.client));
-      if (gps.note) setGpsNote(`Inicio sin GPS: ${gps.note}`);
-      const updated = await startVisit(visitId, {
-        latitude: gps.latitude ?? null,
-        longitude: gps.longitude ?? null,
-        gps_accuracy_m: gps.gps_accuracy_m ?? null,
-        gps_offline: Boolean(gps.gps_offline && !gps.latitude),
-      });
-      setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo iniciar");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function onCloseNoSale(visitId: number) {
-    const visit = visits.find((v) => v.id === visitId);
-    if (visit) setClosingVisit(visit);
-  }
-
-  const active = visits.filter((v) => v.status === "en_curso");
-
   const counts = useMemo(() => {
     const open = visits.filter((v) => v.status === "programada" || v.status === "en_curso");
     const done = visits.filter((v) => v.status === "completada");
@@ -294,8 +156,7 @@ export function VisitsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const next = visits.filter((v) => {
-      if (v.status === "en_curso") return false;
-      if (filter === "open" && v.status !== "programada") return false;
+      if (filter === "open" && v.status !== "programada" && v.status !== "en_curso") return false;
       if (filter === "done" && v.status !== "completada") return false;
       if (filter === "agenda") {
         if (v.status !== "programada") return false;
@@ -306,7 +167,8 @@ export function VisitsPage() {
       const blob = `${v.client?.name ?? ""} ${v.client?.rif ?? ""} ${v.client?.ci ?? ""} ${v.client?.address ?? ""} ${v.description ?? ""}`.toLowerCase();
       return blob.includes(q);
     });
-    return sortVisitsNewestFirst(next);
+    if (filter === "done" || filter === "cancelada") return sortVisitsHistory(next);
+    return sortVisitsAgenda(next);
   }, [visits, filter, query, agendaDay]);
 
   const weekDays = useMemo(() => {
@@ -348,24 +210,18 @@ export function VisitsPage() {
             {counts.open} abiertas · {counts.done} hechas · {counts.cancelled} canceladas
           </p>
         </div>
-        <Button variant="primary" aria-label="Nueva visita" onClick={openNow}>
+        <Button
+          variant="primary"
+          className="header-plus-cta"
+          aria-label="Nueva visita"
+          onClick={openNow}
+        >
           <Plus size={18} />
         </Button>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
       {gpsNote ? <p className="muted small">{gpsNote}</p> : null}
-
-      {active.map((visit) => (
-        <ActiveVisitCard
-          key={`active-${visit.id}`}
-          visit={visit}
-          busy={busyId === visit.id}
-          onOpen={() => setDetailVisit(visit)}
-          onClose={() => onCloseNoSale(visit.id)}
-          onMap={() => setMapVisit(visit)}
-        />
-      ))}
 
       <ListSearch
         id="visits-search"
@@ -406,8 +262,8 @@ export function VisitsPage() {
           </div>
           <div className="week-strip" role="tablist" aria-label="Días">
             {weekDays.map((day) => {
-              const [y, m, d] = day.split("-").map(Number);
-              const label = new Date(y, m - 1, d).toLocaleDateString("es-VE", { weekday: "short" });
+              const d = Number(day.slice(8, 10));
+              const label = formatWeekdayShort(day);
               const count = agendaCountByDay.get(day) ?? 0;
               return (
                 <button
@@ -427,81 +283,16 @@ export function VisitsPage() {
         </section>
       ) : null}
 
-      {loading ? <p className="muted">Cargando…</p> : null}
+      {loading ? <p className="muted list-loading">Cargando…</p> : null}
 
-      <ul className="ficha-stack">
-        {filtered.map((visit) => {
-          const name = clientIdLabel(visit.client, visit.client_id);
-          const idMeta = clientIdMeta(visit.client);
-          const address = visit.client?.address ?? "";
-          const when =
-            visit.status === "programada" && visit.scheduled_date
-              ? formatScheduled(visit.scheduled_date, visit.scheduled_time)
-              : formatWhen(visit.visited_at || visit.created_at);
-          const resultLabel =
-            visit.result === "sin_venta"
-              ? "Sin venta"
-              : visit.result
-                ? "Con venta"
-                : null;
-          return (
-            <li key={visit.id}>
-              <article
-                className="ficha ficha-openable visit-list-card"
-                role="button"
-                tabIndex={0}
-                onClick={() => setDetailVisit(visit)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setDetailVisit(visit);
-                  }
-                }}
-              >
-                <span className="ficha-avatar" aria-hidden>
-                  {clientInitials(name)}
-                </span>
-                <div className="ficha-body">
-                  <div className="ficha-row">
-                    <h3 className="ficha-title">{name}</h3>
-                    {visit.status === "en_curso" ? (
-                      <LiveLed />
-                    ) : (
-                      <span className={`badge badge-${visit.status}`}>{statusLabel[visit.status]}</span>
-                    )}
-                  </div>
-                  <p className="ficha-meta visit-list-sub">
-                    <span>{[idMeta, address].filter(Boolean).join(" · ") || "Sin RIF / dirección"}</span>
-                    <span className="is-end">{when}</span>
-                  </p>
-                  {resultLabel ? (
-                    <p className="ficha-note visit-list-result">{resultLabel}</p>
-                  ) : null}
-                  {visit.status === "programada" ? (
-                    <div className="ficha-actions" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="primary"
-                        disabled={busyId === visit.id}
-                        onClick={() => onStart(visit.id)}
-                      >
-                        <Play size={16} />
-                        {busyId === visit.id ? "Obteniendo GPS…" : "Iniciar"}
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              </article>
-            </li>
-          );
-        })}
+      <ul className="visit-row-list">
+        {filtered.map((visit) => (
+          <VisitRow key={visit.id} visit={visit} onClick={() => setDetailVisit(visit)} />
+        ))}
       </ul>
 
       {!loading && filtered.length === 0 ? (
-        <p className="muted">
-          {filter === "open" && active.length
-            ? "No hay más pendientes. La visita en curso está arriba."
-            : "Sin coincidencias. Prueba otro filtro o crea una visita."}
-        </p>
+        <p className="muted">Sin coincidencias. Prueba otro filtro o crea una visita.</p>
       ) : null}
 
       <VisitForm
@@ -524,28 +315,6 @@ export function VisitsPage() {
         }}
       />
 
-      {closingVisit ? (
-        <CloseVisitSheet
-          visit={closingVisit}
-          open
-          onClose={() => setClosingVisit(null)}
-          onClosed={(updated) => {
-            setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-            setClosingVisit(null);
-            setDetailVisit((cur) => (cur && cur.id === updated.id ? updated : cur));
-          }}
-          onVisitPatched={(updated) => {
-            setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-            setClosingVisit(updated);
-            setDetailVisit((cur) => (cur && cur.id === updated.id ? updated : cur));
-          }}
-        />
-      ) : null}
-
-      {mapVisit ? (
-        <VisitMapSheet visit={mapVisit} open onClose={() => setMapVisit(null)} />
-      ) : null}
-
       {detailVisit ? (
         <VisitDetailSheet
           visit={detailVisit}
@@ -558,77 +327,6 @@ export function VisitsPage() {
         />
       ) : null}
     </WorkspacePage>
-  );
-}
-
-function ActiveVisitCard({
-  visit,
-  busy,
-  onOpen,
-  onClose,
-  onMap,
-}: {
-  visit: Visit;
-  busy: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-  onMap: () => void;
-}) {
-  const { points, tracking, lastError, mockGps } = useVisitGpsTrail(visit.id, true);
-  const watchCount = points.filter((p) => p.source === "watch").length;
-  const last = points.length ? points[points.length - 1] : null;
-
-  return (
-    <section className="card visit-active-card">
-      <button type="button" className="visit-active-open" onClick={onOpen}>
-        <div className="ficha-row" style={{ marginBottom: "0.25rem" }}>
-          <p className="eyebrow" style={{ margin: 0 }}>
-            Visita en curso
-          </p>
-          <LiveLed />
-        </div>
-        <h2 className="visit-active-title">{clientIdLabel(visit.client, visit.client_id)}</h2>
-      </button>
-      {formatCoords(visit) ? (
-        <p className="muted small">
-          <MapPin size={14} style={{ verticalAlign: "middle" }} /> Inicio: {formatCoords(visit)}
-        </p>
-      ) : (
-        <p className="muted small">Sin coordenada de inicio aún</p>
-      )}
-      <p className="trail-status">
-        <Radio size={14} />{" "}
-        {mockGps
-          ? "GPS de prueba · junto al PDV (sin puntos en movimiento)"
-          : tracking
-            ? `Trail activo · ${points.length} punto(s)${
-                watchCount ? ` (${watchCount} en movimiento)` : ""
-              }`
-            : "Trail detenido"}
-      </p>
-      {last ? (
-        <p className="muted small">
-          Último: {Number(last.latitude).toFixed(5)}, {Number(last.longitude).toFixed(5)}
-          {last.accuracy_m ? ` · ±${Number(last.accuracy_m).toFixed(0)} m` : ""}
-        </p>
-      ) : null}
-      {lastError ? <p className="form-error">{lastError}</p> : null}
-      <div className="visit-actions">
-        <Button variant="ghost" type="button" onClick={onOpen}>
-          Ver detalle
-        </Button>
-        <Button variant="secondary" disabled={busy} onClick={onClose}>
-          <Square size={16} />
-          Cerrar visita
-        </Button>
-        {visit.id > 0 ? (
-          <Button variant="ghost" type="button" onClick={onMap}>
-            <MapPin size={16} />
-            Ver trail
-          </Button>
-        ) : null}
-      </div>
-    </section>
   );
 }
 

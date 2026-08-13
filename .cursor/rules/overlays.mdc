@@ -23,6 +23,9 @@ Never invent a custom `screen-form` / full-page dialog for new flows. Use the sh
 - Seller assignment on a client: single `<SelectField>` / `<select>`, not seller fichas.
 - Do not reintroduce `size="lg"` / `aside` on SideSheet — long content belongs in Modal (`size="wide"` when needed).
 - Hooks: `useBodyScrollLock` + `useEscapeKey` live in the shared components; don't duplicate.
+- Nested overlays (ficha + wizard): Escape / backdrop close **only the top** overlay.
+- Native file picker / camera: do **not** treat cancel, Escape, or the ghost click after the picker as `onClose`. The form stays mounted with its state.
+- `PhotoDrop`: two actions — Galería (no `capture`) and Cámara (`capture="environment"`). Do not rely on the OS chooser. Canceling either picker must not close the overlay.
 
 ```tsx
 // ❌ BAD — full-page overlay

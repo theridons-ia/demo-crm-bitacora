@@ -16,18 +16,12 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
 import { canUseMockGps, isMockGpsEnabled, setMockGpsEnabled } from "../lib/gps";
 import type { VisitAlert } from "../lib/types";
-import { accountBasePath, crumbForPath, roleLabel } from "./appNav";
+import { formatDateTime } from "../lib/caracasTime";
 import { HeaderQuickRegister } from "../components/HeaderQuickRegister";
+import { accountBasePath, crumbForPath, roleLabel } from "./appNav";
 
 function formatAlertWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("es-VE", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso);
 }
 
 /** Header superior: breadcrumb + campana (dropdown alertas) + perfil. */

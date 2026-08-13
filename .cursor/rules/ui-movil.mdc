@@ -1,0 +1,34 @@
+---
+description: UI móvil EnRutas — una fila, chrome corto, mapa=agenda, foto/galería
+globs: web/src/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# UI móvil (Fase 4)
+
+Contrato vivo: `docs/implementacion/FASE-4-UI-MOVIL.md`. Una SF por vez. No tocar `startVisit` / `createVisitSale`. Tokens EnRutas (teal/coral/cream); no copiar Tuzona ni Farmatodo.
+
+## Fila de visita
+
+Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
+
+- Estado (punto / `LiveLed`) · nombre PDV · hora o estado · chevron.
+- Toda la fila es el tap → ficha. Sin lat/lng, GPS, Ver trail, ni 3 botones en la fila.
+- Agenda / abiertas: `scheduled_time` ASC. Hechas: fecha DESC.
+
+## Chrome y FAB
+
+- Móvil: no apilar breadcrumb + eyebrow + H1 + blurb + filtros. Contenido (lista/mapa) en el fold.
+- Un solo `+`: FAB **o** botón header. FAB no tapa En curso / Iniciar / footer de modal.
+
+## Mapa = agendado
+
+- Trazo y numeración = `scheduled_time` (no vecino más cercano como ruta oficial).
+- Mapa del día ≠ historial. Sin pin: en la lista, hueco en el polyline.
+- Tres lentes de la misma `Visit` **en Fase 4:** Ruta = hoy · Visitas = bitácora · Mapa = trazo. La **ruta semanal** (1 vendedor × semana) es Fase 5; no abrir entidad `Route` aquí.
+
+## Foto y wizard
+
+- `PhotoDrop`: botones **Galería** y **Cámara** (no un solo picker). Cancelar no cierra el wizard.
+- Un signo de moneda: `Total` + `$ 13.57`, nunca `Total $ $`.
+- Pago: USD = Efectivo USD / Zelle / USDT. Bs = Efectivo Bs / Pago móvil / Transferencia.

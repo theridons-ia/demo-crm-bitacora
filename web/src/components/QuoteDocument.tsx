@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { formatDateTime } from "../lib/caracasTime";
 import { formatQuoteAmount, IVA_RATE, quoteMoney } from "../lib/quoteMoney";
 import type { Client, CurrencyCode, Product } from "../lib/types";
 import { Button } from "./Button";
@@ -142,26 +143,13 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
       data.client?.rif ?? (data.client?.ci ? `CI ${data.client.ci}` : "—");
     const address =
       [data.client?.address, data.client?.state].filter(Boolean).join(" · ") || "—";
-    const issued = data.issuedAt.toLocaleString("es-VE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const issued = formatDateTime(data.issuedAt);
     const validUntil = new Date(data.issuedAt);
     validUntil.setDate(validUntil.getDate() + 1);
     validUntil.setHours(23, 59, 0, 0);
-    const validLabel = validUntil.toLocaleString("es-VE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const validLabel = formatDateTime(validUntil);
     const isOv = data.code.startsWith("OV-");
     const isVes = data.currency === "VES";
-    const moneyLabel = isVes ? "Bs" : "$";
     function amount(usd: number): string {
       return formatQuoteAmount(usd, data.currency, fx);
     }
@@ -370,7 +358,7 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
               </tr>
               <tr className="is-total">
                 <td colSpan={3} />
-                <td>Total {moneyLabel}</td>
+                <td>Total</td>
                 <td className="is-num">{amount(money.total)}</td>
               </tr>
             </tfoot>

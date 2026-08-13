@@ -14,6 +14,7 @@ Fuente de verdad visual: `demo-crm-bitacora-export/` + tokens en `web/src/styles
 - Marca EnRutas visible; tipografía DM Sans (tokens); fondos con atmósfera (no flat genérico AI).
 - Preferir `Button`, `TextField`/`SelectField`, `Modal`, `SideSheet`, `FormStep`, fichas (`.ficha`), badges existentes.
 - Overlays: ver regla `overlays.mdc` (Modal vs SideSheet + scrim oscuro).
+- Móvil (filas, chrome, mapa=agenda, foto): ver regla `ui-movil.mdc` y `docs/implementacion/FASE-4-UI-MOVIL.md`.
 - No inventar paletas purple/indigo ni rediseñar páginas enteras sin pedido explícito.
 
 ## Navegación
@@ -31,7 +32,7 @@ Patrón obligatorio:
 2. **Más** abre hoja inferior (`SideSheet` / menú) con el resto:
    - Ventas · Vendedores · Catálogo · Inventario · Cobranza · Mapa equipo
 3. Alertas y FX viven en **header** (campana / menú perfil), no en el tabbar.
-4. Desktop (≥900px): sidebar completa (todos los ítems). Sin tabbar.
+4. Desktop (≥900px): sidebar completa a **alto de pantalla** (`100dvh`, sticky). El fondo blanco no se corta a mitad; “Vista vendedor” queda al pie. Sin tabbar.
 
 Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pantalla “Actividad”); no fusionar módulos distintos solo para ahorrar un ítem de menú.
 
@@ -58,7 +59,7 @@ Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pant
 
 ## Inicio (vendedor)
 
-- Orden: tarjeta de ruta → **4 KPIs en una fila** (`.home-kpis`, desktop) → **agenda a ancho completo** (`.home-agenda`, hasta 3 paradas).
+- Orden: tarjeta de ruta → **4 KPIs en una fila** (`.home-kpis`, desktop) → **agenda a ancho completo** (lista vertical `.home-agenda`, hasta 3 paradas; no 3 columnas a medio ancho).
 - Móvil: KPIs en 2×2. No meter KPIs y agenda en una sola fila apretada.
 
 ## Ficha de visita + LED en curso
@@ -67,7 +68,7 @@ Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pant
 - **En curso:** componente `LiveLed` (punto coral parpadeante) en ficha, card activa, lista y agenda.
 - Al crear visita (ahora/programada): cerrar form y **abrir la ficha** de esa visita (`setDetailVisit`), no solo dejar el listado.
 - Cancelar visita: `POST /api/visits/{id}/cancel` desde la ficha (programada o en curso **sin OV**).
-- **Lista «Tus visitas»:** chips **Abiertas → Agenda → Hechas → Canceladas** (default Abiertas). En curso en card hero, no duplicada en la lista. Orden **más reciente primero**. Ficha: avatar + nombre a la izquierda y fecha a la derecha (como el bloque cliente del documento). Sin GPS/Trail en la fila; clic abre la ficha.
+- **Lista «Tus visitas»:** chips **Abiertas → Agenda → Hechas → Canceladas** (default Abiertas). En curso: LED en la misma fila (o un hero), no duplicar. **Abiertas/Agenda:** `scheduled_time` ASC (mañana→tarde). **Hechas:** más reciente primero. Ficha: avatar + nombre a la izquierda y fecha a la derecha. Sin GPS/Trail en la fila; clic abre la ficha. Pieza compartida: ver regla `ui-movil.mdc`.
 - **GPS de prueba (solo `npm run dev`):** toggle en el **header** (`GPS simular`). Simula estar **junto al PDV** (coords del cliente ± ~20 m) al iniciar, guardar GPS o cerrar. **No** genera un trail de puntos en movimiento. Al apagarlo, el muestreo continuo se detiene.
 - Mapa de evidencia (`VisitMapSheet`): PDV fucsia · Inicio negro · Trail coral · **Ahora** teal con etiqueta (posición actual, distinto del trail) · Cierre rojo.
 
@@ -90,11 +91,12 @@ Modal compacto. **No** volver a cotizar ni pedir evidencia de más si ya está c
 
 Layout si hay OV y GPS (formato canónico):
 
-1. Card OV (`.visit-sale-confirmed`, borde coral): eyebrow **ORDEN DE VENTA** · `OV-#` · total e ítems.
-2. Card GPS (`.visit-gps-card.has-fix`): pin + **GPS EN ESTA VISITA** · coords · precisión (prueba/offline si aplica).
-3. Acciones en la card GPS (`.visit-gps-actions`): **Ver mapa** (`VisitMapSheet`) y **Actualizar GPS** (`pinVisitGps` / recaptura). El usuario revisa el punto y puede refrescarlo antes de confirmar.
-4. **Nota (opcional)** con `TextField`.
-5. Footer: Cancelar + Confirmar cierre.
+1. Card tiempo (`.visit-close-time`): **Hora iniciada** (`visited_at`) · **Hora de cierre** (ahora) · **Duración**.
+2. Card OV (`.visit-sale-confirmed`, borde coral): eyebrow **ORDEN DE VENTA** · `OV-#` · total e ítems.
+3. Card GPS (`.visit-gps-card.has-fix`): pin + **GPS EN ESTA VISITA** · coords · precisión (prueba/offline si aplica).
+4. Acciones en la card GPS (`.visit-gps-actions`): **Ver mapa** (`VisitMapSheet`) y **Actualizar GPS** (`pinVisitGps` / recaptura). El usuario revisa el punto y puede refrescarlo antes de confirmar.
+5. **Nota (opcional)** con `TextField`.
+6. Footer: Cancelar + Confirmar cierre.
 
 Reglas de evidencia:
 
@@ -155,6 +157,7 @@ Reglas de evidencia:
 - Chips de moneda pegados a la tabla. **Tasa del día** en la misma línea que “Precios de línea sin IVA…”.
 - IVA a la izquierda del pie; etiquetas de totales bajo Precio unit. y montos bajo Subtotal.
 - Barra TOTAL redondeada (`--radius`), pegada a la tabla (sin hueco).
+- Etiqueta **Total** + monto `formatQuoteAmount` (un solo `$`). Prohibido `Total $ $ 13.57`.
 - Misma UI en venta sin visita y venta en visita.
 
 ## Paso 2 Pago (`PaymentCapture`)
@@ -162,7 +165,8 @@ Reglas de evidencia:
 - Resumen compacto del total (subtotal / IVA / barra TOTAL) arriba, misma estética que el cotizador.
 - Crédito: checkbox con texto de ayuda (“sin cobro ahora; va a cobranza”). Si está activo, ocultar captura de cobro y mostrar nota, no un vacío.
 - Métodos: chips/botones del design system (`.choice-group` / `.pay-method`), no radios nativos.
-- **Nunca** `<input type="file">` nativo a la vista (sale “Choose File” en inglés). Usar `PhotoDrop` (`.pay-photo-drop`): input oculto + label en español (“Subir foto”) + miniatura y Quitar.
+- **Nunca** `<input type="file">` nativo a la vista (sale “Choose File” en inglés). Usar `PhotoDrop`: **Galería** (sin `capture`) y **Cámara** (`capture="environment"`) como dos botones. Cancelar el picker no cierra el wizard.
+- Métodos según moneda: **USD** → Efectivo USD, Zelle, USDT. **Bs** → Efectivo Bs, Pago móvil, Transferencia. No mezclar.
 - Cuenta destino con `SelectField`; referencia y nota con `TextField`.
 - Mismo componente en OV de visita, venta standalone y abonos de cobranza.
 

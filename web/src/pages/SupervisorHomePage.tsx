@@ -11,20 +11,8 @@ import { useAuth } from "../auth/AuthContext";
 import { DayRankingCard, rankingInitials, type RankingRow } from "../components/DayRankingCard";
 import { PageWorkspace } from "../layout/PageWorkspace";
 import { ApiError, fetchAlerts, fetchSellers, fetchVisits } from "../lib/api";
+import { caracasHour, formatLongDate, todayISO } from "../lib/caracasTime";
 import type { User, Visit, VisitAlert } from "../lib/types";
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function formatLongDate(d = new Date()): string {
-  return d.toLocaleDateString("es-VE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
 
 function buildRanking(visits: Visit[], sellers: User[]): RankingRow[] {
   const byId = new Map(sellers.map((s) => [s.id, s]));
@@ -68,7 +56,7 @@ function buildRanking(visits: Visit[], sellers: User[]): RankingRow[] {
 }
 
 function greetingPart(): string {
-  const h = new Date().getHours();
+  const h = caracasHour();
   if (h < 12) return " días";
   if (h < 19) return " tardes";
   return " noches";

@@ -4,11 +4,7 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchFxRates, fetchFxToday, upsertFxRate, type FxRate } from "../lib/api";
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import { todayISO } from "../lib/caracasTime";
 
 /** SF-3.3 — tasa USD→VES del día (supervisor). */
 export function FxRatePage() {

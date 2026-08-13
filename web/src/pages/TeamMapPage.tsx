@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchSellers, fetchVisits } from "../lib/api";
+import { todayISO } from "../lib/caracasTime";
 import { clientPdvIconFor, teamVisitIcon } from "../lib/mapMarkers";
 import type { User, Visit, VisitStatus } from "../lib/types";
 
@@ -17,11 +18,6 @@ const STATUS_LABEL: Record<VisitStatus, string> = {
 };
 
 const DEFAULT_CENTER: L.LatLngExpression = [10.07, -69.32]; // Barquisimeto
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function clientCoords(visit: Visit): L.LatLngExpression | null {
   const lat = visit.client?.latitude != null ? Number(visit.client.latitude) : NaN;

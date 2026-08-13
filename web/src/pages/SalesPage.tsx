@@ -1,10 +1,12 @@
 import { Plus, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AsideStats } from "../components/AsideStats";
 import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
 import { MetricGrid, MetricTile } from "../components/MetricTile";
 import { Modal } from "../components/Modal";
+import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
 import {
   emptyPaymentCapture,
   PaymentCapture,
@@ -73,6 +75,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [composing, setComposing] = useState(false);
   const [detailSale, setDetailSale] = useState<Sale | null>(null);
   const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [clientId, setClientId] = useState<number | "">("");
   const [origin, setOrigin] = useState<StandaloneOrigin>("mostrador");
@@ -88,6 +91,15 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
   const submitIntent = useRef<"quote" | "sale">("sale");
+  const wasComposing = useRef(false);
+
+  useEffect(() => {
+    if (teamView || searchParams.get("nueva") !== "1") return;
+    setComposing(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("nueva");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, teamView]);
 
   const SALE_STEPS = [
     { id: "cliente", label: "Cliente" },
@@ -142,14 +154,21 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   }, [sales, query, sellerNameById]);
 
   useEffect(() => {
-    if (!composing) return;
+    if (!composing) {
+      wasComposing.current = false;
+      return;
+    }
+    const justOpened = !wasComposing.current;
+    wasComposing.current = true;
     let cancelled = false;
     setLoadingCatalog(true);
-    setLines([newQuoteLine()]);
-    setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
-    setIsCredit(false);
-    setWizardStep(0);
-    setFormError(null);
+    if (justOpened) {
+      setLines([newQuoteLine()]);
+      setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
+      setIsCredit(false);
+      setWizardStep(0);
+      setFormError(null);
+    }
     (async () => {
       try {
         const [c, p, banks] = navigator.onLine
@@ -416,14 +435,19 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
             </p>
           </div>
           {!teamView ? (
-            <Button type="button" variant="accent" onClick={() => setComposing(true)}>
+            <Button
+              type="button"
+              variant="accent"
+              className="header-plus-cta"
+              onClick={() => setComposing(true)}
+            >
               <Plus size={18} aria-hidden />
               Nueva
             </Button>
           ) : null}
         </header>
 
-        <MetricGrid aria-label="Resumen ventas">
+        <MetricGrid aria-label="Resumen ventas" className="chrome-defer-metrics">
           <MetricTile label="Órdenes" value={sales.length} icon={ShoppingCart} />
           <MetricTile
             label="Total"
@@ -447,7 +471,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           />
         </div>
 
-        {loading ? <p className="muted">Cargando…</p> : null}
+        {loading ? <p className="muted list-loading">Cargando…</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
         {!loading && !filteredSales.length ? (
           <p className="muted">
@@ -481,7 +505,10 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       {!teamView ? (
         <Modal
           open={composing}
-          onClose={() => setComposing(false)}
+          onClose={() => {
+            if (shouldIgnoreOverlayClose()) return;
+            setComposing(false);
+          }}
           size="wide"
           eyebrow="Nueva orden"
           title="Venta sin visita"
@@ -493,7 +520,10 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   type="button"
                   variant="ghost"
                   disabled={submitting}
-                  onClick={() => setComposing(false)}
+                  onClick={() => {
+                    if (shouldIgnoreOverlayClose()) return;
+                    setComposing(false);
+                  }}
                 >
                   Cancelar
                 </Button>

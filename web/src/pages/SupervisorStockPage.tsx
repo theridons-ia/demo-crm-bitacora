@@ -6,6 +6,7 @@ import { SideSheet } from "../components/SideSheet";
 import { StockTable, stockState, type StockState } from "../components/StockTable";
 import { TextField } from "../components/TextField";
 import { WorkspacePage } from "../layout/WorkspacePage";
+import { formatDateShort } from "../lib/caracasTime";
 import {
   ApiError,
   createStockMovement,
@@ -162,7 +163,7 @@ export function SupervisorStockPage() {
                       </strong>
                       <span className="muted small">
                         {m.kind === "purchase" ? "Compra" : "Ajuste"}
-                        {` · ${new Date(m.created_at).toLocaleDateString("es-VE")}`}
+                        {` · ${formatDateShort(m.created_at)}`}
                       </span>
                     </li>
                   ))}

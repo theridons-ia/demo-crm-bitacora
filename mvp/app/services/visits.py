@@ -131,7 +131,9 @@ def close_visit_with_optional_sale(
     visit.result = result
     if description is not None:
         visit.description = description
-    visit.visited_at = gps_captured_at or visit.visited_at
+    # visited_at = inicio (start_visit). No pisarlo con el GPS de cierre.
+    if visit.visited_at is None:
+        visit.visited_at = gps_captured_at
     if latitude is not None:
         visit.latitude = latitude
     if longitude is not None:

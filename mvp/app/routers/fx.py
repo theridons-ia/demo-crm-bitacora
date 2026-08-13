@@ -8,6 +8,7 @@ from ..database import get_db
 from ..models import FxRate, User
 from ..schemas import FxRateOut, FxRateUpsert
 from ..services.fx import get_latest_rate, get_rate_for_date, list_rates, upsert_rate
+from ..timeutil import today_caracas
 
 router = APIRouter(prefix="/api/fx", tags=["fx"])
 
@@ -28,7 +29,7 @@ def fx_today(
     on_date: date | None = Query(default=None),
 ):
     """Tasa del día (default hoy) o la más reciente anterior."""
-    day = on_date or date.today()
+    day = on_date or today_caracas()
     row = get_rate_for_date(db, day) or get_latest_rate(db, on_or_before=day)
     if not row:
         raise HTTPException(status_code=404, detail="No hay tasa FX cargada")

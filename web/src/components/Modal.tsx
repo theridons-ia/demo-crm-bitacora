@@ -1,8 +1,9 @@
 import { X } from "lucide-react";
-import { useId, type ReactNode } from "react";
+import { useCallback, useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
 import { useBodyScrollLock, useEscapeKey } from "../hooks/useOverlay";
+import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
 
 type Props = {
   open: boolean;
@@ -30,8 +31,12 @@ export function Modal({
   footer,
   size = "default",
 }: Props) {
+  const close = useCallback(() => {
+    if (shouldIgnoreOverlayClose()) return;
+    onClose();
+  }, [onClose]);
   useBodyScrollLock(open);
-  useEscapeKey(open, onClose);
+  useEscapeKey(open, close);
   const titleId = useId();
 
   if (!open || typeof document === "undefined") return null;
@@ -43,7 +48,7 @@ export function Modal({
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      <button type="button" className="app-overlay-backdrop" aria-label="Cerrar" onClick={onClose} />
+      <button type="button" className="app-overlay-backdrop" aria-label="Cerrar" onClick={close} />
       <div className="app-modal-panel">
         <header className="app-modal-head">
           <div className="app-modal-head-copy">
@@ -53,7 +58,7 @@ export function Modal({
             </h2>
             {blurb ? <p className="app-modal-blurb">{blurb}</p> : null}
           </div>
-          <Button type="button" variant="ghost" onClick={onClose} aria-label="Cerrar">
+          <Button type="button" variant="ghost" onClick={close} aria-label="Cerrar">
             <X size={18} />
           </Button>
         </header>

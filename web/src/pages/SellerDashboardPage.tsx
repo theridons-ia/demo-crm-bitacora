@@ -4,21 +4,8 @@ import { CheckCircle2, DollarSign, MapPin, Route, Store } from "lucide-react";
 import { MetricGrid, MetricTile } from "../components/MetricTile";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchClients, fetchSales, fetchVisits } from "../lib/api";
+import { isSameCaracasDay, monthPrefixISO, todayISO } from "../lib/caracasTime";
 import type { Sale, Visit } from "../lib/types";
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function isSameDay(iso: string | null | undefined, day: string): boolean {
-  if (!iso) return false;
-  return iso.slice(0, 10) === day;
-}
-
-function monthPrefix(d = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 /** Dashboard de desempeño del vendedor. */
 export function SellerDashboardPage() {
@@ -28,7 +15,7 @@ export function SellerDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const day = todayISO();
-  const month = monthPrefix();
+  const month = monthPrefixISO();
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +50,7 @@ export function SellerDashboardPage() {
   const salesToday = useMemo(
     () =>
       sales
-        .filter((s) => isSameDay(s.created_at, day))
+        .filter((s) => isSameCaracasDay(s.created_at, day))
         .reduce((acc, s) => acc + Number(s.total_amount || 0), 0),
     [sales, day],
   );

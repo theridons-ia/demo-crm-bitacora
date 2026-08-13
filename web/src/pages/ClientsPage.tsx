@@ -1,5 +1,6 @@
 import { Plus, Store } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
@@ -23,6 +24,16 @@ export function ClientsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("nuevo") !== "1") return;
+    setEditing(null);
+    setFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("nuevo");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +108,7 @@ export function ClientsPage() {
           </div>
           <Button
             variant="accent"
+            className="header-plus-cta"
             onClick={() => {
               setEditing(null);
               setFormOpen(true);
@@ -116,7 +128,7 @@ export function ClientsPage() {
           />
         </div>
 
-        {loading ? <p className="muted">Cargando…</p> : null}
+        {loading ? <p className="muted list-loading">Cargando…</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
 
         <ul className="ficha-stack">

@@ -24,15 +24,8 @@ import {
   fetchVisits,
   unassignVisit,
 } from "../lib/api";
+import { todayISO } from "../lib/caracasTime";
 import type { Client, User, Visit, VisitStatus } from "../lib/types";
-
-function todayISO(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 function clientLabel(client: Client): string {
   const id = client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "";

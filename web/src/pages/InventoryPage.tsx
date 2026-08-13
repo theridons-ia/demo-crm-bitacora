@@ -89,7 +89,7 @@ export function InventoryPage() {
           onChange={setQuery}
           placeholder="Nombre o SKU…"
         />
-        <div className="filter-chips" role="tablist" aria-label="Estado de stock">
+        <div className="filter-chips chips-row" role="tablist" aria-label="Estado de stock">
           {(
             [
               ["todos", "Todos"],
@@ -110,7 +110,7 @@ export function InventoryPage() {
         </div>
       </div>
 
-      {loading ? <p className="muted">Cargando…</p> : null}
+      {loading ? <p className="muted list-loading">Cargando…</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
       {!loading && filtered.length ? <StockTable products={filtered} /> : null}
