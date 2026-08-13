@@ -73,6 +73,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-2.4** | Visibilidad catálogo | Qué productos ve cada vendedor | hecho |
 | **SF-2.5** | Mapa equipo | Visitas del día en mapa | hecho |
 | **SF-2.6** | Refresh visual UI | Tokens + DM Sans; Inicio/Hoy/Inventario estilo mock (móvil+desktop) | hecho |
+| **SF-2.6b** | Logo EnRutas + consistencia | Logo en shells; marca EnRutas; sin doble Salir desktop | hecho |
 
 
 ---
@@ -93,9 +94,16 @@ Detalle: [`implementacion/FASE-3-ENDURECER.md`](implementacion/FASE-3-ENDURECER.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-3.3** (tasa FX del día).
+**Listo para commit / tu push:** **SF-2.6b** (logo EnRutas + consistencia visual).
 
 **Siguiente:** **SF-3.4** import Excel (o Contabo al final).
+
+### Cómo verificar SF-2.6b
+
+1. Login: logo EnRutas grande.
+2. Supervisor: logo en sidebar + título EnRutas.
+3. Vendedor desktop: topbar con logo; **sin** segunda barra Salir encima del hero.
+4. Vendedor móvil: logo + Salir en cabecera; bottom nav intacta.
 
 ### Cómo verificar SF-3.3
 

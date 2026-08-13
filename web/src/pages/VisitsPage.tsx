@@ -190,7 +190,7 @@ export function VisitsPage() {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Bitácora Campo</p>
+          <p className="eyebrow">EnRutas</p>
           <h1>Visitas</h1>
           <p className="muted">Ruta de campo · evidencia GPS al iniciar y cerrar</p>
         </div>

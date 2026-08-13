@@ -371,7 +371,7 @@ export function SalesPage() {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Bitácora Campo</p>
+          <p className="eyebrow">EnRutas</p>
           <h1>Ventas</h1>
           <p className="muted">Órdenes con o sin visita</p>
         </div>

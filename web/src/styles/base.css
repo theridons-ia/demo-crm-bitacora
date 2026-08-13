@@ -421,11 +421,7 @@ a {
   }
 
   .topbar-mark {
-    width: 12px;
-    height: 36px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, var(--accent), #18312f);
-    flex-shrink: 0;
+    display: none;
   }
 
   .topbar-title {
@@ -883,11 +879,7 @@ a {
 }
 
 .sup-mark {
-  width: 12px;
-  height: 36px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--accent), #18312f);
-  flex-shrink: 0;
+  display: none;
 }
 
 .sup-title {
@@ -1349,14 +1341,70 @@ a {
   gap: 0.5rem;
 }
 
+/* ——— Marca EnRutas ——— */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.brand-logo-row {
+  gap: 0.7rem;
+}
+
+.brand-logo-img {
+  display: block;
+  height: auto;
+  object-fit: contain;
+}
+
+.brand-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--primary);
+  letter-spacing: -0.02em;
+}
+
+.brand-tag {
+  margin: 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.login-logo {
+  margin-bottom: 0.75rem;
+}
+
+.seller-top-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.seller-top-logo {
+  display: none;
+}
+
 /* ——— SF-2.6 refresh visual (móvil primero) ——— */
 .brand-mark {
-  display: block;
-  width: 12px;
-  height: 40px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--accent), var(--primary));
-  margin-bottom: 0.85rem;
+  display: none;
 }
 
 .display-title {
@@ -1791,10 +1839,11 @@ a {
   padding-inline: 0.85rem;
 }
 
-@media (min-width: 480px) {
-  .seller-logout-label {
-    display: inline;
+@media (max-width: 767px) {
+  .seller-top-logo {
+    display: inline-flex;
   }
+}
 
   .kpi-row-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1802,6 +1851,10 @@ a {
 }
 
 @media (min-width: 768px) {
+  .seller-top {
+    display: none; /* topbar ya lleva marca + Salir; evita doble header */
+  }
+
   .seller-hero {
     grid-template-columns: 1.2fr 0.9fr;
     align-items: stretch;

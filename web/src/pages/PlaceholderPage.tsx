@@ -10,7 +10,7 @@ export function PlaceholderPage({ title, nextSf, blurb }: Props) {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Bitácora Campo</p>
+          <p className="eyebrow">EnRutas</p>
           <h1>{title}</h1>
           <p className="muted">{blurb}</p>
         </div>

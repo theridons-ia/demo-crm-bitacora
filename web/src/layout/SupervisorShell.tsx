@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 import { SUPERVISOR_NAV_TABS } from "./supervisorNav";
 
 /**
- * Shell del supervisor (SF-2.1):
- * sidebar fija en tablet/desktop; en móvil estrecho = lista superior, sin bottom nav.
+ * Shell del supervisor:
+ * sidebar en tablet/desktop; en móvil nav horizontal, sin bottom nav.
  */
 export function SupervisorShell() {
   const { user, logout } = useAuth();
@@ -14,9 +15,9 @@ export function SupervisorShell() {
     <div className="app-shell app-shell-supervisor">
       <aside className="sup-sidebar" aria-label="Navegación supervisor">
         <div className="sup-brand">
-          <span className="sup-mark" aria-hidden />
+          <BrandLogo size={40} />
           <div>
-            <p className="sup-title">Bitácora Campo</p>
+            <p className="sup-title">EnRutas</p>
             <p className="sup-role muted small">Supervisor</p>
           </div>
         </div>

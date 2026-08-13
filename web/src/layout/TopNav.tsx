@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 import { SELLER_NAV_TABS } from "./sellerNav";
 
 /** Top bar vendedor (≥768px). Móvil usa BottomNav. */
@@ -10,9 +11,9 @@ export function TopNav() {
   return (
     <header className="topbar" aria-label="Navegación principal">
       <div className="topbar-brand">
-        <span className="topbar-mark" aria-hidden />
+        <BrandLogo size={36} />
         <div>
-          <p className="topbar-title">Bitácora Campo</p>
+          <p className="topbar-title">EnRutas</p>
           <p className="topbar-user muted small">
             {user?.full_name ?? "Vendedor"}
             {user?.route_name ? ` · ${user.route_name}` : ""}

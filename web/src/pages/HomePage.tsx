@@ -2,6 +2,7 @@ import { ClipboardList, DollarSign, LogOut, MapPin, Plus, Route, Search, Store }
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 import { Button } from "../components/Button";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
@@ -123,12 +124,15 @@ export function HomePage() {
   return (
     <>
       <header className="seller-top">
-        <div>
-          <p className="eyebrow">Bitácora Campo</p>
-          <p className="muted small seller-top-meta">
-            {formatLongDate()}
-            {user?.route_name ? ` · ${user.route_name}` : ""}
-          </p>
+        <div className="seller-top-brand">
+          <BrandLogo size={32} className="seller-top-logo" />
+          <div>
+            <p className="eyebrow">EnRutas</p>
+            <p className="muted small seller-top-meta">
+              {formatLongDate()}
+              {user?.route_name ? ` · ${user.route_name}` : ""}
+            </p>
+          </div>
         </div>
         <Button variant="ghost" onClick={logout} aria-label="Cerrar sesión" className="seller-logout">
           <LogOut size={18} />

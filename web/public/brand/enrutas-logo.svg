@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140" role="img" aria-label="EnRutas">
+  <!-- Pin -->
+  <path
+    fill="#2d4a42"
+    d="M60 8c-22.1 0-40 17.7-40 39.5C20 72 60 128 60 128s40-56 40-80.5C100 25.7 82.1 8 60 8z"
+  />
+  <!-- Cream disc -->
+  <circle cx="60" cy="48" r="26" fill="#f6f2eb"/>
+  <!-- Soft highlight on pin rim -->
+  <path
+    fill="none"
+    stroke="#f6f2eb"
+    stroke-width="3"
+    stroke-linecap="round"
+    d="M78 30c6 5 10 12 10 20"
+    opacity=".55"
+  />
+  <!-- Check -->
+  <path
+    fill="none"
+    stroke="#e87a5d"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="M46 49l10 10 18-20"
+  />
+  <!-- Route path -->
+  <path
+    fill="none"
+    stroke="#e87a5d"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="M28 118h44c12 0 18-8 28-8"
+  />
+  <circle cx="28" cy="118" r="5.5" fill="#e87a5d"/>
+  <circle cx="100" cy="110" r="5.5" fill="#e87a5d"/>
+</svg>

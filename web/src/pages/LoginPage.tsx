@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { BrandLogo } from "../components/BrandLogo";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { ApiError } from "../lib/api";
@@ -37,10 +38,10 @@ export function LoginPage() {
   return (
     <div className="app-shell login-shell">
       <header className="login-header">
-        <span className="brand-mark" aria-hidden />
-        <p className="eyebrow">Bitácora Campo</p>
+        <BrandLogo size={72} className="login-logo" />
+        <p className="eyebrow">EnRutas</p>
         <h1 className="display-title">Entrar a la ruta.</h1>
-        <p className="muted">Vendedor y supervisor con la misma app · JWT + FastAPI.</p>
+        <p className="muted">Visitas, ventas y evidencia GPS · vendedor y supervisor.</p>
       </header>
 
       <form className="card login-card" onSubmit={onSubmit}>

@@ -4,11 +4,12 @@ Decisiones y pendientes hablados en chat, para no perderlos.
 
 ---
 
-## UI / tipografía (SF-2.6)
+## UI / tipografía / marca
 
-- Referencia visual: mock Replit (supervisor / seller / inventory) — crema, verde, coral.
-- **Fraunces descartada** para titulares; usamos **DM Sans** en toda la app.
-- Refresh aplicado en login, inicio vendedor, hoy supervisor e inventario (móvil + desktop).
+- Referencia visual: mock Replit + logo **EnRutas** (pin verde, check coral, ruta).
+- **Fraunces descartada**; tipografía **DM Sans**.
+- Marca en UI: **EnRutas** (logo SVG en `web/public/brand/enrutas-logo.svg`).
+- Consistencia SF-2.6b: logo en login/topbar/sidebar; sin doble «Salir» en desktop vendedor; marks de barra sustituidos por logo.
 
 - Nombre de producto en exploración: **EnRutas** (dejar de usar solo “Bitácora” en cara al cliente).
 - Dominio elegido para piloto: **`enrutas.cc`** (Namecheap; renovación ~$14/año aprox.).
