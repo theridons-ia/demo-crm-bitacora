@@ -38,4 +38,30 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "visits", "gps_skipped", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(engine, "visits", "gps_skip_reason", "VARCHAR(255)")
     _add_column_if_missing(engine, "visits", "photo_evidence", "TEXT")
+    _add_column_if_missing(engine, "visits", "scheduled_time", "TIME")
     _add_column_if_missing(engine, "sales", "fx_rate_usd_ves", "NUMERIC(14,4)")
+    _add_column_if_missing(engine, "sales", "bank_account_id", "INTEGER")
+    _add_column_if_missing(engine, "sales", "payment_reference", "VARCHAR(64)")
+    _add_column_if_missing(engine, "sales", "payment_evidence", "TEXT")
+    _add_column_if_missing(engine, "sales", "quote_snapshot", "TEXT")
+    _add_column_if_missing(engine, "sale_payments", "bank_account_id", "INTEGER")
+    _add_column_if_missing(engine, "sale_payments", "payment_reference", "VARCHAR(64)")
+    _add_column_if_missing(engine, "sale_payments", "payment_evidence", "TEXT")
+
+    # Extender enum PaymentMethod si es nativo en Postgres
+    with engine.begin() as conn:
+        try:
+            conn.execute(
+                text(
+                    """
+                    DO $$ BEGIN
+                      ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'pago_movil';
+                    EXCEPTION
+                      WHEN duplicate_object THEN null;
+                      WHEN undefined_object THEN null;
+                    END $$;
+                    """
+                )
+            )
+        except Exception:
+            pass

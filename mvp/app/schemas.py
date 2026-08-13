@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -6,8 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .models import (
     AlertSeverity,
     AlertType,
+    BankAccountType,
+    BankMovementKind,
     CurrencyCode,
     GpsPointSource,
+    PayableStatus,
     PaymentMethod,
     SaleOrigin,
     SaleResult,
@@ -78,6 +81,14 @@ class ClientOut(ORMModel):
     longitude: Decimal | None = None
     is_active: bool
 
+
+class ClientAssignmentsOut(BaseModel):
+    seller_id: int
+    client_ids: list[int]
+
+
+class ClientAssignmentsUpdate(BaseModel):
+    client_ids: list[int] = Field(default_factory=list)
 
 class ClientUpdate(BaseModel):
     """Actualización de cliente (SF-1.12). Mismos campos que el alta."""
@@ -211,7 +222,11 @@ class SaleIn(BaseModel):
     currency: CurrencyCode = CurrencyCode.USD
     payment_method: PaymentMethod = PaymentMethod.cash_usd
     is_credit: bool = False
+    bank_account_id: int | None = None
+    payment_reference: str | None = Field(default=None, max_length=64)
+    payment_evidence: str | None = Field(default=None, max_length=600_000)
     notes: str | None = None
+    quote_snapshot: str | None = Field(default=None, max_length=200_000)
     items: list[SaleItemIn] = Field(default_factory=list)
     local_uuid: str | None = None
     created_offline: bool = False
@@ -245,10 +260,13 @@ class SaleOut(ORMModel):
     origin: SaleOrigin
     currency: CurrencyCode
     payment_method: PaymentMethod
+    bank_account_id: int | None = None
+    payment_reference: str | None = None
     total_amount: Decimal
     is_credit: bool
     fx_rate_usd_ves: Decimal | None = None
     notes: str | None
+    quote_snapshot: str | None = None
     created_offline: bool
     created_at: datetime
     items: list[SaleItemOut] = []
@@ -259,6 +277,9 @@ class SalePaymentCreate(BaseModel):
     amount: Decimal = Field(gt=0)
     currency: CurrencyCode = CurrencyCode.USD
     payment_method: PaymentMethod = PaymentMethod.cash_usd
+    bank_account_id: int | None = None
+    payment_reference: str | None = Field(default=None, max_length=64)
+    payment_evidence: str | None = Field(default=None, max_length=600_000)
     notes: str | None = Field(default=None, max_length=255)
 
 
@@ -268,6 +289,8 @@ class SalePaymentOut(ORMModel):
     amount: Decimal
     currency: CurrencyCode
     payment_method: PaymentMethod
+    bank_account_id: int | None = None
+    payment_reference: str | None = None
     notes: str | None
     received_by_id: int
     created_at: datetime
@@ -289,11 +312,71 @@ class ReceivableOut(BaseModel):
     payments: list[SalePaymentOut] = []
 
 
+class BankAccountCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    bank_name: str | None = Field(default=None, max_length=80)
+    account_type: BankAccountType = BankAccountType.bank
+    currency: CurrencyCode = CurrencyCode.USD
+    pay_hint: str | None = Field(default=None, max_length=160)
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class BankAccountUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    bank_name: str | None = Field(default=None, max_length=80)
+    account_type: BankAccountType | None = None
+    currency: CurrencyCode | None = None
+    pay_hint: str | None = Field(default=None, max_length=160)
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
+class BankAccountOut(ORMModel):
+    id: int
+    name: str
+    bank_name: str | None
+    account_type: BankAccountType
+    currency: CurrencyCode
+    pay_hint: str | None
+    is_active: bool
+    sort_order: int
+    balance: Decimal = Decimal("0")
+    created_at: datetime
+
+
+class BankMovementOut(ORMModel):
+    id: int
+    bank_account_id: int
+    kind: BankMovementKind
+    amount: Decimal
+    currency: CurrencyCode
+    payment_method: PaymentMethod | None = None
+    reference: str | None = None
+    notes: str | None = None
+    sale_id: int | None = None
+    sale_payment_id: int | None = None
+    created_at: datetime
+    account_name: str | None = None
+
+
+class PayableOut(ORMModel):
+    id: int
+    supplier_name: str
+    description: str | None
+    amount: Decimal
+    currency: CurrencyCode
+    status: PayableStatus
+    due_date: date | None
+    created_at: datetime
+
+
 class VisitCreate(BaseModel):
     client_id: int
     status: VisitStatus = VisitStatus.en_curso
     description: str | None = None
     scheduled_date: date | None = None
+    scheduled_time: time | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     gps_accuracy_m: Decimal | None = None
@@ -329,6 +412,7 @@ class VisitAssign(BaseModel):
     seller_id: int
     client_id: int
     scheduled_date: date
+    scheduled_time: time | None = None
     description: str | None = None
 
 
@@ -340,6 +424,7 @@ class VisitOut(ORMModel):
     result: SaleResult | None
     description: str | None
     scheduled_date: date | None
+    scheduled_time: time | None = None
     visited_at: datetime | None
     latitude: Decimal | None
     longitude: Decimal | None

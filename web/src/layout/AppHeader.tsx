@@ -1,0 +1,337 @@
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  AlertTriangle,
+  Bell,
+  Check,
+  ChevronDown,
+  DollarSign,
+  LogOut,
+  Settings,
+  SlidersHorizontal,
+  UserRound,
+} from "lucide-react";
+import { useAuth } from "../auth/AuthContext";
+import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
+import type { VisitAlert } from "../lib/types";
+import { accountBasePath, crumbForPath, roleLabel } from "./appNav";
+import { HeaderQuickRegister } from "../components/HeaderQuickRegister";
+
+function formatAlertWhen(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("es-VE", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/** Header superior: breadcrumb + campana (dropdown alertas) + perfil. */
+export function AppHeader() {
+  const { user, logout } = useAuth();
+  const { pathname } = useLocation();
+  const crumb = crumbForPath(pathname);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [alerts, setAlerts] = useState<VisitAlert[]>([]);
+  const [alertCount, setAlertCount] = useState(0);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [ackBusy, setAckBusy] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const alertsRef = useRef<HTMLDivElement>(null);
+  const base = accountBasePath(user?.role);
+  const isSupervisor = user?.role === "supervisor" || user?.role === "admin";
+
+  useEffect(() => {
+    setProfileOpen(false);
+    setAlertsOpen(false);
+  }, [pathname]);
+
+  async function refreshAlertCount() {
+    if (!isSupervisor) {
+      setAlertCount(0);
+      return;
+    }
+    try {
+      const list = await fetchAlerts({ unacked_only: true });
+      setAlertCount(list.length);
+    } catch (err) {
+      if (!(err instanceof ApiError)) setAlertCount(0);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isSupervisor) {
+        setAlertCount(0);
+        return;
+      }
+      try {
+        const list = await fetchAlerts({ unacked_only: true });
+        if (!cancelled) setAlertCount(list.length);
+      } catch (err) {
+        if (!cancelled && !(err instanceof ApiError)) setAlertCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSupervisor, pathname]);
+
+  useEffect(() => {
+    if (!profileOpen && !alertsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (profileOpen && menuRef.current && !menuRef.current.contains(t)) {
+        setProfileOpen(false);
+      }
+      if (alertsOpen && alertsRef.current && !alertsRef.current.contains(t)) {
+        setAlertsOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setProfileOpen(false);
+        setAlertsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [profileOpen, alertsOpen]);
+
+  async function openAlerts() {
+    setProfileOpen(false);
+    const next = !alertsOpen;
+    setAlertsOpen(next);
+    if (!next) return;
+    setAlertsLoading(true);
+    try {
+      const list = await fetchAlerts({ unacked_only: true });
+      setAlerts(list.slice(0, 8));
+      setAlertCount(list.length);
+    } catch {
+      setAlerts([]);
+    } finally {
+      setAlertsLoading(false);
+    }
+  }
+
+  async function onAck(alertId: number) {
+    setAckBusy(alertId);
+    try {
+      await acknowledgeAlert(alertId);
+      setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      setAlertCount((c) => Math.max(0, c - 1));
+    } catch {
+      /* keep list */
+    } finally {
+      setAckBusy(null);
+    }
+  }
+
+  return (
+    <header className="app-header">
+      <nav className="app-breadcrumb" aria-label="Ruta">
+        <span className="app-crumb-section">{crumb.section}</span>
+        <span className="app-crumb-sep" aria-hidden>
+          /
+        </span>
+        <span className="app-crumb-page">{crumb.page}</span>
+      </nav>
+
+      <div className="app-header-actions">
+        {user?.role === "vendedor" ? <HeaderQuickRegister /> : null}
+
+        {isSupervisor ? (
+          <div className="app-header-alerts" ref={alertsRef}>
+            <button
+              type="button"
+              className="app-header-bell"
+              aria-label={
+                alertCount > 0 ? `Alertas (${alertCount} pendientes)` : "Alertas"
+              }
+              aria-expanded={alertsOpen}
+              aria-haspopup="dialog"
+              title="Alertas"
+              onClick={() => void openAlerts()}
+            >
+              <Bell size={18} strokeWidth={2} />
+              {alertCount > 0 ? (
+                <span className="app-header-bell-badge">
+                  {alertCount > 9 ? "9+" : alertCount}
+                </span>
+              ) : (
+                <span className="app-header-bell-dot" aria-hidden />
+              )}
+            </button>
+
+            {alertsOpen ? (
+              <div className="app-alerts-panel" role="dialog" aria-label="Alertas pendientes">
+                <div className="app-alerts-panel-head">
+                  <div>
+                    <p className="eyebrow">Operación</p>
+                    <h2 className="app-alerts-panel-title">Alertas</h2>
+                  </div>
+                  <span className="muted small">{alertCount} pendientes</span>
+                </div>
+
+                {alertsLoading ? <p className="muted small">Cargando…</p> : null}
+
+                {!alertsLoading && alerts.length === 0 ? (
+                  <p className="muted small">Sin alertas pendientes.</p>
+                ) : null}
+
+                <ul className="app-alerts-list">
+                  {alerts.map((a) => (
+                    <li key={a.id} className="app-alerts-item">
+                      <span className="app-alerts-icon" aria-hidden>
+                        <AlertTriangle size={14} />
+                      </span>
+                      <div className="app-alerts-copy">
+                        <strong>{a.message}</strong>
+                        <span>
+                          {a.seller_name ?? "Vendedor"}
+                          {a.client_name ? ` · ${a.client_name}` : ""}
+                          {` · ${formatAlertWhen(a.created_at)}`}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="app-alerts-ack"
+                        disabled={ackBusy === a.id}
+                        onClick={() => void onAck(a.id)}
+                        title="Marcar vista"
+                      >
+                        <Check size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="app-alerts-panel-foot">
+                  <Link
+                    to="/sup/alertas"
+                    className="link-accent"
+                    onClick={() => {
+                      setAlertsOpen(false);
+                      void refreshAlertCount();
+                    }}
+                  >
+                    Ver todas las alertas
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="app-header-bell"
+            aria-label="Notificaciones"
+            title="Notificaciones"
+            disabled
+          >
+            <Bell size={18} strokeWidth={2} />
+          </button>
+        )}
+
+        <div className="app-header-profile" ref={menuRef}>
+          <button
+            type="button"
+            className="app-header-profile-btn"
+            aria-expanded={profileOpen}
+            aria-haspopup="menu"
+            onClick={() => {
+              setAlertsOpen(false);
+              setProfileOpen((v) => !v);
+            }}
+          >
+            <span className="avatar-chip avatar-chip-sm" aria-hidden>
+              {user?.initials ?? "—"}
+            </span>
+            <span className="app-header-profile-name">
+              {user?.full_name?.split(" ")[0] ?? "Usuario"}
+            </span>
+            <ChevronDown size={16} aria-hidden />
+          </button>
+
+          {profileOpen ? (
+            <div className="app-header-menu" role="menu">
+              <div className="app-header-menu-meta">
+                <p className="app-profile-name">{user?.full_name}</p>
+                <p className="muted small">
+                  {roleLabel(user?.role)}
+                  {user?.route_name ? ` · ${user.route_name}` : ""}
+                </p>
+              </div>
+              <Link
+                to={`${base}/perfil`}
+                className="app-header-menu-link"
+                role="menuitem"
+                onClick={() => setProfileOpen(false)}
+              >
+                <UserRound size={16} aria-hidden />
+                Perfil
+              </Link>
+              <Link
+                to={`${base}/ajustes`}
+                className="app-header-menu-link"
+                role="menuitem"
+                onClick={() => setProfileOpen(false)}
+              >
+                <Settings size={16} aria-hidden />
+                Ajustes
+              </Link>
+              <Link
+                to={`${base}/preferencias`}
+                className="app-header-menu-link"
+                role="menuitem"
+                onClick={() => setProfileOpen(false)}
+              >
+                <SlidersHorizontal size={16} aria-hidden />
+                Preferencias
+              </Link>
+              {isSupervisor ? (
+                <Link
+                  to="/sup/fx"
+                  className="app-header-menu-link"
+                  role="menuitem"
+                  onClick={() => setProfileOpen(false)}
+                >
+                  <DollarSign size={16} aria-hidden />
+                  Tasa FX
+                </Link>
+              ) : null}
+              {user?.role === "vendedor" ? (
+                <Link
+                  to="/app/desempeno"
+                  className="app-header-menu-link"
+                  role="menuitem"
+                  onClick={() => setProfileOpen(false)}
+                >
+                  Desempeño
+                </Link>
+              ) : null}
+              <button
+                type="button"
+                className="app-header-menu-item"
+                role="menuitem"
+                onClick={logout}
+              >
+                <LogOut size={16} aria-hidden />
+                Cerrar sesión
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </header>
+  );
+}

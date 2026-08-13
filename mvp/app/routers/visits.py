@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_supervisor
 from ..database import get_db
+from ..services.client_assignments import assign_client_to_seller, seller_can_see_client
 from ..models import Client, GpsPointSource, Sale, User, UserRole, Visit, VisitGpsPoint, VisitStatus
-from ..schemas import VisitAssign, VisitClose, VisitCreate, VisitOut, VisitStart
+from ..schemas import SaleIn, SaleOut, VisitAssign, VisitClose, VisitCreate, VisitOut, VisitStart
+from ..services.sales import create_sale_for_open_visit
 from ..services.visits import close_visit_with_optional_sale
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
@@ -33,7 +35,11 @@ def list_visits(
     seller_id: int | None = Query(default=None),
     status: VisitStatus | None = Query(default=None),
 ):
-    query = _visit_query(db).order_by(Visit.scheduled_date.asc().nullslast(), Visit.created_at.desc())
+    query = _visit_query(db).order_by(
+        Visit.scheduled_date.asc().nullslast(),
+        Visit.scheduled_time.asc().nullslast(),
+        Visit.created_at.desc(),
+    )
     if current_user.role.value == "vendedor":
         query = query.filter(Visit.seller_id == current_user.id)
     elif seller_id is not None:
@@ -66,12 +72,16 @@ def assign_visit(
     if not client:
         raise HTTPException(status_code=400, detail="Cliente no válido")
 
+    # Asegurar cartera: al planificar ruta el cliente queda asignado al vendedor
+    assign_client_to_seller(db, payload.seller_id, payload.client_id)
+
     visit = Visit(
         seller_id=payload.seller_id,
         client_id=payload.client_id,
         status=VisitStatus.programada,
         description=payload.description,
         scheduled_date=payload.scheduled_date,
+        scheduled_time=payload.scheduled_time,
     )
     db.add(visit)
     db.commit()
@@ -109,6 +119,14 @@ def create_visit(
         if existing:
             return _visit_query(db).filter(Visit.id == existing.id).one()
 
+    client = db.query(Client).filter(Client.id == payload.client_id, Client.is_active.is_(True)).first()
+    if not client:
+        raise HTTPException(status_code=400, detail="Cliente no válido")
+    if current_user.role == UserRole.vendedor:
+        if not seller_can_see_client(db, current_user, payload.client_id):
+            # Alta de visita sobre cliente propio: lo mete en cartera
+            assign_client_to_seller(db, current_user.id, payload.client_id)
+
     now = datetime.now(timezone.utc)
     visit = Visit(
         seller_id=current_user.id,
@@ -116,6 +134,7 @@ def create_visit(
         status=payload.status,
         description=payload.description,
         scheduled_date=payload.scheduled_date,
+        scheduled_time=payload.scheduled_time,
         latitude=payload.latitude,
         longitude=payload.longitude,
         gps_accuracy_m=payload.gps_accuracy_m,
@@ -182,6 +201,25 @@ def start_visit(
     return _visit_query(db).filter(Visit.id == visit_id).one()
 
 
+@router.post("/{visit_id}/sale", response_model=SaleOut)
+def create_visit_sale(
+    visit_id: int,
+    payload: SaleIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Registra la OV en una visita en_curso; la ficha sigue abierta hasta cerrar visita."""
+    visit = (
+        db.query(Visit)
+        .options(joinedload(Visit.sale), joinedload(Visit.client))
+        .filter(Visit.id == visit_id)
+        .first()
+    )
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visita no encontrada")
+    return create_sale_for_open_visit(db, visit, payload, seller=current_user)
+
+
 @router.post("/{visit_id}/close", response_model=VisitOut)
 def close_visit(
     visit_id: int,
@@ -191,7 +229,7 @@ def close_visit(
 ):
     visit = (
         db.query(Visit)
-        .options(joinedload(Visit.client))
+        .options(joinedload(Visit.client), joinedload(Visit.sale))
         .filter(Visit.id == visit_id)
         .first()
     )

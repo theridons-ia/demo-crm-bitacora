@@ -1,0 +1,123 @@
+---
+description: UI EnRutas — design system, shell, nav móvil, anti-overflow
+globs: web/src/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# UI EnRutas
+
+Fuente de verdad visual: `demo-crm-bitacora-export/` + tokens en `web/src/styles/tokens.css` + componentes en `web/src/components/`.
+
+## Principios
+
+- Una composición por viewport (no “dashboard” de cards sueltas en el hero).
+- Marca EnRutas visible; tipografía DM Sans (tokens); fondos con atmósfera (no flat genérico AI).
+- Preferir `Button`, `TextField`/`SelectField`, `Modal`, `SideSheet`, `FormStep`, fichas (`.ficha`), badges existentes.
+- Overlays: ver regla `overlays.mdc` (Modal vs SideSheet + scrim oscuro).
+- No inventar paletas purple/indigo ni rediseñar páginas enteras sin pedido explícito.
+
+## Navegación
+
+### Vendedor (móvil)
+Bottom tabbar **5 ítems**: Inicio · Visitas · Ventas · Inventario · Clientes.  
+Secundarios (ruta, desempeño, cuenta) vía header/perfil.
+
+### Supervisor (móvil)
+**No** meter 10 destinos en el tabbar ni chips horizontales interminables.  
+Patrón obligatorio:
+
+1. Bottom tabbar **4 primarios + Más**:
+   - Inicio · Ruta · Visitas · Clientes · **Más**
+2. **Más** abre hoja inferior (`SideSheet` / menú) con el resto:
+   - Ventas · Vendedores · Catálogo · Inventario · Cobranza · Mapa equipo
+3. Alertas y FX viven en **header** (campana / menú perfil), no en el tabbar.
+4. Desktop (≥900px): sidebar completa (todos los ítems). Sin tabbar.
+
+Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pantalla “Actividad”); no fusionar módulos distintos solo para ahorrar un ítem de menú.
+
+## Panel derecho (workspace aside)
+
+- **Móvil / &lt;1100px:** no mostrar columna derecha.
+- **Desktop ≥1100px:** solo si hay contenido útil (`asideExtra` / widgets reales).
+- Prohibido: título duplicado de la página, placeholder “Info contextual”, tips vacíos.
+- `WorkspacePage` / `PageWorkspace`: omitir `aside` si no hay widgets.
+
+## Anti-overflow móvil
+
+- Nunca `width: 100vw` en layouts (usa `100%`).
+- Contenedores flex/grid: `min-width: 0`.
+- Tablas/mapas/listas anchas: scroll **local** (`overflow-x: auto` en el hijo), no en `body`.
+- `html, body, #root, .app-frame`: sin scroll horizontal de página.
+- Probar mentalmente ~360–412px (Galaxy / Pixel).
+
+## Al tocar UI
+
+1. Reusar clases/tokens existentes.
+2. Si hay screenshot del usuario: listar inconsistencias y arreglar solo esas.
+3. No regenerar layouts “bonitos” desde cero.
+
+## Ficha de visita + LED en curso
+
+- Detalle: `VisitDetailSheet` — hero de estado + `dl` denso (`visit-detail-row`), no lista suelta con mucho aire.
+- **En curso:** componente `LiveLed` (punto coral parpadeante) en ficha, card activa, lista y agenda.
+- Al crear visita (ahora/programada): cerrar form y **abrir la ficha** de esa visita (`setDetailVisit`), no solo dejar el listado.
+- No mostrar UI de «Activar GPS de prueba» en producción/demo vendedor.
+
+## Venta en visita (flujo principal)
+
+1. Visita **en curso** → **Registrar venta** (`VisitSaleWizard` en `Modal` wide):  
+   **1 Productos+moneda → 2 Pago → 3 Resumen** (`QuoteDocument` descargable PNG/PDF).
+2. Confirmar OV → se guarda `quote_snapshot` (documento) y vuelves a la ficha con banner **OV-#**, total e ítems; la visita **sigue abierta**.
+   - Ver después: ficha visita «Ver cotización / OV» o Ventas → clic fila → pestaña **Cotización / documento** (PNG/PDF).
+3. **Cerrar visita** (`CloseVisitSheet`): **solo evidencia** GPS/foto.  
+   - Si no hay OV: advertencia → «Registrar venta» o «Cerrar sin venta».  
+   - **No** volver a cotizar en el cierre.
+4. API: `POST /api/visits/{id}/sale`. Cierre con OV existente no reenvía productos.
+5. Cotizador: `SaleQuoter` por select (sin barra de búsqueda redundante).
+6. Overlay: wizard largo = `Modal`; no inventar pantalla full-page.
+
+## Wizard de venta standalone
+
+- Alta sin visita: rail `WizardSteps` **1 Cliente → 2 Productos → 3 Pago**.
+- Cotizar / confirmar solo en el paso 3.
+
+## Lista de Ventas
+
+- No usar fichas sueltas para el listado: `SalesTable` (columnas densas, fecha desc.).
+- Clic en fila → `SaleDetailSheet` (resumen OV + líneas).
+- Mismo patrón visual que inventario (`stock-table-*`).
+
+## Feeling FINA → EnRutas
+
+- Emular **estructura** (KPI tiles, action stack, hub finanzas), no la paleta morada.
+- Tokens: `--primary` teal, `--accent` coral, cream `--background`.
+- `MetricTile` / `MetricGrid` para KPIs; `ActionStack` solo en hubs de acción.
+- `PaymentCapture` en venta contado / cierre con venta / abonos.
+- Bancos = catálogo de cuentas de la empresa; el vendedor solo elige destino.
+- Cotizador: `SaleQuoter` con líneas + subtotales; copiar cotización ≠ confirmar venta.
+
+## Acciones rápidas (vendedor)
+
+- **Móvil (&lt;900px):** FAB coral (`QuickAddFab`) encima del tabbar.
+- **Desktop (≥900px):** botón **Registrar** en el header (`HeaderQuickRegister`); FAB oculto.
+- Mismo menú: visita · venta · cliente. No duplicar FAB + Registrar a la vez.
+
+## Botones y choice groups
+
+- CTA de página (`Nueva`, etc.): `page-header page-header-with-action` + `Button` — **nunca** full-width por `page-header-stack`.
+- Opciones cortas (origen, moneda, resultado): `.choice-group` + `.chip` (compacto, ancho al contenido).
+- Solo usar `.id-type-toggle` (grid 1fr 1fr) cuando las dos opciones deban ocupar el mismo ancho (ej. CI / RIF).
+- Prohibido: chips o botones de 2 opciones estirados a 100% del modal sin necesidad.
+
+## Cotizador de venta
+
+- No listar todo el catálogo con qty en cada fila.
+- Usar `SaleQuoter`: filas producto (select) + precio + stock + cantidad + quitar; botón **Agregar producto**.
+- Misma UI en venta sin visita y cierre de visita con venta.
+- Visual alineado a columnas de inventario (`StockTable`).
+
+## Panel derecho (métricas)
+
+- KPIs simples: componente `AsideStats` (eyebrow + título + filas label/valor).
+- `chart-card` + `bar-list` solo si hay **barras reales** (ranking / progreso).
+- Prohibido: card «Resumen» con solo textos sueltos sin jerarquía.

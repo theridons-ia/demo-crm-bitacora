@@ -5,8 +5,9 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Sale, SalePayment, User
+from ..models import PaymentMethod, Sale, SalePayment, User
 from ..schemas import ReceivableOut, SalePaymentCreate, SalePaymentOut
+from .banks import record_sale_collection
 
 
 def _paid_amount(sale: Sale) -> Decimal:
@@ -20,6 +21,8 @@ def _payment_out(p: SalePayment) -> SalePaymentOut:
         amount=p.amount,
         currency=p.currency,
         payment_method=p.payment_method,
+        bank_account_id=p.bank_account_id,
+        payment_reference=p.payment_reference,
         notes=p.notes,
         received_by_id=p.received_by_id,
         created_at=p.created_at,
@@ -100,15 +103,20 @@ def register_payment(
             detail=f"El abono ({payload.amount}) supera el saldo ({balance})",
         )
 
-    payment = SalePayment(
-        sale_id=sale.id,
+    if payload.payment_method == PaymentMethod.credit:
+        raise HTTPException(status_code=400, detail="El abono no puede ser a crédito")
+
+    record_sale_collection(
+        db,
+        sale=sale,
+        actor=actor,
         amount=payload.amount,
-        currency=payload.currency,
         payment_method=payload.payment_method,
+        bank_account_id=payload.bank_account_id,
+        payment_reference=payload.payment_reference,
+        payment_evidence=payload.payment_evidence,
         notes=payload.notes,
-        received_by_id=actor.id,
     )
-    db.add(payment)
     db.commit()
 
     sale = (

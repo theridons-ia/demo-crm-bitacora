@@ -207,8 +207,25 @@ def close_visit_with_optional_sale(
                 meta_json=f'{{"distance_m": {dist:.1f}}}',
             )
 
+    existing_sale = (
+        visit.sale
+        if visit.sale is not None
+        else db.query(Sale).filter(Sale.visit_id == visit.id).first()
+    )
     needs_sale = result in (SaleResult.venta_parcial, SaleResult.venta_cerrada)
-    if needs_sale:
+
+    if existing_sale is not None:
+        if result == SaleResult.sin_venta:
+            raise HTTPException(
+                status_code=400,
+                detail="La visita ya tiene OV; cierra con resultado de venta",
+            )
+        if sale_in and sale_in.items:
+            raise HTTPException(
+                status_code=400,
+                detail="La venta ya está registrada; no reenvíes productos al cerrar",
+            )
+    elif needs_sale:
         if not sale_in or not sale_in.items:
             raise HTTPException(status_code=400, detail="Debes indicar productos para una venta")
         seller = db.query(User).filter(User.id == seller_id).first()
@@ -230,15 +247,37 @@ def close_visit_with_optional_sale(
             origin=SaleOrigin.visita,
             currency=sale_in.currency,
             payment_method=sale_in.payment_method,
+            bank_account_id=None if sale_in.is_credit else sale_in.bank_account_id,
+            payment_reference=None if sale_in.is_credit else sale_in.payment_reference,
+            payment_evidence=None if sale_in.is_credit else sale_in.payment_evidence,
             total_amount=total,
             is_credit=sale_in.is_credit,
             fx_rate_usd_ves=fx_rate,
             notes=sale_in.notes,
+            quote_snapshot=sale_in.quote_snapshot,
             local_uuid=sale_in.local_uuid,
             created_offline=sale_in.created_offline,
             items=items,
         )
         db.add(sale)
+        db.flush()
+        from .sales import _stamp_quote_snapshot
+
+        sale.quote_snapshot = _stamp_quote_snapshot(sale_in.quote_snapshot, sale_id=sale.id)
+        if not sale_in.is_credit:
+            from .banks import record_sale_collection
+
+            actor = db.query(User).filter(User.id == seller_id).first()
+            if actor:
+                record_sale_collection(
+                    db,
+                    sale=sale,
+                    actor=actor,
+                    payment_method=sale_in.payment_method,
+                    bank_account_id=sale_in.bank_account_id,
+                    payment_reference=sale_in.payment_reference,
+                    payment_evidence=sale_in.payment_evidence,
+                )
     elif sale_in and sale_in.items:
         raise HTTPException(status_code=400, detail="No envíes productos si el resultado es sin venta")
 

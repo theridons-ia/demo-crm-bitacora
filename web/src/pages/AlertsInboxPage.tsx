@@ -1,6 +1,7 @@
 import { Check, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../components/Button";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
 import type { AlertSeverity, AlertType, VisitAlert } from "../lib/types";
 
@@ -72,7 +73,11 @@ export function AlertsInboxPage() {
   }
 
   return (
-    <>
+    <WorkspacePage
+      eyebrow="Operación"
+      title="Alertas"
+      blurb="Revisa y marca como vistas las alertas GPS y foto del equipo."
+    >
       <header className="page-header">
         <div>
           <p className="eyebrow">Supervisor</p>
@@ -159,6 +164,6 @@ export function AlertsInboxPage() {
           );
         })}
       </ul>
-    </>
+    </WorkspacePage>
   );
 }

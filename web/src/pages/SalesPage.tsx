@@ -1,14 +1,36 @@
-import { Plus, Receipt, ShoppingCart } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Plus, ShoppingCart } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { AsideStats } from "../components/AsideStats";
 import { Button } from "../components/Button";
+import { ListSearch } from "../components/ListSearch";
+import { MetricGrid, MetricTile } from "../components/MetricTile";
+import { Modal } from "../components/Modal";
+import {
+  emptyPaymentCapture,
+  PaymentCapture,
+  type PaymentCaptureValue,
+} from "../components/PaymentCapture";
+import { SaleDetailSheet } from "../components/SaleDetailSheet";
+import {
+  newQuoteLine,
+  quoteLinesToItems,
+  quoteLinesTotal,
+  SaleQuoter,
+  type QuoteLine,
+} from "../components/SaleQuoter";
+import { SalesTable } from "../components/SalesTable";
+import { WizardSteps } from "../components/WizardSteps";
 import { TextField } from "../components/TextField";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
   createSale,
+  fetchBankAccounts,
   fetchClients,
   fetchFxToday,
   fetchProducts,
   fetchSales,
+  fetchSellers,
   type SaleCreateInput,
 } from "../lib/api";
 import { newLocalUuid } from "../lib/offlineDb";
@@ -17,49 +39,59 @@ import {
   getCachedClients,
   getCachedProducts,
 } from "../lib/offlineQueue";
-import type { Client, CurrencyCode, Product, Sale, SaleOrigin } from "../lib/types";
+import { sortSalesNewestFirst } from "../lib/saleLabels";
+import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
+import { draftQuoteCode, buildQuoteLines } from "../components/QuoteDocument";
+import { useAuth } from "../auth/AuthContext";
+import type {
+  BankAccount,
+  Client,
+  CurrencyCode,
+  Product,
+  Sale,
+  SaleOrigin,
+  User,
+} from "../lib/types";
 
-type QtyMap = Record<number, number>;
-type StandaloneOrigin = Exclude<SaleOrigin, "visita">;
-
-const ORIGIN_LABEL: Record<SaleOrigin, string> = {
-  visita: "Visita",
-  mostrador: "Mostrador",
-  online: "Online",
+type SalesPageProps = {
+  teamView?: boolean;
 };
 
-function formatWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("es-VE", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
+type StandaloneOrigin = Exclude<SaleOrigin, "visita">;
 
-/** Órdenes: lista + alta sin visita (mostrador / online). */
-export function SalesPage() {
+/** Órdenes: lista + alta sin visita (mostrador / online) en Modal. */
+export function SalesPage({ teamView = false }: SalesPageProps) {
+  const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
+  const [sellers, setSellers] = useState<User[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [detailSale, setDetailSale] = useState<Sale | null>(null);
+  const [query, setQuery] = useState("");
 
   const [clientId, setClientId] = useState<number | "">("");
   const [origin, setOrigin] = useState<StandaloneOrigin>("mostrador");
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
-  const [qty, setQty] = useState<QtyMap>({});
+  const [lines, setLines] = useState<QuoteLine[]>(() => [newQuoteLine()]);
   const [notes, setNotes] = useState("");
   const [isCredit, setIsCredit] = useState(false);
+  const [payment, setPayment] = useState<PaymentCaptureValue>(() => emptyPaymentCapture());
   const [fxRate, setFxRate] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
+  const submitIntent = useRef<"quote" | "sale">("sale");
+
+  const SALE_STEPS = [
+    { id: "cliente", label: "Cliente" },
+    { id: "productos", label: "Productos" },
+    { id: "pago", label: "Pago" },
+  ] as const;
 
   function reload() {
     setLoading(true);
@@ -83,17 +115,56 @@ export function SalesPage() {
   }, []);
 
   useEffect(() => {
+    if (!teamView) return;
+    fetchSellers()
+      .then(setSellers)
+      .catch(() => setSellers([]));
+  }, [teamView]);
+
+  const sellerNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const s of sellers) map.set(s.id, s.full_name);
+    return map;
+  }, [sellers]);
+
+  const filteredSales = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base = sortSalesNewestFirst(sales);
+    if (!q) return base;
+    return base.filter((sale) => {
+      const name = sale.client?.name ?? "";
+      const id = sale.client?.rif ?? sale.client?.ci ?? "";
+      const seller = sellerNameById.get(sale.seller_id) ?? "";
+      return `${name} ${id} ${seller} OV-${sale.id}`.toLowerCase().includes(q);
+    });
+  }, [sales, query, sellerNameById]);
+
+  useEffect(() => {
     if (!composing) return;
     let cancelled = false;
     setLoadingCatalog(true);
+    setLines([newQuoteLine()]);
+    setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
+    setIsCredit(false);
+    setWizardStep(0);
+    setFormError(null);
     (async () => {
       try {
-        const [c, p] = navigator.onLine
-          ? await Promise.all([fetchClients(), fetchProducts()])
-          : await Promise.all([getCachedClients(), getCachedProducts()]);
+        const [c, p, banks] = navigator.onLine
+          ? await Promise.all([
+              fetchClients(),
+              fetchProducts(),
+              fetchBankAccounts({ active_only: true }).catch(() => []),
+            ])
+          : await Promise.all([
+              getCachedClients(),
+              getCachedProducts(),
+              Promise.resolve([] as BankAccount[]),
+            ]);
         if (!cancelled) {
           setClients(c);
           setProducts(p);
+          setAccounts(banks);
           if (c.length && clientId === "") setClientId(c[0].id);
           if (!c.length || !p.length) {
             setFormError("Catálogo incompleto en cache. Conéctate para sincronizar.");
@@ -127,24 +198,53 @@ export function SalesPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir el form
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composing]);
 
-  const total = useMemo(() => {
-    return products.reduce((sum, p) => {
-      const q = qty[p.id] ?? 0;
-      return sum + q * Number(p.price_usd);
-    }, 0);
-  }, [products, qty]);
+  const total = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
 
-  function setProductQty(productId: number, next: number, maxStock: number) {
-    const clamped = Math.max(0, Math.min(next, maxStock));
-    setQty((prev) => {
-      const copy = { ...prev };
-      if (clamped === 0) delete copy[productId];
-      else copy[productId] = clamped;
-      return copy;
-    });
+  const fxHint =
+    currency === "VES"
+      ? fxRate
+        ? `≈ ${(total * fxRate).toLocaleString("es-VE", { maximumFractionDigits: 2 })} Bs (tasa ${fxRate})`
+        : "Liquidar en Bs (falta tasa FX)"
+      : null;
+
+  function canAdvanceFrom(step: number): string | null {
+    if (step === 0) {
+      if (clientId === "") return "Selecciona un cliente";
+      return null;
+    }
+    if (step === 1) {
+      if (!quoteLinesToItems(lines).length) return "Agrega al menos un producto";
+      return null;
+    }
+    return null;
+  }
+
+  function goNext() {
+    const err = canAdvanceFrom(wizardStep);
+    if (err) {
+      setFormError(err);
+      return;
+    }
+    setFormError(null);
+    setWizardStep((s) => Math.min(2, s + 1));
+  }
+
+  function goBack() {
+    setFormError(null);
+    setWizardStep((s) => Math.max(0, s - 1));
+  }
+
+  function resetComposeForm() {
+    setLines([newQuoteLine()]);
+    setNotes("");
+    setIsCredit(false);
+    setOrigin("mostrador");
+    setCurrency("USD");
+    setPayment(emptyPaymentCapture());
+    setWizardStep(0);
   }
 
   async function onSubmit(event: FormEvent) {
@@ -154,21 +254,69 @@ export function SalesPage() {
       setFormError("Selecciona un cliente");
       return;
     }
-    const items = Object.entries(qty)
-      .map(([pid, quantity]) => ({ product_id: Number(pid), quantity }))
-      .filter((line) => line.quantity > 0);
+    const items = quoteLinesToItems(lines);
     if (!items.length) {
       setFormError("Agrega al menos un producto");
       return;
     }
+
+    if (submitIntent.current === "quote") {
+      const client = clients.find((c) => c.id === clientId);
+      const draft = [
+        `COTIZACIÓN · ${client?.name ?? `Cliente #${clientId}`}`,
+        ...items.map((it) => {
+          const p = products.find((x) => x.id === it.product_id);
+          return `· ${p?.name ?? it.product_id} x${it.quantity} = $${(
+            (p ? Number(p.price_usd) : 0) * it.quantity
+          ).toFixed(2)}`;
+        }),
+        `Total: $${total.toFixed(2)} USD`,
+        notes.trim() ? `Nota: ${notes.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      try {
+        await navigator.clipboard.writeText(draft);
+        setFormError(null);
+        setComposing(false);
+        setError(null);
+        window.alert("Cotización copiada al portapapeles. Confirma la venta cuando el cliente acepte.");
+      } catch {
+        setFormError("No se pudo copiar la cotización. Revisa permisos del navegador.");
+      }
+      return;
+    }
+
+    if (!isCredit && !payment.payment_method) {
+      setFormError("Selecciona forma de pago");
+      return;
+    }
+
+    const client = clients.find((c) => c.id === clientId) ?? null;
+    const quote_snapshot = serializeQuoteSnapshot({
+      code: draftQuoteCode(0),
+      issuedAt: new Date(),
+      sellerName: user?.full_name ?? "Vendedor",
+      client,
+      clientFallback: client?.name ?? `Cliente #${clientId}`,
+      currency,
+      fxRate,
+      lines: buildQuoteLines(lines, products),
+      notes: notes.trim() || null,
+      isCredit,
+    });
 
     const payload: SaleCreateInput = {
       client_id: clientId,
       origin,
       currency,
       is_credit: isCredit,
-      payment_method: isCredit ? "credit" : "cash_usd",
+      payment_method: isCredit ? "credit" : payment.payment_method,
+      bank_account_id: isCredit ? null : payment.bank_account_id,
+      payment_reference: isCredit ? null : payment.payment_reference.trim() || null,
+      payment_evidence: isCredit ? null : payment.payment_evidence,
       notes: notes.trim() || null,
+      quote_snapshot,
       items,
       local_uuid: newLocalUuid("sale"),
       created_offline: !navigator.onLine,
@@ -178,11 +326,7 @@ export function SalesPage() {
     try {
       if (!navigator.onLine) {
         await enqueueCreateSale(payload);
-        setQty({});
-        setNotes("");
-        setIsCredit(false);
-        setOrigin("mostrador");
-        setCurrency("USD");
+        resetComposeForm();
         setComposing(false);
         setError(null);
         setFormError(null);
@@ -190,11 +334,7 @@ export function SalesPage() {
       }
       const created = await createSale(payload);
       setSales((prev) => [created, ...prev]);
-      setQty({});
-      setNotes("");
-      setIsCredit(false);
-      setOrigin("mostrador");
-      setCurrency("USD");
+      resetComposeForm();
       setComposing(false);
     } catch (err) {
       if (!navigator.onLine || err instanceof TypeError) {
@@ -213,217 +353,298 @@ export function SalesPage() {
     }
   }
 
-  if (composing) {
-    return (
-      <div className="screen-form">
-        <header className="page-header">
-          <div>
-            <p className="eyebrow">Nueva orden</p>
-            <h1>Venta sin visita</h1>
-            <p className="muted">Mostrador u online · descuenta stock</p>
-          </div>
-          <Button variant="ghost" type="button" onClick={() => setComposing(false)}>
-            Volver
-          </Button>
-        </header>
-
-        <form className="card form-stack" onSubmit={onSubmit}>
-          <div className="field">
-            <label htmlFor="sale-client">Cliente</label>
-            <select
-              id="sale-client"
-              className="input"
-              value={clientId === "" ? "" : String(clientId)}
-              onChange={(e) => setClientId(e.target.value ? Number(e.target.value) : "")}
-              required
-              disabled={loadingCatalog}
-            >
-              <option value="">Selecciona…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.rif ? ` · ${c.rif}` : c.ci ? ` · CI ${c.ci}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Origen</span>
-            <div className="id-type-toggle" role="group">
-              <button
-                type="button"
-                className={origin === "mostrador" ? "chip active" : "chip"}
-                onClick={() => setOrigin("mostrador")}
-              >
-                Mostrador
-              </button>
-              <button
-                type="button"
-                className={origin === "online" ? "chip active" : "chip"}
-                onClick={() => setOrigin("online")}
-              >
-                Online
-              </button>
-            </div>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Moneda</span>
-            <div className="id-type-toggle" role="group">
-              <button
-                type="button"
-                className={currency === "USD" ? "chip active" : "chip"}
-                onClick={() => setCurrency("USD")}
-              >
-                USD
-              </button>
-              <button
-                type="button"
-                className={currency === "VES" ? "chip active" : "chip"}
-                onClick={() => setCurrency("VES")}
-              >
-                Bs (VES)
-              </button>
-            </div>
-          </div>
-
-          <label className="credit-check">
-            <input
-              type="checkbox"
-              checked={isCredit}
-              onChange={(e) => setIsCredit(e.target.checked)}
-            />
-            <span>Venta a crédito (queda en cobranza del supervisor)</span>
-          </label>
-
-          {loadingCatalog ? <p className="muted">Cargando productos…</p> : null}
-
-          <ul className="product-pick-list">
-            {products.map((product) => {
-              const q = qty[product.id] ?? 0;
-              return (
-                <li key={product.id} className="product-pick-row">
-                  <div>
-                    <strong>{product.name}</strong>
-                    <p className="muted small">
-                      {product.sku} · ${Number(product.price_usd).toFixed(2)} / {product.unit} · stock{" "}
-                      {product.stock}
-                    </p>
-                  </div>
-                  <div className="qty-controls">
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      onClick={() => setProductQty(product.id, q - 1, product.stock)}
-                      disabled={q <= 0}
-                    >
-                      −
-                    </button>
-                    <span className="qty-value">{q}</span>
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      onClick={() => setProductQty(product.id, q + 1, product.stock)}
-                      disabled={q >= product.stock}
-                    >
-                      +
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          <p className="sale-total">
-            Total estimado: <strong>${total.toFixed(2)} USD</strong>
-            {currency === "VES" ? (
-              fxRate ? (
-                <> · ≈ {(total * fxRate).toLocaleString("es-VE", { maximumFractionDigits: 2 })} Bs (tasa {fxRate})</>
-              ) : (
-                <> · liquidar en Bs (falta tasa FX del supervisor)</>
-              )
-            ) : null}
-          </p>
-
-          <TextField
-            id="sale-notes"
-            label="Nota"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-
-          {formError ? (
-            <p className="form-error" role="alert">
-              {formError}
-            </p>
-          ) : null}
-
-          <Button type="submit" variant="accent" block disabled={submitting || loadingCatalog}>
-            {submitting ? "Guardando…" : "Confirmar venta"}
-          </Button>
-        </form>
-      </div>
-    );
-  }
+  const totalAmount = sales.reduce((a, s) => a + Number(s.total_amount || 0), 0);
+  const creditCount = sales.filter((s) => s.is_credit).length;
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">EnRutas</p>
-          <h1>Ventas</h1>
-          <p className="muted">Órdenes con o sin visita</p>
-        </div>
-        <Button type="button" variant="accent" onClick={() => setComposing(true)}>
-          <Plus size={18} aria-hidden />
-          Nueva
-        </Button>
-      </header>
+      <WorkspacePage
+        eyebrow={teamView ? "Equipo" : "Comercial"}
+        title="Ventas"
+        blurb={
+          teamView
+            ? "Órdenes del equipo · clic para ver detalle."
+            : "Órdenes recientes · clic para ver resumen."
+        }
+        asideExtra={
+          <AsideStats
+            title="Ventas"
+            items={[
+              { label: "Órdenes", value: sales.length },
+              { label: "Total", value: `$${totalAmount.toFixed(0)}` },
+              { label: "A crédito", value: creditCount },
+            ]}
+          />
+        }
+      >
+        <header className="page-header page-header-with-action">
+          <div>
+            <p className="eyebrow">{teamView ? "Equipo · comercial" : "Comercial"}</p>
+            <h1 className="display-title">Ventas</h1>
+            <p className="muted">
+              {sales.length} órdenes · ${totalAmount.toFixed(0)}
+            </p>
+          </div>
+          {!teamView ? (
+            <Button type="button" variant="accent" onClick={() => setComposing(true)}>
+              <Plus size={18} aria-hidden />
+              Nueva
+            </Button>
+          ) : null}
+        </header>
 
-      <section className="card">
-        <div className="section-title">
-          <span className="icon-badge">
-            <Receipt size={18} />
-          </span>
-          <h2>Recientes</h2>
+        <MetricGrid aria-label="Resumen ventas">
+          <MetricTile label="Órdenes" value={sales.length} icon={ShoppingCart} />
+          <MetricTile
+            label="Total"
+            value={`$${totalAmount.toFixed(0)}`}
+            tone="solid"
+          />
+          <MetricTile label="A crédito" value={creditCount} tone="warning" />
+          <MetricTile
+            label="Contado"
+            value={sales.length - creditCount}
+            tone="success"
+          />
+        </MetricGrid>
+
+        <div className="list-page-tools">
+          <ListSearch
+            id="sales-search"
+            value={query}
+            onChange={setQuery}
+            placeholder={teamView ? "Cliente, OV o vendedor…" : "Cliente u OV…"}
+          />
         </div>
+
         {loading ? <p className="muted">Cargando…</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
-        {!loading && !sales.length ? (
+        {!loading && !filteredSales.length ? (
           <p className="muted">
-            Aún no hay ventas. Cierra una visita con venta o crea una de mostrador/online.
+            {sales.length
+              ? "Sin coincidencias."
+              : "Aún no hay ventas. Registra una en visita o crea mostrador/online."}
           </p>
         ) : null}
-        <ul className="client-list">
-          {sales.map((sale) => {
-            const name = sale.client?.name ?? `Cliente #${sale.client_id}`;
-            const lines = sale.items.reduce((n, i) => n + i.quantity, 0);
-            return (
-              <li key={sale.id} className="client-item">
-                <div>
-                  <strong>{name}</strong>
-                  <span className="muted">
-                    {" "}
-                    · {ORIGIN_LABEL[sale.origin]}
-                    {sale.visit_id ? ` · visita #${sale.visit_id}` : " · sin visita"}
-                  </span>
-                  {sale.is_credit ? (
-                    <span className="status-pill status-warn" style={{ marginLeft: "0.4rem" }}>
-                      Crédito
-                    </span>
-                  ) : null}
+
+        {!loading && filteredSales.length ? (
+          <SalesTable
+            sales={filteredSales}
+            showSeller={teamView}
+            sellerNameById={sellerNameById}
+            onRowClick={setDetailSale}
+          />
+        ) : null}
+      </WorkspacePage>
+
+      <SaleDetailSheet
+        sale={detailSale}
+        open={detailSale != null}
+        onClose={() => setDetailSale(null)}
+        sellerName={
+          detailSale && teamView
+            ? sellerNameById.get(detailSale.seller_id) ?? null
+            : null
+        }
+      />
+
+      {!teamView ? (
+        <Modal
+          open={composing}
+          onClose={() => setComposing(false)}
+          size="wide"
+          eyebrow="Nueva orden"
+          title="Venta sin visita"
+          blurb="Cotiza o confirma · descuenta stock al confirmar"
+          footer={
+            <div className="side-sheet-actions">
+              {wizardStep === 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={submitting}
+                  onClick={() => setComposing(false)}
+                >
+                  Cancelar
+                </Button>
+              ) : (
+                <Button type="button" variant="ghost" disabled={submitting} onClick={goBack}>
+                  Atrás
+                </Button>
+              )}
+              {wizardStep < 2 ? (
+                <Button type="button" variant="accent" disabled={submitting || loadingCatalog} onClick={goNext}>
+                  Siguiente
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="submit"
+                    form="sale-create-form"
+                    variant="secondary"
+                    disabled={submitting || loadingCatalog}
+                    onClick={() => {
+                      submitIntent.current = "quote";
+                    }}
+                  >
+                    Copiar cotización
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="sale-create-form"
+                    variant="accent"
+                    disabled={submitting || loadingCatalog}
+                    onClick={() => {
+                      submitIntent.current = "sale";
+                    }}
+                  >
+                    {submitting ? "Guardando…" : "Confirmar venta"}
+                  </Button>
+                </>
+              )}
+            </div>
+          }
+        >
+          <form id="sale-create-form" className="sheet-form-stack" onSubmit={onSubmit}>
+            <WizardSteps steps={[...SALE_STEPS]} current={wizardStep} />
+
+            {wizardStep === 0 ? (
+              <>
+                <div className="field">
+                  <label htmlFor="sale-client">Cliente</label>
+                  <select
+                    id="sale-client"
+                    className="input"
+                    value={clientId === "" ? "" : String(clientId)}
+                    onChange={(e) => setClientId(e.target.value ? Number(e.target.value) : "")}
+                    required
+                    disabled={loadingCatalog}
+                  >
+                    <option value="">Selecciona…</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.rif ? ` · ${c.rif}` : c.ci ? ` · CI ${c.ci}` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <p className="muted small">
-                  <ShoppingCart size={14} aria-hidden style={{ verticalAlign: "-2px" }} />{" "}
-                  ${Number(sale.total_amount).toFixed(2)} {sale.currency} · {lines} uds ·{" "}
-                  {formatWhen(sale.created_at)}
+
+                <div className="field">
+                  <span className="field-label">Origen</span>
+                  <div className="choice-group" role="group" aria-label="Origen">
+                    <button
+                      type="button"
+                      className={origin === "mostrador" ? "chip active" : "chip"}
+                      onClick={() => setOrigin("mostrador")}
+                    >
+                      Mostrador
+                    </button>
+                    <button
+                      type="button"
+                      className={origin === "online" ? "chip active" : "chip"}
+                      onClick={() => setOrigin("online")}
+                    >
+                      Online
+                    </button>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <span className="field-label">Moneda</span>
+                  <div className="choice-group" role="group" aria-label="Moneda">
+                    <button
+                      type="button"
+                      className={currency === "USD" ? "chip active" : "chip"}
+                      onClick={() => {
+                        setCurrency("USD");
+                        setPayment((prev) => ({
+                          ...prev,
+                          payment_method:
+                            prev.payment_method === "cash_ves" ? "cash_usd" : prev.payment_method,
+                        }));
+                      }}
+                    >
+                      USD
+                    </button>
+                    <button
+                      type="button"
+                      className={currency === "VES" ? "chip active" : "chip"}
+                      onClick={() => {
+                        setCurrency("VES");
+                        setPayment((prev) => ({
+                          ...prev,
+                          payment_method:
+                            prev.payment_method === "cash_usd" ? "cash_ves" : prev.payment_method,
+                        }));
+                      }}
+                    >
+                      Bs (VES)
+                    </button>
+                  </div>
+                </div>
+
+                <label className="credit-check">
+                  <input
+                    type="checkbox"
+                    checked={isCredit}
+                    onChange={(e) => setIsCredit(e.target.checked)}
+                  />
+                  <span>Venta a crédito (queda en cobranza del supervisor)</span>
+                </label>
+              </>
+            ) : null}
+
+            {wizardStep === 1 ? (
+              <>
+                {loadingCatalog ? <p className="muted">Cargando productos…</p> : null}
+                {!loadingCatalog ? (
+                  <SaleQuoter
+                    products={products}
+                    lines={lines}
+                    onChange={setLines}
+                    disabled={submitting}
+                    totalUsd={total}
+                    fxHint={fxHint}
+                  />
+                ) : null}
+              </>
+            ) : null}
+
+            {wizardStep === 2 ? (
+              <>
+                <p className="sale-total">
+                  Total: <strong>${total.toFixed(2)} USD</strong>
+                  {fxHint ? <> · {fxHint}</> : null}
                 </p>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+                {!isCredit ? (
+                  <PaymentCapture
+                    value={payment}
+                    onChange={setPayment}
+                    accounts={accounts}
+                    currency={currency}
+                    disabled={submitting}
+                  />
+                ) : (
+                  <p className="muted">Venta a crédito — sin cobro ahora; va a cobranza.</p>
+                )}
+                <TextField
+                  id="sale-notes"
+                  label="Nota"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </>
+            ) : null}
+
+            {formError ? (
+              <p className="form-error" role="alert">
+                {formError}
+              </p>
+            ) : null}
+          </form>
+        </Modal>
+      ) : null}
     </>
   );
 }

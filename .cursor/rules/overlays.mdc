@@ -1,0 +1,36 @@
+---
+description: EnRutas overlay UX — Modal vs SideSheet conventions
+globs: web/src/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# Overlays (Modal / SideSheet)
+
+Never invent a custom `screen-form` / full-page dialog for new flows. Use the shared components.
+
+## Choose the pattern
+
+| Use | Component | Examples |
+|-----|-----------|----------|
+| Long form / map / calendar / multi-step | `Modal` (`components/Modal.tsx`) | Cliente alta/edición, cerrar visita, ficha, programar visita, asignar ruta, venta |
+| Short action (few fields or confirm) | `SideSheet` (`components/SideSheet.tsx`) | Abono, ingreso/ajuste stock, quitar de ruta, asignar vendedor (dropdown) |
+
+## Rules
+
+- Always use dark full-screen scrim via `.app-overlay-backdrop` (covers sidebar).
+- Prefer `FormStep` for multi-step body content.
+- Put primary/cancel actions in the `footer` prop (`.side-sheet-actions`).
+- Seller assignment on a client: single `<SelectField>` / `<select>`, not seller fichas.
+- Do not reintroduce `size="lg"` / `aside` on SideSheet — long content belongs in Modal (`size="wide"` when needed).
+- Hooks: `useBodyScrollLock` + `useEscapeKey` live in the shared components; don't duplicate.
+
+```tsx
+// ❌ BAD — full-page overlay
+<div className="screen-form">…</div>
+
+// ✅ GOOD — long form
+<Modal open={open} onClose={onClose} size="wide" title="…" footer={…}>…</Modal>
+
+// ✅ GOOD — short action
+<SideSheet open={open} onClose={onClose} title="…" footer={…}>…</SideSheet>
+```

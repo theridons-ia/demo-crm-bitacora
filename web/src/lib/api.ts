@@ -98,8 +98,31 @@ export function fetchSellers(): Promise<User[]> {
   return request<User[]>("/api/users/sellers");
 }
 
-export function fetchClients(): Promise<Client[]> {
-  return request<Client[]>("/api/clients");
+export function fetchClients(params?: { seller_id?: number }): Promise<Client[]> {
+  const q = new URLSearchParams();
+  if (params?.seller_id != null) q.set("seller_id", String(params.seller_id));
+  const qs = q.toString();
+  return request<Client[]>(`/api/clients${qs ? `?${qs}` : ""}`);
+}
+
+export type ClientAssignments = {
+  seller_id: number;
+  client_ids: number[];
+};
+
+export function fetchClientAssignments(sellerId: number): Promise<ClientAssignments> {
+  return request<ClientAssignments>(`/api/sellers/${sellerId}/client-assignments`);
+}
+
+export function updateClientAssignments(
+  sellerId: number,
+  client_ids: number[],
+): Promise<ClientAssignments> {
+  return request<ClientAssignments>(`/api/sellers/${sellerId}/client-assignments`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_ids }),
+  });
 }
 
 export type ClientCreateInput = {
@@ -149,6 +172,7 @@ export type VisitAssignInput = {
   seller_id: number;
   client_id: number;
   scheduled_date: string;
+  scheduled_time?: string | null;
   description?: string | null;
 };
 
@@ -169,6 +193,7 @@ export type VisitCreateInput = {
   status?: VisitStatus;
   description?: string | null;
   scheduled_date?: string | null;
+  scheduled_time?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   gps_accuracy_m?: number | null;
@@ -215,6 +240,9 @@ export type VisitCloseInput = {
     currency?: CurrencyCode;
     payment_method?: PaymentMethod;
     is_credit?: boolean;
+    bank_account_id?: number | null;
+    payment_reference?: string | null;
+    payment_evidence?: string | null;
     notes?: string | null;
     items: { product_id: number; quantity: number }[];
     local_uuid?: string | null;
@@ -227,6 +255,30 @@ export function closeVisit(visitId: number, payload: VisitCloseInput): Promise<V
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+}
+
+export type VisitSaleInput = {
+  origin?: "visita";
+  currency?: CurrencyCode;
+  payment_method?: PaymentMethod;
+  is_credit?: boolean;
+  bank_account_id?: number | null;
+  payment_reference?: string | null;
+  payment_evidence?: string | null;
+  notes?: string | null;
+  quote_snapshot?: string | null;
+  items: { product_id: number; quantity: number }[];
+  local_uuid?: string | null;
+  created_offline?: boolean;
+};
+
+/** OV en visita en_curso; la visita no se cierra. */
+export function createVisitSale(visitId: number, payload: VisitSaleInput): Promise<Sale> {
+  return request<Sale>(`/api/visits/${visitId}/sale`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ origin: "visita", ...payload }),
   });
 }
 
@@ -265,7 +317,11 @@ export type SaleCreateInput = {
   currency?: CurrencyCode;
   payment_method?: PaymentMethod;
   is_credit?: boolean;
+  bank_account_id?: number | null;
+  payment_reference?: string | null;
+  payment_evidence?: string | null;
   notes?: string | null;
+  quote_snapshot?: string | null;
   items: { product_id: number; quantity: number }[];
   local_uuid?: string | null;
   created_offline?: boolean;
@@ -431,6 +487,9 @@ export function registerReceivablePayment(
     amount: number;
     currency?: string;
     payment_method?: string;
+    bank_account_id?: number | null;
+    payment_reference?: string | null;
+    payment_evidence?: string | null;
     notes?: string | null;
   },
 ): Promise<Receivable> {
@@ -486,4 +545,68 @@ export type Supplier = {
 
 export function fetchSuppliers(): Promise<Supplier[]> {
   return request<Supplier[]>("/api/suppliers");
+}
+
+export function fetchBankAccounts(params?: {
+  active_only?: boolean;
+  currency?: CurrencyCode;
+}): Promise<import("./types").BankAccount[]> {
+  const q = new URLSearchParams();
+  if (params?.active_only) q.set("active_only", "true");
+  if (params?.currency) q.set("currency", params.currency);
+  const qs = q.toString();
+  return request(`/api/banks${qs ? `?${qs}` : ""}`);
+}
+
+export function createBankAccount(payload: {
+  name: string;
+  bank_name?: string | null;
+  account_type?: import("./types").BankAccountType;
+  currency?: CurrencyCode;
+  pay_hint?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}): Promise<import("./types").BankAccount> {
+  return request("/api/banks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateBankAccount(
+  id: number,
+  payload: Partial<{
+    name: string;
+    bank_name: string | null;
+    account_type: import("./types").BankAccountType;
+    currency: CurrencyCode;
+    pay_hint: string | null;
+    is_active: boolean;
+    sort_order: number;
+  }>,
+): Promise<import("./types").BankAccount> {
+  return request(`/api/banks/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchBankMovements(params?: {
+  bank_account_id?: number;
+  limit?: number;
+}): Promise<import("./types").BankMovement[]> {
+  const q = new URLSearchParams();
+  if (params?.bank_account_id != null) q.set("bank_account_id", String(params.bank_account_id));
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return request(`/api/banks/movements${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchPayables(params?: { open_only?: boolean }): Promise<import("./types").PayableInvoice[]> {
+  const q = new URLSearchParams();
+  if (params?.open_only === false) q.set("open_only", "false");
+  const qs = q.toString();
+  return request(`/api/payables${qs ? `?${qs}` : ""}`);
 }

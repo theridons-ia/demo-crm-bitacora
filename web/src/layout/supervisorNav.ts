@@ -1,30 +1,54 @@
 import {
-  AlertTriangle,
   Banknote,
-  DollarSign,
+  ClipboardList,
+  Landmark,
   LayoutDashboard,
-  Map,
+  Map as MapIcon,
+  MoreHorizontal,
   Package,
   PackagePlus,
+  Receipt,
   Route,
+  ShoppingCart,
+  Store,
+  Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
 export type SupervisorNavTab = {
-  to: string;
+  to?: string;
   label: string;
   icon: LucideIcon;
-  nextSf?: string;
+  /** Tab que abre el menú Más (no es ruta). */
+  more?: boolean;
 };
 
-/** Menú supervisor — sidebar (sin bottom nav). */
-export const SUPERVISOR_NAV_TABS: SupervisorNavTab[] = [
-  { to: "/sup/hoy", label: "Hoy", icon: LayoutDashboard },
-  { to: "/sup/ruta", label: "Ruta del día", icon: Route },
-  { to: "/sup/alertas", label: "Alertas", icon: AlertTriangle },
-  { to: "/sup/catalogo", label: "Catálogo", icon: Package },
-  { to: "/sup/inventario", label: "Inventario", icon: PackagePlus },
-  { to: "/sup/cobranza", label: "Cobranza", icon: Banknote },
-  { to: "/sup/fx", label: "Tasa FX", icon: DollarSign },
-  { to: "/sup/mapa", label: "Mapa equipo", icon: Map },
+/** Tabbar móvil supervisor: 4 primarios + Más. */
+export const SUPERVISOR_PRIMARY_TABS: SupervisorNavTab[] = [
+  { to: "/sup/hoy", label: "Inicio", icon: LayoutDashboard },
+  { to: "/sup/ruta", label: "Ruta", icon: Route },
+  { to: "/sup/visitas", label: "Visitas", icon: ClipboardList },
+  { to: "/sup/clientes", label: "Clientes", icon: Store },
+  { label: "Más", icon: MoreHorizontal, more: true },
 ];
+
+/** Destinos del menú Más (móvil). Alertas/FX → header. */
+export const SUPERVISOR_MORE_ITEMS: { to: string; label: string; icon: LucideIcon; blurb: string }[] =
+  [
+    { to: "/sup/finanzas", label: "Finanzas", icon: Wallet, blurb: "Hub cobranza, bancos y CxP" },
+    { to: "/sup/ventas", label: "Ventas", icon: ShoppingCart, blurb: "Órdenes del equipo" },
+    { to: "/sup/cobranza", label: "Cobranza", icon: Banknote, blurb: "Créditos y abonos" },
+    { to: "/sup/bancos", label: "Bancos", icon: Landmark, blurb: "Cajas y cuentas de cobro" },
+    { to: "/sup/por-pagar", label: "Por pagar", icon: Receipt, blurb: "CxP demo proveedores" },
+    { to: "/sup/vendedores", label: "Vendedores", icon: Users, blurb: "Equipo y rutas" },
+    { to: "/sup/catalogo", label: "Catálogo", icon: Package, blurb: "Visibilidad por vendedor" },
+    { to: "/sup/inventario", label: "Inventario", icon: PackagePlus, blurb: "Stock e ingresos" },
+    { to: "/sup/mapa", label: "Mapa equipo", icon: MapIcon, blurb: "Visitas del día en mapa" },
+  ];
+
+export function isSupervisorMorePath(pathname: string): boolean {
+  return SUPERVISOR_MORE_ITEMS.some(
+    (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
+  );
+}

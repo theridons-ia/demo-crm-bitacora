@@ -1,22 +1,28 @@
-import { ClipboardList, DollarSign, LogOut, MapPin, Plus, Route, Search, Store } from "lucide-react";
+import {
+  ArrowUpRight,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
+  DollarSign,
+  MapPin,
+  Plus,
+  Route,
+  Search,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { BrandLogo } from "../components/BrandLogo";
 import { Button } from "../components/Button";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
+import { MetricGrid, MetricTile } from "../components/MetricTile";
+import { LiveLed } from "../components/LiveLed";
 import { TextField } from "../components/TextField";
+import { PageWorkspace } from "../layout/PageWorkspace";
 import { ApiError, fetchClients, fetchSales, fetchVisits } from "../lib/api";
 import { getCachedClients } from "../lib/offlineQueue";
-import type { Client, Sale, Visit } from "../lib/types";
-
-function hasPdvPin(client: Client): boolean {
-  if (client.latitude == null || client.longitude == null) return false;
-  const lat = Number(client.latitude);
-  const lng = Number(client.longitude);
-  return Number.isFinite(lat) && Number.isFinite(lng);
-}
+import type { Client, Sale, Visit, VisitStatus } from "../lib/types";
 
 function todayISO(): string {
   const d = new Date();
@@ -38,14 +44,34 @@ function initials(name: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
+function visitBadge(status: VisitStatus | null): { label: string; className: string } | null {
+  if (!status) return { label: "Pendiente", className: "badge badge-accent" };
+  if (status === "completada") return { label: "Visitado", className: "badge badge-success" };
+  if (status === "en_curso") return { label: "Próxima", className: "badge badge-progress" };
+  if (status === "programada") return { label: "Próxima", className: "badge badge-progress" };
+  return null;
+}
+
+function formatVisitTime(iso: string | null | undefined, scheduled: string | null | undefined): string {
+  if (iso) {
+    try {
+      return new Date(iso).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      /* fall through */
+    }
+  }
+  if (scheduled) return "Hoy";
+  return "—";
+}
+
 function isSameDay(iso: string | null | undefined, day: string): boolean {
   if (!iso) return false;
   return iso.slice(0, 10) === day;
 }
 
-/** Inicio vendedor — refresh visual SF-2.6 (móvil + desktop). */
+/** Inicio vendedor — workspace con panel derecho al ras. */
 export function HomePage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -56,8 +82,19 @@ export function HomePage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const day = todayISO();
+  const firstName = user?.full_name?.split(" ")[0] ?? "";
+
+  useEffect(() => {
+    if (searchParams.get("nuevo") !== "cliente") return;
+    setEditingClient(null);
+    setFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("nuevo");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +140,10 @@ export function HomePage() {
     [visits],
   );
   const completed = dayVisits.filter((v) => v.status === "completada").length;
+  const inProgress = dayVisits.filter((v) => v.status === "en_curso").length;
   const totalDay = dayVisits.length;
+  const coverage = totalDay ? Math.round((completed / totalDay) * 100) : 0;
+
   const nextVisit = useMemo(() => {
     const open = dayVisits.find((v) => v.status === "en_curso");
     if (open) return open;
@@ -117,99 +157,153 @@ export function HomePage() {
   }, [sales, day]);
 
   const upcoming = useMemo(
-    () => dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso").slice(0, 4),
+    () => dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso").slice(0, 5),
     [dayVisits],
   );
 
+  const visitStatusByClient = useMemo(() => {
+    const map = new Map<number, VisitStatus>();
+    for (const v of dayVisits) {
+      const prev = map.get(v.client_id);
+      if (!prev) {
+        map.set(v.client_id, v.status);
+        continue;
+      }
+      // Prefer en_curso > programada > completada for badge
+      const rank = (s: VisitStatus) =>
+        s === "en_curso" ? 3 : s === "programada" ? 2 : s === "completada" ? 1 : 0;
+      if (rank(v.status) > rank(prev)) map.set(v.client_id, v.status);
+    }
+    return map;
+  }, [dayVisits]);
+
+  const routeTitle = nextVisit
+    ? (nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`)
+    : totalDay
+      ? "Ruta del día en marcha"
+      : "Tu ruta comienza aquí";
+
   return (
     <>
-      <header className="seller-top">
-        <div className="seller-top-brand">
-          <BrandLogo size={32} className="seller-top-logo" />
+      <PageWorkspace>
+        <div className="greeting-row">
           <div>
-            <p className="eyebrow">EnRutas</p>
-            <p className="muted small seller-top-meta">
-              {formatLongDate()}
-              {user?.route_name ? ` · ${user.route_name}` : ""}
-            </p>
+            <p className="eyebrow">{formatLongDate()}</p>
+            <h1>Hola{firstName ? `, ${firstName}` : ""}</h1>
+            <p className="greeting-sub">Lista para mover la ruta.</p>
           </div>
         </div>
-        <Button variant="ghost" onClick={logout} aria-label="Cerrar sesión" className="seller-logout">
-          <LogOut size={18} />
-          <span className="seller-logout-label">Salir</span>
-        </Button>
-      </header>
 
-      <section className="seller-hero">
-        <div className="seller-hero-copy">
-          <h1 className="display-title">Vamos por la siguiente.</h1>
-          <p className="seller-hero-sub muted">
-            Hola{user?.full_name ? `, ${user.full_name.split(" ")[0]}` : ""}. Tu jornada de campo.
-          </p>
-        </div>
+        <section className="route-card" aria-label="Tu ruta de hoy">
+          <Link to="/app/ruta" className="route-card-link">
+            <div className="route-card-top">
+              <p className="label">Tu ruta de hoy</p>
+              <span className="route-arrow" aria-hidden>
+                <ArrowUpRight size={18} strokeWidth={2.4} />
+              </span>
+            </div>
+            <h2>{routeTitle}</h2>
+            <div className="progress-track" aria-hidden>
+              <div className="progress-fill" style={{ width: `${Math.min(100, coverage)}%` }} />
+            </div>
+            <div className="route-meta">
+              <span>
+                {completed} de {totalDay || "—"} visitas registradas
+              </span>
+              <strong>{coverage}%</strong>
+            </div>
+          </Link>
+        </section>
 
-        <div className="seller-next-card">
-          <p className="seller-next-label">Siguiente acción</p>
-          {nextVisit ? (
-            <>
-              <p className="seller-next-name">
-                {nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`}
-              </p>
-              <p className="seller-next-meta">
-                {nextVisit.status === "en_curso" ? "En curso" : "Programada"}
-                {nextVisit.client?.address ? ` · ${nextVisit.client.address}` : ""}
-              </p>
-              <Link to="/app/visitas" className="btn btn-primary btn-block seller-next-cta">
-                <ClipboardList size={18} />
-                {nextVisit.status === "en_curso" ? "Continuar visita" : "Ir a visitas"}
-              </Link>
-            </>
+        <MetricGrid aria-label="Resumen del día">
+          <MetricTile
+            label="Ventas hoy"
+            value={`$${salesToday.toFixed(0)}`}
+            icon={DollarSign}
+            tone="solid"
+          />
+          <MetricTile
+            label="Visitas"
+            value={`${completed}/${totalDay || "—"}`}
+            icon={Route}
+            hint="completadas hoy"
+          />
+          <MetricTile
+            label="Cobertura"
+            value={`${coverage}%`}
+            icon={CheckCircle2}
+            tone="success"
+          />
+          <MetricTile
+            label="En curso"
+            value={inProgress}
+            icon={ClipboardList}
+            tone="accent"
+          />
+        </MetricGrid>
+
+        <section className="card seller-panel">
+          <div className="seller-panel-head">
+            <div>
+              <h2 className="section-heading">Agenda de hoy</h2>
+              <p className="muted small">{upcoming.length} paradas abiertas</p>
+            </div>
+            <Calendar size={18} aria-hidden color="var(--muted-foreground)" />
+          </div>
+
+          {upcoming.length === 0 ? (
+            <p className="muted">No hay visitas abiertas para hoy.</p>
           ) : (
-            <>
-              <p className="seller-next-name">Sin visita pendiente hoy</p>
-              <p className="seller-next-meta">Abre Visitas o pide ruta al supervisor.</p>
-              <Link to="/app/visitas" className="btn btn-primary btn-block seller-next-cta">
-                <ClipboardList size={18} />
-                Ver visitas
-              </Link>
-            </>
+            <ol className="visit-timeline">
+              {upcoming.map((v) => (
+                <li key={v.id} className="visit-timeline-item">
+                  <span className="visit-timeline-time">
+                    {formatVisitTime(v.visited_at ?? v.created_at, v.scheduled_date)}
+                  </span>
+                  <span className="visit-timeline-rail" aria-hidden>
+                    <span
+                      className={`visit-timeline-dot${
+                        v.status === "en_curso"
+                          ? " is-now"
+                          : v.status === "completada"
+                            ? " is-done"
+                            : ""
+                      }`}
+                    />
+                  </span>
+                  <div className="visit-timeline-copy">
+                    <strong>{v.client?.name ?? `Cliente #${v.client_id}`}</strong>
+                    <span>
+                      {v.status === "en_curso" ? (
+                        <LiveLed />
+                      ) : (
+                        "Programada"
+                      )}
+                      {v.client?.address ? ` · ${v.client.address}` : ""}
+                    </span>
+                  </div>
+                  <ChevronRight size={16} aria-hidden color="var(--muted-foreground)" />
+                </li>
+              ))}
+            </ol>
           )}
-        </div>
-      </section>
 
-      <section className="kpi-row" aria-label="Resumen del día">
-        <article className="kpi-card">
-          <span className="kpi-icon" aria-hidden>
-            <Route size={18} />
-          </span>
-          <p className="kpi-value">
-            {completed} / {totalDay || "—"}
-          </p>
-          <p className="kpi-label">visitas hoy</p>
-        </article>
-        <article className="kpi-card">
-          <span className="kpi-icon" aria-hidden>
-            <DollarSign size={18} />
-          </span>
-          <p className="kpi-value">${salesToday.toFixed(0)}</p>
-          <p className="kpi-label">ventas hoy</p>
-        </article>
-        <article className="kpi-card">
-          <span className="kpi-icon" aria-hidden>
-            <Store size={18} />
-          </span>
-          <p className="kpi-value">{clients.length}</p>
-          <p className="kpi-label">en cartera</p>
-        </article>
-      </section>
+          <Link
+            to="/app/ruta"
+            className="btn btn-secondary btn-block"
+            style={{ marginTop: "0.85rem" }}
+          >
+            <MapPin size={18} />
+            Ver recorrido completo
+          </Link>
+        </section>
 
-      <div className="seller-main-grid">
         <section className="card seller-panel">
           <div className="seller-panel-head">
             <div>
               <h2 className="section-heading">Mi cartera</h2>
               <p className="muted small">
-                {clients.length} cliente{clients.length === 1 ? "" : "s"} · recientes primero
+                {clients.length} cliente{clients.length === 1 ? "" : "s"} · los más recientes primero
               </p>
             </div>
             <Button
@@ -221,7 +315,7 @@ export function HomePage() {
               }}
             >
               <Plus size={18} />
-              Nuevo
+              Nuevo cliente
             </Button>
           </div>
 
@@ -230,7 +324,7 @@ export function HomePage() {
             <TextField
               id="clients-search"
               label="Buscar cliente"
-              placeholder="Nombre, RIF, CI, estado…"
+              placeholder="Buscar cliente o dirección…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -245,8 +339,8 @@ export function HomePage() {
 
           <ul className="client-card-list">
             {filtered.map((client) => {
-              const pinned = hasPdvPin(client);
               const highlight = justCreatedId === client.id;
+              const badge = visitBadge(visitStatusByClient.get(client.id) ?? null);
               return (
                 <li key={client.id}>
                   <button
@@ -260,62 +354,26 @@ export function HomePage() {
                     <span className="client-card-body">
                       <span className="client-card-top">
                         <strong>{client.name}</strong>
-                        {pinned ? (
-                          <span className="status-pill status-ok">
-                            <Store size={12} aria-hidden /> Con pin
-                          </span>
-                        ) : (
-                          <span className="status-pill status-warn">Sin pin</span>
-                        )}
+                        {badge ? <span className={badge.className}>{badge.label}</span> : null}
                       </span>
                       <span className="muted small">
                         {client.state ?? "—"}
                         {client.address ? ` · ${client.address}` : ""}
                       </span>
-                      {pinned ? (
-                        <span className="muted small client-coords">
-                          <MapPin size={12} aria-hidden />{" "}
-                          {Number(client.latitude).toFixed(4)}, {Number(client.longitude).toFixed(4)}
-                        </span>
-                      ) : null}
                     </span>
+                    <ChevronRight className="client-card-chevron" size={18} aria-hidden />
                   </button>
                 </li>
               );
             })}
           </ul>
-        </section>
 
-        <aside className="card seller-panel seller-upcoming">
-          <h2 className="section-heading">Próximas visitas</h2>
-          <p className="muted small" style={{ marginTop: 0 }}>
-            Ruta del día
-          </p>
-          {upcoming.length === 0 ? (
-            <p className="muted">No hay visitas abiertas para hoy.</p>
-          ) : (
-            <ol className="upcoming-list">
-              {upcoming.map((v) => (
-                <li key={v.id} className="upcoming-item">
-                  <span className={`upcoming-dot status-dot-${v.status}`} aria-hidden />
-                  <div>
-                    <p className="upcoming-name">
-                      {v.client?.name ?? `Cliente #${v.client_id}`}
-                    </p>
-                    <p className="muted small">
-                      {v.status === "en_curso" ? "En curso" : "Programada"}
-                      {v.client?.address ? ` · ${v.client.address}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-          <Link to="/app/visitas" className="btn btn-secondary btn-block" style={{ marginTop: "0.85rem" }}>
-            Ver recorrido
+          <Link to="/app/clientes" className="link-accent" style={{ marginTop: "0.35rem" }}>
+            <ClipboardList size={16} style={{ verticalAlign: "-3px", marginRight: 4 }} />
+            Ver cartera completa
           </Link>
-        </aside>
-      </div>
+        </section>
+      </PageWorkspace>
 
       <ClientForm
         open={formOpen}

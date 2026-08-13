@@ -37,6 +37,7 @@ export type Visit = {
   result: SaleResult | null;
   description: string | null;
   scheduled_date: string | null;
+  scheduled_time?: string | null;
   visited_at: string | null;
   latitude: string | null;
   longitude: string | null;
@@ -47,6 +48,7 @@ export type Visit = {
   created_at: string;
   client: Client | null;
   seller?: User | null;
+  sale?: Sale | null;
 };
 
 export type Product = {
@@ -67,7 +69,51 @@ export type PaymentMethod =
   | "cash_ves"
   | "transfer_ves"
   | "cash_eur"
-  | "credit";
+  | "credit"
+  | "pago_movil";
+
+export type BankAccountType = "cash" | "bank" | "zelle" | "pago_movil" | "other";
+export type BankMovementKind = "income" | "expense";
+export type PayableStatus = "open" | "paid" | "partial";
+
+export type BankAccount = {
+  id: number;
+  name: string;
+  bank_name: string | null;
+  account_type: BankAccountType;
+  currency: CurrencyCode;
+  pay_hint: string | null;
+  is_active: boolean;
+  sort_order: number;
+  balance: string;
+  created_at: string;
+};
+
+export type BankMovement = {
+  id: number;
+  bank_account_id: number;
+  kind: BankMovementKind;
+  amount: string;
+  currency: CurrencyCode;
+  payment_method: PaymentMethod | null;
+  reference: string | null;
+  notes: string | null;
+  sale_id: number | null;
+  sale_payment_id: number | null;
+  created_at: string;
+  account_name: string | null;
+};
+
+export type PayableInvoice = {
+  id: number;
+  supplier_name: string;
+  description: string | null;
+  amount: string;
+  currency: CurrencyCode;
+  status: PayableStatus;
+  due_date: string | null;
+  created_at: string;
+};
 
 export type SaleOrigin = "visita" | "mostrador" | "online";
 
@@ -86,10 +132,13 @@ export type Sale = {
   origin: SaleOrigin;
   currency: CurrencyCode;
   payment_method: PaymentMethod;
+  bank_account_id?: number | null;
+  payment_reference?: string | null;
   total_amount: string;
   is_credit: boolean;
   fx_rate_usd_ves?: string | null;
   notes: string | null;
+  quote_snapshot?: string | null;
   created_offline: boolean;
   created_at: string;
   items: SaleItem[];

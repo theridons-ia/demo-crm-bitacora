@@ -1,5 +1,5 @@
 import enum
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -53,6 +54,26 @@ class PaymentMethod(str, enum.Enum):
     transfer_ves = "transfer_ves"
     cash_eur = "cash_eur"
     credit = "credit"
+    pago_movil = "pago_movil"
+
+
+class BankAccountType(str, enum.Enum):
+    cash = "cash"
+    bank = "bank"
+    zelle = "zelle"
+    pago_movil = "pago_movil"
+    other = "other"
+
+
+class BankMovementKind(str, enum.Enum):
+    income = "income"
+    expense = "expense"
+
+
+class PayableStatus(str, enum.Enum):
+    open = "open"
+    paid = "paid"
+    partial = "partial"
 
 
 class SaleOrigin(str, enum.Enum):
@@ -175,6 +196,24 @@ class SellerProductVisibility(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class SellerClientAssignment(Base):
+    """Cartera de clientes por vendedor (SF-2.8).
+
+    El vendedor solo ve clientes asignados. Sin filas = cartera vacía.
+    Supervisor/admin ven todos y asignan.
+    """
+
+    __tablename__ = "seller_client_assignments"
+    __table_args__ = (
+        UniqueConstraint("seller_id", "client_id", name="uq_seller_client_assignment"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Visit(Base):
     __tablename__ = "visits"
 
@@ -185,6 +224,7 @@ class Visit(Base):
     result: Mapped[SaleResult | None] = mapped_column(Enum(SaleResult), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     scheduled_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    scheduled_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     visited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
@@ -227,10 +267,16 @@ class Sale(Base):
     payment_method: Mapped[PaymentMethod] = mapped_column(
         Enum(PaymentMethod), default=PaymentMethod.cash_usd
     )
+    bank_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bank_accounts.id"), nullable=True, index=True
+    )
+    payment_reference: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payment_evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     is_credit: Mapped[bool] = mapped_column(Boolean, default=False)
     fx_rate_usd_ves: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quote_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     local_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     created_offline: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -260,7 +306,7 @@ class SaleItem(Base):
 
 
 class SalePayment(Base):
-    """Abono a una venta a crédito (SF-3.2)."""
+    """Abono a una venta a crédito, o pago contado registrado (SF-3.2 + bancos)."""
 
     __tablename__ = "sale_payments"
 
@@ -271,12 +317,82 @@ class SalePayment(Base):
     payment_method: Mapped[PaymentMethod] = mapped_column(
         Enum(PaymentMethod), default=PaymentMethod.cash_usd
     )
+    bank_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bank_accounts.id"), nullable=True, index=True
+    )
+    payment_reference: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payment_evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
     received_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     sale: Mapped[Sale] = relationship(back_populates="payments")
     received_by: Mapped[User] = relationship()
+    bank_account: Mapped["BankAccount | None"] = relationship(back_populates="payments")
+
+
+class BankAccount(Base):
+    """Cuenta de cobro de la empresa (caja, banco, Zelle, pago móvil)."""
+
+    __tablename__ = "bank_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    bank_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    account_type: Mapped[BankAccountType] = mapped_column(
+        Enum(BankAccountType, name="bankaccounttype", native_enum=False, length=20),
+        default=BankAccountType.bank,
+    )
+    currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode), default=CurrencyCode.USD)
+    pay_hint: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    movements: Mapped[list["BankMovement"]] = relationship(back_populates="bank_account")
+    payments: Mapped[list[SalePayment]] = relationship(back_populates="bank_account")
+
+
+class BankMovement(Base):
+    __tablename__ = "bank_movements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bank_account_id: Mapped[int] = mapped_column(ForeignKey("bank_accounts.id"), index=True)
+    kind: Mapped[BankMovementKind] = mapped_column(
+        Enum(BankMovementKind, name="bankmovementkind", native_enum=False, length=20),
+        default=BankMovementKind.income,
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode), default=CurrencyCode.USD)
+    payment_method: Mapped[PaymentMethod | None] = mapped_column(Enum(PaymentMethod), nullable=True)
+    reference: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"), nullable=True, index=True)
+    sale_payment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sale_payments.id"), nullable=True, index=True
+    )
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    bank_account: Mapped[BankAccount] = relationship(back_populates="movements")
+
+
+class PayableInvoice(Base):
+    """CxP demo (piloto) — facturas a proveedores."""
+
+    __tablename__ = "payable_invoices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode), default=CurrencyCode.USD)
+    status: Mapped[PayableStatus] = mapped_column(
+        Enum(PayableStatus, name="payablestatus", native_enum=False, length=20),
+        default=PayableStatus.open,
+    )
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class VisitGpsPoint(Base):

@@ -1,6 +1,8 @@
 import { Check, Package } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
+import { ListSearch } from "../components/ListSearch";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
   fetchCatalogVisibility,
@@ -10,13 +12,14 @@ import {
 } from "../lib/api";
 import type { Product, User } from "../lib/types";
 
-/** SF-2.4 — qué productos ve/vende cada vendedor. */
+/** Catálogo por vendedor — lista tipo ficha + búsqueda. */
 export function CatalogVisibilityPage() {
   const [sellers, setSellers] = useState<User[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sellerId, setSellerId] = useState<number | "">("");
   const [unrestricted, setUnrestricted] = useState(true);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,9 +80,17 @@ export function CatalogVisibilityPage() {
     };
   }, [sellerId, loadVisibility]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => `${p.name} ${p.sku}`.toLowerCase().includes(q));
+  }, [products, query]);
+
+  const visibleCount = unrestricted ? products.length : selected.size;
+  const selectedSeller = sellers.find((s) => s.id === sellerId) ?? null;
+
   function toggleProduct(id: number) {
     if (unrestricted) {
-      // Salir de “todos”: queda el catálogo menos el desmarcado
       setUnrestricted(false);
       setSelected(new Set(products.map((p) => p.id).filter((pid) => pid !== id)));
       return;
@@ -122,16 +133,62 @@ export function CatalogVisibilityPage() {
   }
 
   return (
-    <>
-      <header className="page-header">
+    <WorkspacePage
+      eyebrow="Operación"
+      title="Catálogo"
+      blurb="Define qué productos ve y vende cada vendedor."
+      asideExtra={
+        <section className="card chart-card">
+          <h2>Visibilidad</h2>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            {selectedSeller?.full_name ?? "—"}
+          </p>
+          <div className="bar-list">
+            <div>
+              <div className="bar-item-top">
+                <span>Productos visibles</span>
+                <strong>
+                  {visibleCount}/{products.length || "—"}
+                </strong>
+              </div>
+              <div className="bar-track" aria-hidden>
+                <div
+                  className="bar-fill dark"
+                  style={{
+                    width: products.length
+                      ? `${Math.round((visibleCount / products.length) * 100)}%`
+                      : "0%",
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="accent"
+            block
+            style={{ marginTop: "0.85rem" }}
+            disabled={busy || sellerId === ""}
+            onClick={() => void onSave()}
+          >
+            <Check size={18} />
+            Guardar
+          </Button>
+        </section>
+      }
+    >
+      <header className="page-header page-header-stack">
         <div>
-          <p className="eyebrow">Supervisor</p>
-          <h1>Catálogo por vendedor</h1>
+          <p className="eyebrow">Supervisor · catálogo</p>
+          <h1 className="display-title">Catálogo</h1>
           <p className="muted">
-            Sin restricción = ve todo. Con selección = solo esos productos en Inventario y
-            ventas.
+            {unrestricted ? "Catálogo completo" : `${selected.size} seleccionados`} ·{" "}
+            {products.length} productos
           </p>
         </div>
+        <Button type="button" variant="secondary" onClick={selectAllVisible} disabled={busy}>
+          Permitir todos
+        </Button>
       </header>
 
       {error ? (
@@ -141,7 +198,7 @@ export function CatalogVisibilityPage() {
       ) : null}
       {savedNote ? <p className="offline-banner is-online">{savedNote}</p> : null}
 
-      <section className="card route-filters">
+      <div className="list-page-tools">
         <label className="field" htmlFor="vis-seller">
           <span className="field-label">Vendedor</span>
           <select
@@ -159,58 +216,63 @@ export function CatalogVisibilityPage() {
             ))}
           </select>
         </label>
-        <div className="vis-mode">
-          <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
-            Modo:{" "}
-            <strong>{unrestricted ? "Catálogo completo" : `${selected.size} seleccionados`}</strong>
-          </p>
-          <Button type="button" variant="secondary" onClick={selectAllVisible} disabled={busy}>
-            Permitir todos
-          </Button>
-        </div>
-      </section>
 
-      <section className="card">
-        <div className="section-title" style={{ marginBottom: "0.85rem" }}>
-          <span className="icon-badge">
-            <Package size={18} />
-          </span>
-          <h2 className="section-title">Productos</h2>
-        </div>
+        <ListSearch
+          id="catalog-search"
+          value={query}
+          onChange={setQuery}
+          placeholder="Buscar producto o SKU…"
+        />
+      </div>
 
-        {loading ? <p className="muted">Cargando…</p> : null}
+      {loading ? <p className="muted">Cargando…</p> : null}
 
-        <ul className="vis-product-list">
-          {products.map((p) => {
-            const on = unrestricted || selected.has(p.id);
-            return (
-              <li key={p.id}>
-                <label className={`vis-product-row${on ? " is-on" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => toggleProduct(p.id)}
-                    disabled={busy}
-                  />
-                  <span>
-                    <strong>{p.name}</strong>
-                    <span className="muted"> · {p.sku}</span>
-                    <br />
-                    <span className="muted small">
-                      ${Number(p.price_usd).toFixed(2)} · stock {p.stock}
-                    </span>
+      <ul className="ficha-stack">
+        {filtered.map((p) => {
+          const on = unrestricted || selected.has(p.id);
+          return (
+            <li key={p.id}>
+              <button
+                type="button"
+                className={`ficha ficha-select${on ? " is-on" : ""}`}
+                onClick={() => toggleProduct(p.id)}
+                disabled={busy}
+                aria-pressed={on}
+              >
+                <span className="ficha-check" aria-hidden>
+                  {on ? <Check size={16} /> : <Package size={16} />}
+                </span>
+                <span className="ficha-body">
+                  <span className="ficha-row">
+                    <h3 className="ficha-title">{p.name}</h3>
+                    <strong className="ficha-amount">${Number(p.price_usd).toFixed(0)}</strong>
                   </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+                  <p className="ficha-meta">
+                    {p.sku} · stock {p.stock} {p.unit}
+                  </p>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
 
-        <Button type="button" variant="accent" block disabled={busy || sellerId === ""} onClick={() => void onSave()}>
+      {!loading && filtered.length === 0 ? (
+        <p className="muted">Sin coincidencias en el catálogo.</p>
+      ) : null}
+
+      <div className="mobile-only-save" style={{ marginTop: "1rem" }}>
+        <Button
+          type="button"
+          variant="accent"
+          block
+          disabled={busy || sellerId === ""}
+          onClick={() => void onSave()}
+        >
           <Check size={18} />
           Guardar visibilidad
         </Button>
-      </section>
-    </>
+      </div>
+    </WorkspacePage>
   );
 }

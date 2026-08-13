@@ -1,7 +1,11 @@
 import { PackagePlus } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button } from "../components/Button";
+import { ListSearch } from "../components/ListSearch";
+import { SideSheet } from "../components/SideSheet";
+import { StockTable, stockState, type StockState } from "../components/StockTable";
 import { TextField } from "../components/TextField";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
   createStockMovement,
@@ -13,11 +17,14 @@ import {
 } from "../lib/api";
 import type { Product } from "../lib/types";
 
-/** SF-3.1 — ingresos de compra y ajustes de stock (supervisor). */
+/** Inventario supervisor: tabla de existencias; ingreso/ajuste en side sheet. */
 export function SupervisorStockPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"todos" | StockState>("todos");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [productId, setProductId] = useState<number | "">("");
   const [supplierId, setSupplierId] = useState<number | "">("");
   const [kind, setKind] = useState<"purchase" | "adjustment">("purchase");
@@ -41,7 +48,6 @@ export function SupervisorStockPage() {
       setProducts(p);
       setSuppliers(s);
       setMovements(m);
-      setProductId((prev) => (prev !== "" && p.some((x) => x.id === prev) ? prev : p[0]?.id ?? ""));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar inventario");
     } finally {
@@ -52,6 +58,37 @@ export function SupervisorStockPage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  const valueStock = useMemo(
+    () => products.reduce((acc, p) => acc + Number(p.price_usd) * p.stock, 0),
+    [products],
+  );
+  const toRestock = useMemo(
+    () => products.filter((p) => stockState(p.stock) !== "disponible").length,
+    [products],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return products.filter((p) => {
+      const st = stockState(p.stock);
+      if (status !== "todos" && st !== status) return false;
+      if (!q) return true;
+      return `${p.name} ${p.sku}`.toLowerCase().includes(q);
+    });
+  }, [products, query, status]);
+
+  function openMovement(forProduct?: Product) {
+    setOkNote(null);
+    setError(null);
+    setKind("purchase");
+    setQuantity("10");
+    setUnitCost("");
+    setNotes("");
+    setSupplierId("");
+    setProductId(forProduct?.id ?? products[0]?.id ?? "");
+    setSheetOpen(true);
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -77,6 +114,7 @@ export function SupervisorStockPage() {
         `${movement.kind === "purchase" ? "Ingreso" : "Ajuste"}: ${movement.product_name} · stock ahora ${movement.stock_after}`,
       );
       setNotes("");
+      setSheetOpen(false);
       await reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar el movimiento");
@@ -87,30 +125,131 @@ export function SupervisorStockPage() {
 
   return (
     <>
-      <header className="page-header page-header-stack">
-        <div>
-          <p className="eyebrow">Supervisor · operación</p>
-          <h1 className="display-title">Inventario e ingresos.</h1>
-          <p className="muted">
-            Compra a proveedor o ajuste manual. El stock global sube/baja al instante.
+      <WorkspacePage
+        eyebrow="Operación"
+        title="Inventario"
+        blurb="Stock del almacén. Ingresos y ajustes desde el panel lateral."
+        asideExtra={
+          <>
+            <section className="card chart-card">
+              <h2>Bodega</h2>
+              <div className="bar-list">
+                <div>
+                  <div className="bar-item-top">
+                    <span>Valor stock</span>
+                    <strong>${valueStock.toFixed(0)}</strong>
+                  </div>
+                </div>
+                <div>
+                  <div className="bar-item-top">
+                    <span>A reponer</span>
+                    <strong>{toRestock}</strong>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section className="card aside-hint">
+              <p className="eyebrow">Movimientos</p>
+              <h2 className="aside-hint-title">Últimos ingresos</h2>
+              {movements.length === 0 ? (
+                <p className="muted small">Aún no hay movimientos.</p>
+              ) : (
+                <ul className="movements-mini">
+                  {movements.slice(0, 6).map((m) => (
+                    <li key={m.id}>
+                      <strong className="small">
+                        {m.product_name} · {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
+                      </strong>
+                      <span className="muted small">
+                        {m.kind === "purchase" ? "Compra" : "Ajuste"}
+                        {` · ${new Date(m.created_at).toLocaleDateString("es-VE")}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
+        }
+      >
+        <header className="page-header page-header-stack">
+          <div>
+            <p className="eyebrow">Supervisor · bodega</p>
+            <h1 className="display-title">Existencias actuales</h1>
+            <p className="muted">
+              {filtered.length} productos visibles · ${valueStock.toFixed(0)} en stock
+            </p>
+          </div>
+          <Button type="button" variant="accent" onClick={() => openMovement()}>
+            <PackagePlus size={18} />
+            Ingreso / ajuste
+          </Button>
+        </header>
+
+        {okNote ? <p className="offline-banner is-online">{okNote}</p> : null}
+        {error && !sheetOpen ? (
+          <p className="form-error" role="alert">
+            {error}
           </p>
+        ) : null}
+
+        <div className="list-page-tools">
+          <ListSearch
+            id="sup-inv-search"
+            value={query}
+            onChange={setQuery}
+            placeholder="Nombre o SKU…"
+          />
+          <div className="filter-chips" role="tablist" aria-label="Estado de stock">
+            {(
+              [
+                ["todos", "Todos"],
+                ["disponible", "Disponible"],
+                ["bajo", "Bajo stock"],
+                ["agotado", "Agotado"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={status === id ? "chip active" : "chip"}
+                onClick={() => setStatus(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </header>
 
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {okNote ? <p className="offline-banner is-online">{okNote}</p> : null}
+        {loading ? <p className="muted">Cargando…</p> : null}
 
-      <section className="card seller-panel">
-        <div className="seller-panel-head">
-          <h2 className="section-heading">Registrar movimiento</h2>
-          <PackagePlus size={20} aria-hidden />
-        </div>
+        {!loading && filtered.length ? (
+          <StockTable products={filtered} onRowClick={(p) => openMovement(p)} />
+        ) : null}
 
-        <form className="route-assign-form" onSubmit={onSubmit}>
+        {!loading && filtered.length === 0 ? (
+          <p className="muted">Sin productos con este filtro.</p>
+        ) : null}
+      </WorkspacePage>
+
+      <SideSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        eyebrow="Bodega"
+        title={kind === "purchase" ? "Ingreso de compra" : "Ajuste de stock"}
+        footer={
+          <Button
+            type="submit"
+            form="stock-movement-form"
+            variant="accent"
+            block
+            disabled={busy || productId === ""}
+          >
+            {busy ? "Guardando…" : "Guardar movimiento"}
+          </Button>
+        }
+      >
+        <form id="stock-movement-form" className="route-assign-form" onSubmit={onSubmit}>
           <div className="filter-chips" role="tablist" aria-label="Tipo de movimiento">
             <button
               type="button"
@@ -136,7 +275,6 @@ export function SupervisorStockPage() {
               value={productId === "" ? "" : String(productId)}
               onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : "")}
               required
-              disabled={loading}
             >
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -193,64 +331,13 @@ export function SupervisorStockPage() {
             placeholder="Factura, motivo del ajuste…"
           />
 
-          <Button type="submit" variant="accent" block disabled={busy || productId === ""}>
-            Guardar movimiento
-          </Button>
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
         </form>
-      </section>
-
-      <section className="card seller-panel" style={{ marginTop: "0.85rem" }}>
-        <h2 className="section-heading">Existencias</h2>
-        {loading ? <p className="muted">Cargando…</p> : null}
-        <ul className="inv-list">
-          {products.map((p) => (
-            <li key={p.id} className="inv-row">
-              <div className="inv-body">
-                <div className="inv-top">
-                  <strong>{p.name}</strong>
-                  <span className="status-pill status-ok">{p.stock} u.</span>
-                </div>
-                <p className="muted small">
-                  {p.sku} · ${Number(p.price_usd).toFixed(2)}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="card seller-panel" style={{ marginTop: "0.85rem" }}>
-        <h2 className="section-heading">Últimos movimientos</h2>
-        {movements.length === 0 ? (
-          <p className="muted">Aún no hay movimientos.</p>
-        ) : (
-          <ul className="upcoming-list">
-            {movements.map((m) => (
-              <li key={m.id} className="upcoming-item">
-                <span
-                  className="upcoming-dot"
-                  style={{ background: m.quantity >= 0 ? "var(--success)" : "var(--destructive)" }}
-                  aria-hidden
-                />
-                <div>
-                  <p className="upcoming-name">
-                    {m.product_name} · {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
-                  </p>
-                  <p className="muted small">
-                    {m.kind === "purchase" ? "Compra" : "Ajuste"}
-                    {m.supplier_name ? ` · ${m.supplier_name}` : ""}
-                    {m.created_by_name ? ` · ${m.created_by_name}` : ""}
-                    {` · ${new Date(m.created_at).toLocaleString("es-VE", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}`}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      </SideSheet>
     </>
   );
 }

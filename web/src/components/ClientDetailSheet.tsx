@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "./Button";
+import { Modal } from "./Modal";
 import { clientPdvIconFor } from "../lib/mapMarkers";
 import type { Client } from "../lib/types";
 
@@ -18,7 +19,7 @@ function hasPdvPin(client: Client): boolean {
   return Number.isFinite(Number(client.latitude)) && Number.isFinite(Number(client.longitude));
 }
 
-/** Ficha de cliente: datos + mapa con pin PDV. */
+/** Ficha de cliente: datos + mapa con pin PDV (Modal centrado). */
 export function ClientDetailSheet({ client, open, onClose, onEdit }: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -53,7 +54,7 @@ export function ClientDetailSheet({ client, open, onClose, onEdit }: Props) {
       )
       .openPopup();
 
-    const t = window.setTimeout(() => map.invalidateSize(), 100);
+    const t = window.setTimeout(() => map.invalidateSize(), 120);
     return () => {
       window.clearTimeout(t);
       map.remove();
@@ -61,28 +62,32 @@ export function ClientDetailSheet({ client, open, onClose, onEdit }: Props) {
     };
   }, [open, client, pinned]);
 
-  if (!open) return null;
-
   return (
-    <div className="screen-form" role="dialog" aria-modal="true" aria-labelledby="client-detail-title">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Ficha de cliente</p>
-          <h1 id="client-detail-title">{client.name}</h1>
-          <p className="muted">
-            {client.state ? `${client.state} · ` : ""}
-            {pinned ? "Con ubicación en mapa" : "Sin pin de mapa"}
-          </p>
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="wide"
+      eyebrow="Ficha de cliente"
+      title={client.name}
+      blurb={
+        client.state
+          ? `${client.state} · ${pinned ? "Con ubicación en mapa" : "Sin pin de mapa"}`
+          : pinned
+            ? "Con ubicación en mapa"
+            : "Sin pin de mapa"
+      }
+      footer={
+        <div className="side-sheet-actions">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cerrar
+          </Button>
+          <Button type="button" variant="accent" onClick={onEdit}>
+            Editar datos y pin
+          </Button>
         </div>
-        <Button variant="ghost" type="button" onClick={onClose}>
-          Volver
-        </Button>
-      </header>
-
-      <section className="card form-stack">
-        <Button type="button" variant="accent" block onClick={onEdit}>
-          Editar datos y pin
-        </Button>
+      }
+    >
+      <div className="sheet-form-stack">
         <div>
           <p className="field-label">Identificación</p>
           <p>
@@ -125,12 +130,12 @@ export function ClientDetailSheet({ client, open, onClose, onEdit }: Props) {
             </>
           ) : (
             <p className="muted small">
-              Este cliente no tiene pin. Toca <strong>Editar datos y pin</strong> para fijar la
+              Este cliente no tiene pin. Usa <strong>Editar datos y pin</strong> para fijar la
               ubicación en el mapa.
             </p>
           )}
         </div>
-      </section>
-    </div>
+      </div>
+    </Modal>
   );
 }

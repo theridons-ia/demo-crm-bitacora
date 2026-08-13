@@ -1,0 +1,245 @@
+import { Package, Plus, Trash2 } from "lucide-react";
+import { useMemo } from "react";
+import type { Product } from "../lib/types";
+import { Button } from "./Button";
+
+export type QuoteLine = {
+  key: string;
+  productId: number | null;
+  quantity: number;
+};
+
+type Props = {
+  products: Product[];
+  lines: QuoteLine[];
+  onChange: (lines: QuoteLine[]) => void;
+  disabled?: boolean;
+  /** Mostrar bloque de total bajo la tabla. */
+  totalUsd?: number;
+  fxHint?: string | null;
+};
+
+let lineSeq = 0;
+export function newQuoteLine(partial?: Partial<QuoteLine>): QuoteLine {
+  lineSeq += 1;
+  return {
+    key: `ql-${Date.now()}-${lineSeq}`,
+    productId: null,
+    quantity: 1,
+    ...partial,
+  };
+}
+
+/** Cotizador serio: filas + subtotales (elige producto en cada línea). */
+export function SaleQuoter({
+  products,
+  lines,
+  onChange,
+  disabled,
+  totalUsd,
+  fxHint,
+}: Props) {
+  const byId = useMemo(() => {
+    const map = new Map<number, Product>();
+    for (const p of products) map.set(p.id, p);
+    return map;
+  }, [products]);
+
+  const selectedIds = useMemo(() => {
+    const set = new Set<number>();
+    for (const line of lines) {
+      if (line.productId != null) set.add(line.productId);
+    }
+    return set;
+  }, [lines]);
+
+  function updateLine(key: string, patch: Partial<QuoteLine>) {
+    onChange(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  }
+
+  function removeLine(key: string) {
+    const next = lines.filter((line) => line.key !== key);
+    onChange(next.length ? next : [newQuoteLine()]);
+  }
+
+  function addLine() {
+    onChange([...lines, newQuoteLine()]);
+  }
+
+  function optionsFor(line: QuoteLine): Product[] {
+    return products.filter((p) => {
+      if (p.stock <= 0) return false;
+      if (p.id !== line.productId && selectedIds.has(p.id)) return false;
+      return true;
+    });
+  }
+
+  return (
+    <div className="sale-quoter">
+      <div className="sale-quoter-head">
+        <span className="field-label">Productos</span>
+        <span className="muted small">
+          {lines.filter((l) => l.productId != null).length} línea(s)
+        </span>
+      </div>
+
+      <div className="sale-quoter-table">
+        <div className="sale-quoter-cols" aria-hidden>
+          <span>Producto</span>
+          <span>Precio</span>
+          <span>Cant.</span>
+          <span>Subtotal</span>
+          <span />
+        </div>
+
+        <ul className="sale-quoter-body">
+          {lines.map((line) => {
+            const product = line.productId != null ? byId.get(line.productId) : undefined;
+            const maxStock = product?.stock ?? 0;
+            const opts = optionsFor(line);
+            const lineTotal = product
+              ? line.quantity * Number(product.price_usd)
+              : 0;
+
+            return (
+              <li key={line.key} className="sale-quoter-row">
+                <div className="sale-quoter-product">
+                  <span className="stock-product-icon" aria-hidden>
+                    <Package size={16} />
+                  </span>
+                  <select
+                    className="input sale-quoter-select"
+                    value={line.productId ?? ""}
+                    disabled={disabled}
+                    aria-label="Producto"
+                    onChange={(e) => {
+                      const id = e.target.value ? Number(e.target.value) : null;
+                      const next = id != null ? byId.get(id) : undefined;
+                      updateLine(line.key, {
+                        productId: id,
+                        quantity: next
+                          ? Math.min(Math.max(1, line.quantity), next.stock)
+                          : 1,
+                      });
+                    }}
+                  >
+                    <option value="">Elegir producto…</option>
+                    {opts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} · {p.sku} (stock {p.stock})
+                      </option>
+                    ))}
+                    {product && !opts.some((p) => p.id === product.id) ? (
+                      <option value={product.id}>
+                        {product.name} · {product.sku}
+                      </option>
+                    ) : null}
+                  </select>
+                </div>
+
+                <div className="sale-quoter-meta">
+                  <span className="sale-quoter-label">Precio</span>
+                  <strong>
+                    {product ? `$${Number(product.price_usd).toFixed(2)}` : "—"}
+                  </strong>
+                </div>
+
+                <div className="sale-quoter-qty">
+                  <span className="sale-quoter-label">Cant.</span>
+                  <div className="qty-controls">
+                    <button
+                      type="button"
+                      className="qty-btn"
+                      disabled={disabled || !product || line.quantity <= 1}
+                      aria-label="Menos"
+                      onClick={() =>
+                        updateLine(line.key, {
+                          quantity: Math.max(1, line.quantity - 1),
+                        })
+                      }
+                    >
+                      −
+                    </button>
+                    <span className="qty-value">{product ? line.quantity : 0}</span>
+                    <button
+                      type="button"
+                      className="qty-btn"
+                      disabled={disabled || !product || line.quantity >= maxStock}
+                      aria-label="Más"
+                      onClick={() =>
+                        updateLine(line.key, {
+                          quantity: Math.min(maxStock, line.quantity + 1),
+                        })
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sale-quoter-meta">
+                  <span className="sale-quoter-label">Subtotal</span>
+                  <strong>{product ? `$${lineTotal.toFixed(2)}` : "—"}</strong>
+                </div>
+
+                <button
+                  type="button"
+                  className="sale-quoter-remove"
+                  disabled={disabled}
+                  aria-label="Quitar línea"
+                  onClick={() => removeLine(line.key)}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <Button
+        type="button"
+        variant="secondary"
+        className="sale-quoter-add"
+        disabled={
+          disabled || products.every((p) => p.stock <= 0 || selectedIds.has(p.id))
+        }
+        onClick={addLine}
+      >
+        <Plus size={16} aria-hidden />
+        Agregar producto
+      </Button>
+
+      {totalUsd != null ? (
+        <div className="sale-quoter-summary">
+          <div>
+            <span className="muted">Total cotizado</span>
+            <strong>${totalUsd.toFixed(2)} USD</strong>
+          </div>
+          {fxHint ? <p className="muted small">{fxHint}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function quoteLinesToItems(
+  lines: QuoteLine[],
+): { product_id: number; quantity: number }[] {
+  return lines
+    .filter(
+      (l): l is QuoteLine & { productId: number } =>
+        l.productId != null && l.quantity > 0,
+    )
+    .map((l) => ({ product_id: l.productId, quantity: l.quantity }));
+}
+
+export function quoteLinesTotal(lines: QuoteLine[], products: Product[]): number {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  return lines.reduce((sum, line) => {
+    if (line.productId == null) return sum;
+    const p = byId.get(line.productId);
+    if (!p) return sum;
+    return sum + line.quantity * Number(p.price_usd);
+  }, 0);
+}

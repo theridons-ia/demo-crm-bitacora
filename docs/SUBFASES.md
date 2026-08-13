@@ -74,6 +74,9 @@ No mezclar varias SF en un solo commit si se puede evitar.
 | **SF-2.5** | Mapa equipo | Visitas del día en mapa | hecho |
 | **SF-2.6** | Refresh visual UI | Tokens + DM Sans; Inicio/Hoy/Inventario estilo mock (móvil+desktop) | hecho |
 | **SF-2.6b** | Logo EnRutas + consistencia | Logo en shells; marca EnRutas; sin doble Salir desktop | hecho |
+| **SF-2.6c** | UI export (cards/gráficos) | Ruta progress, métricas 2×2, CTA coral, ring + barras ranking/cobranza | hecho |
+| **SF-2.7** | Shell unificado | Sidebar + header perfil (vendedor/supervisor); workspace con panel derecho | hecho |
+| **SF-2.8** | Cartera + recorrido + desempeño | Clientes por vendedor; mapa ruta punteada; menú perfil; dashboard | hecho |
 
 
 ---
@@ -94,9 +97,31 @@ Detalle: [`implementacion/FASE-3-ENDURECER.md`](implementacion/FASE-3-ENDURECER.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-2.6b** (logo EnRutas + consistencia visual).
+**Listo para commit / tu push:** **SF-2.8** (cartera, recorrido mapa, perfil, desempeño).
 
 **Siguiente:** **SF-3.4** import Excel (o Contabo al final).
+
+### Cómo verificar SF-2.8
+
+1. Login Marina: menú **Clientes** (solo su cartera). Carlos no ve los de Marina.
+2. Supervisor → **Clientes**: asignar PDV a vendedores y guardar.
+3. Inicio vendedor: click **Tu ruta de hoy** o **Ver recorrido** → mapa con trazo punteado; al cerrar visitas el trazo se solidifica.
+4. Perfil (arriba derecha): Perfil / Ajustes / Preferencias (+ Desempeño en vendedor).
+5. Móvil: tab **Clientes** (ya no Resumen).
+
+### Cómo verificar SF-2.7
+
+1. Desktop ≥1100px: sidebar (logo + menú) + header; **panel derecho al ras** del saludo/header de cada vista.
+2. Sin «Accesos rápidos» duplicando el menú; panel con contexto / placeholders rellenables.
+3. Todas las vistas usan el mismo ancho de workspace (~1120–1200px).
+4. FAB coral (+) en vendedor: Visita / Venta / Cliente.
+5. Móvil: panel derecho debajo del main; bottom nav / chips.
+
+### Cómo verificar SF-2.6c
+
+1. Vendedor Inicio: saludo + avatar; tarjeta oscura «Tu ruta de hoy» con barra oro; grid 2×2 de métricas; CTA coral «Registrar actividad».
+2. Supervisor Hoy: mismas métricas; anillo de cobertura; ranking con barras; alertas.
+3. Cobranza: resumen Facturado / Cobrado / Por cobrar + top deudores con barras.
 
 ### Cómo verificar SF-2.6b
 

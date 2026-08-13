@@ -1,10 +1,33 @@
-import { ClipboardList, MapPin, Play, Plus, Radio, Square } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  Calendar,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  MapPin,
+  Play,
+  Plus,
+  Radio,
+  Square,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { CloseVisitSheet } from "../components/CloseVisitSheet";
-import { TextField } from "../components/TextField";
+import { ListSearch } from "../components/ListSearch";
+import { LiveLed } from "../components/LiveLed";
+import {
+  MonthCalendar,
+  addDaysISO,
+  calendarTodayISO,
+  formatAgendaDay,
+} from "../components/MonthCalendar";
+import { Modal } from "../components/Modal";
+import { FormStep } from "../components/SideSheet";
+import { SelectField, TextField } from "../components/TextField";
+import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitMapSheet } from "../components/VisitMapSheet";
 import { useVisitGpsTrail } from "../hooks/useVisitGpsTrail";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
   createVisit,
@@ -12,13 +35,7 @@ import {
   fetchVisits,
   startVisit,
 } from "../lib/api";
-import {
-  canUseMockGps,
-  getCurrentPosition,
-  isMockGpsEnabled,
-  isSecureGeoContext,
-  setMockGpsEnabled,
-} from "../lib/gps";
+import { getCurrentPosition } from "../lib/gps";
 import {
   listLocalVisits,
   newLocalUuid,
@@ -35,16 +52,52 @@ const statusLabel: Record<VisitStatus, string> = {
   cancelada: "Cancelada",
 };
 
+type VisitFilter = "all" | "open" | "done" | "agenda" | "sale";
+
 function clientIdLabel(client: Client | null | undefined, clientId: number): string {
   if (!client) return `Cliente #${clientId}`;
-  const id = client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "";
-  return id ? `${client.name} · ${id}` : client.name;
+  const id = client.rif ? client.rif : client.ci ? client.ci : "";
+  return id ? `${client.name}` : client.name;
+}
+
+function clientIdMeta(client: Client | null | undefined): string {
+  if (!client) return "";
+  return client.rif ?? client.ci ?? "";
 }
 
 function formatCoords(visit: Visit): string | null {
   if (visit.latitude == null || visit.longitude == null) return null;
   const acc = visit.gps_accuracy_m ? ` · ±${Number(visit.gps_accuracy_m).toFixed(0)} m` : "";
   return `${Number(visit.latitude).toFixed(5)}, ${Number(visit.longitude).toFixed(5)}${acc}`;
+}
+
+function formatWhen(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("es-VE", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function visitIconTone(status: VisitStatus): string {
+  if (status === "en_curso") return "tone-progress";
+  if (status === "programada") return "tone-accent";
+  if (status === "completada") return "tone-ok";
+  return "tone-muted";
+}
+
+function VisitStatusIcon({ status }: { status: VisitStatus }) {
+  if (status === "en_curso") return <Clock size={16} />;
+  if (status === "programada") return <Calendar size={16} />;
+  if (status === "completada") return <CheckCircle2 size={16} />;
+  return <ClipboardList size={16} />;
 }
 
 function localVisitToVisit(local: LocalPendingVisit): Visit {
@@ -58,6 +111,7 @@ function localVisitToVisit(local: LocalPendingVisit): Visit {
     result: null,
     description: local.description,
     scheduled_date: null,
+    scheduled_time: null,
     visited_at: local.created_at,
     latitude: local.latitude != null ? String(local.latitude) : null,
     longitude: local.longitude != null ? String(local.longitude) : null,
@@ -90,10 +144,24 @@ export function VisitsPage() {
   const [error, setError] = useState<string | null>(null);
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"now" | "schedule">("now");
+  const [agendaDay, setAgendaDay] = useState(() => calendarTodayISO());
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [mockGps, setMockGps] = useState(() => isMockGpsEnabled());
   const [closingVisit, setClosingVisit] = useState<Visit | null>(null);
   const [mapVisit, setMapVisit] = useState<Visit | null>(null);
+  const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<VisitFilter>("open");
+
+  useEffect(() => {
+    if (searchParams.get("nueva") !== "1") return;
+    setFormMode("now");
+    setFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("nueva");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const reload = useCallback(async () => {
     const locals = (await listLocalVisits()).map(localVisitToVisit);
@@ -118,11 +186,6 @@ export function VisitsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    if (!isSecureGeoContext() && !isMockGpsEnabled()) {
-      setGpsNote(
-        "Sin HTTPS el GPS real está bloqueado. Activa «GPS de prueba» para simular coordenadas (solo desarrollo).",
-      );
-    }
     reload()
       .catch((err) => {
         if (!cancelled) {
@@ -186,143 +249,258 @@ export function VisitsPage() {
 
   const active = visits.filter((v) => v.status === "en_curso");
 
+  const counts = useMemo(() => {
+    const open = visits.filter((v) => v.status === "programada" || v.status === "en_curso");
+    const done = visits.filter((v) => v.status === "completada");
+    const agenda = visits.filter((v) => v.status === "programada");
+    const sale = visits.filter((v) => v.result && v.result !== "sin_venta");
+    return { open: open.length, done: done.length, agenda: agenda.length, sale: sale.length };
+  }, [visits]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return visits.filter((v) => {
+      if (filter === "open" && !(v.status === "programada" || v.status === "en_curso")) return false;
+      if (filter === "done" && v.status !== "completada") return false;
+      if (filter === "agenda") {
+        if (v.status !== "programada") return false;
+        if (v.scheduled_date !== agendaDay) return false;
+      }
+      if (filter === "sale" && !(v.result && v.result !== "sin_venta")) return false;
+      if (!q) return true;
+      const blob = `${v.client?.name ?? ""} ${v.client?.rif ?? ""} ${v.client?.ci ?? ""} ${v.description ?? ""}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }, [visits, filter, query, agendaDay]);
+
+  const weekDays = useMemo(() => {
+    const start = addDaysISO(calendarTodayISO(), -1);
+    return Array.from({ length: 7 }, (_, i) => addDaysISO(start, i));
+  }, []);
+
+  const agendaCountByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const v of visits) {
+      if (v.status !== "programada" || !v.scheduled_date) continue;
+      map.set(v.scheduled_date, (map.get(v.scheduled_date) ?? 0) + 1);
+    }
+    return map;
+  }, [visits]);
+
+  function openSchedule(day?: string) {
+    if (day) setAgendaDay(day);
+    setFormMode("schedule");
+    setFormOpen(true);
+  }
+
+  function openNow() {
+    setFormMode("now");
+    setFormOpen(true);
+  }
+
   return (
-    <>
+    <WorkspacePage
+      eyebrow="Bitácora"
+      title="Visitas"
+      blurb="Inicia, cierra y registra visitas con evidencia GPS."
+    >
       <header className="page-header">
         <div>
-          <p className="eyebrow">EnRutas</p>
-          <h1>Visitas</h1>
-          <p className="muted">Ruta de campo · evidencia GPS al iniciar y cerrar</p>
+          <p className="eyebrow">Bitácora</p>
+          <h1 className="display-title">Tus visitas</h1>
+          <p className="muted">
+            {counts.done} hechas · {active.length} en curso · {counts.agenda} en agenda
+          </p>
         </div>
+        <Button variant="primary" aria-label="Nueva visita" onClick={openNow}>
+          <Plus size={18} />
+        </Button>
       </header>
 
-      {canUseMockGps() ? (
-        <section className="card" style={{ marginBottom: "1rem" }}>
-          <div className="section-title" style={{ marginBottom: "0.5rem" }}>
-            <h2 style={{ margin: 0, fontSize: "1rem" }}>Pruebas GPS</h2>
-          </div>
-          <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
-            {isSecureGeoContext()
-              ? "Este origen permite GPS real. El modo prueba sirve para forzar coordenadas de Lara."
-              : "Este origen no es HTTPS: usa GPS de prueba o `npm run dev:https`."}
-          </p>
-          <Button
-            variant={mockGps ? "primary" : "secondary"}
-            block
-            type="button"
-            onClick={() => {
-              const next = !mockGps;
-              setMockGpsEnabled(next);
-              setMockGps(next);
-              setGpsNote(
-                next
-                  ? "GPS de prueba ON — coordenadas simuladas cerca de Barquisimeto."
-                  : "GPS de prueba OFF.",
-              );
-            }}
-          >
-            {mockGps ? "GPS de prueba: activado" : "Activar GPS de prueba"}
-          </Button>
-        </section>
-      ) : null}
-
-      {gpsNote ? <p className={mockGps ? "gps-ok-note" : "form-error"}>{gpsNote}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
+      {gpsNote ? <p className="muted small">{gpsNote}</p> : null}
 
       {active.map((visit) => (
         <ActiveVisitCard
-          key={visit.id}
+          key={`active-${visit.id}`}
           visit={visit}
           busy={busyId === visit.id}
+          onOpen={() => setDetailVisit(visit)}
           onClose={() => onCloseNoSale(visit.id)}
           onMap={() => setMapVisit(visit)}
         />
       ))}
 
-      <section className="card" style={{ marginBottom: "1rem" }}>
-        <Button variant="accent" block onClick={() => setFormOpen(true)}>
-          <Plus size={18} />
-          Nueva visita
-        </Button>
-      </section>
+      <ListSearch
+        id="visits-search"
+        value={query}
+        onChange={setQuery}
+        placeholder="Buscar cliente, RIF o nota"
+      />
+
+      <div className="chips-row" role="tablist" aria-label="Filtros">
+        {(
+          [
+            ["done", "Hechas"],
+            ["open", "Abiertas"],
+            ["agenda", "Agenda"],
+            ["sale", "Con venta"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={filter === key ? "chip active" : "chip"}
+            onClick={() => setFilter(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filter === "agenda" ? (
+        <section className="calendar-panel" aria-label="Agenda semanal">
+          <div className="section-head" style={{ marginTop: 0 }}>
+            <h2 className="section-heading">Agenda</h2>
+            <button type="button" className="link-accent" onClick={() => openSchedule(agendaDay)}>
+              Programar
+            </button>
+          </div>
+          <div className="week-strip" role="tablist" aria-label="Días">
+            {weekDays.map((day) => {
+              const [y, m, d] = day.split("-").map(Number);
+              const label = new Date(y, m - 1, d).toLocaleDateString("es-VE", { weekday: "short" });
+              const count = agendaCountByDay.get(day) ?? 0;
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  className={day === agendaDay ? "day-chip active" : "day-chip"}
+                  onClick={() => setAgendaDay(day)}
+                >
+                  <span>{label}</span>
+                  <strong>{d}</strong>
+                  <em>{count}</em>
+                </button>
+              );
+            })}
+          </div>
+          <p className="muted small">Agenda · {formatAgendaDay(agendaDay)}</p>
+        </section>
+      ) : null}
 
       {loading ? <p className="muted">Cargando…</p> : null}
 
-      <section className="card">
-        <div className="section-title">
-          <span className="icon-badge">
-            <ClipboardList size={18} />
-          </span>
-          <h2>Historial</h2>
-        </div>
-
-        {!loading && visits.length === 0 ? (
-          <p className="muted">Aún no hay visitas. Crea una para empezar.</p>
-        ) : null}
-
-        <ul className="client-list">
-          {visits.map((visit) => {
-            const coords = formatCoords(visit);
-            return (
-              <li key={visit.id} className="client-item visit-item">
-                <div className="visit-item-head">
-                  <strong>{clientIdLabel(visit.client, visit.client_id)}</strong>
-                  <span className={`status-pill status-${visit.status}`}>
-                    {statusLabel[visit.status]}
-                  </span>
-                </div>
-                {visit.scheduled_date ? (
-                  <p className="muted small">Programada: {visit.scheduled_date}</p>
-                ) : null}
-                {visit.description ? <p className="muted small">{visit.description}</p> : null}
-                {visit.result ? <p className="muted small">Resultado: {visit.result}</p> : null}
-                {coords ? (
-                  <p className="muted small">
-                    <MapPin size={14} style={{ verticalAlign: "middle" }} /> {coords}
+      <ul className="ficha-stack">
+        {filtered.map((visit) => {
+          const coords = formatCoords(visit);
+          const idMeta = clientIdMeta(visit.client);
+          const timeLabel =
+            visit.scheduled_time != null
+              ? String(visit.scheduled_time).slice(0, 5)
+              : null;
+          const when =
+            visit.status === "programada" && visit.scheduled_date
+              ? [visit.scheduled_date, timeLabel].filter(Boolean).join(" · ")
+              : formatWhen(visit.visited_at || visit.created_at);
+          return (
+            <li key={visit.id}>
+              <article
+                className="ficha ficha-openable"
+                role="button"
+                tabIndex={0}
+                onClick={() => setDetailVisit(visit)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDetailVisit(visit);
+                  }
+                }}
+              >
+                <span className={`ficha-icon ${visitIconTone(visit.status)}`} aria-hidden>
+                  <VisitStatusIcon status={visit.status} />
+                </span>
+                <div className="ficha-body">
+                  <div className="ficha-row">
+                    <h3 className="ficha-title">{clientIdLabel(visit.client, visit.client_id)}</h3>
+                    {visit.status === "en_curso" ? (
+                      <LiveLed />
+                    ) : (
+                      <span className={`badge badge-${visit.status}`}>{statusLabel[visit.status]}</span>
+                    )}
+                  </div>
+                  <p className="ficha-meta">
+                    {[idMeta, when].filter(Boolean).join(" · ")}
                   </p>
-                ) : null}
-
-                <div className="visit-actions">
-                  {visit.status === "programada" ? (
-                    <Button
-                      variant="primary"
-                      disabled={busyId === visit.id}
-                      onClick={() => onStart(visit.id)}
-                    >
-                      <Play size={16} />
-                      {busyId === visit.id ? "Obteniendo GPS…" : "Iniciar + GPS"}
-                    </Button>
+                  {visit.description ? <p className="ficha-note">{visit.description}</p> : null}
+                  {visit.result ? (
+                    <p className="ficha-note">
+                      Resultado: {visit.result === "sin_venta" ? "Sin venta" : "Con venta"}
+                    </p>
                   ) : null}
-                  {visit.status === "en_curso" ? (
-                    <Button
-                      variant="secondary"
-                      disabled={busyId === visit.id}
-                      onClick={() => onCloseNoSale(visit.id)}
-                    >
-                      <Square size={16} />
-                      Cerrar visita
-                    </Button>
+                  {coords ? (
+                    <p className="ficha-meta">
+                      <MapPin size={12} style={{ verticalAlign: "middle" }} /> {coords}
+                    </p>
                   ) : null}
-                  {visit.id > 0 && (coords || visit.status !== "programada") ? (
-                    <Button variant="ghost" type="button" onClick={() => setMapVisit(visit)}>
-                      <MapPin size={16} />
-                      Ver trail
+                  <div className="ficha-actions" onClick={(e) => e.stopPropagation()}>
+                    {visit.status === "programada" ? (
+                      <Button
+                        variant="primary"
+                        disabled={busyId === visit.id}
+                        onClick={() => onStart(visit.id)}
+                      >
+                        <Play size={16} />
+                        {busyId === visit.id ? "Obteniendo GPS…" : "Iniciar"}
+                      </Button>
+                    ) : null}
+                    {visit.status === "en_curso" ? (
+                      <Button
+                        variant="secondary"
+                        disabled={busyId === visit.id}
+                        onClick={() => onCloseNoSale(visit.id)}
+                      >
+                        <Square size={16} />
+                        Cerrar
+                      </Button>
+                    ) : null}
+                    {visit.id > 0 && (coords || visit.status !== "programada") ? (
+                      <Button variant="ghost" type="button" onClick={() => setMapVisit(visit)}>
+                        <MapPin size={16} />
+                        Trail
+                      </Button>
+                    ) : null}
+                    <Button variant="ghost" type="button" onClick={() => setDetailVisit(visit)}>
+                      Ver
                     </Button>
-                  ) : null}
+                  </div>
                 </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+              </article>
+            </li>
+          );
+        })}
+      </ul>
+
+      {!loading && filtered.length === 0 ? (
+        <p className="muted">Sin coincidencias. Prueba otro filtro o crea una visita.</p>
+      ) : null}
 
       <VisitForm
         open={formOpen}
+        mode={formMode}
+        initialDate={agendaDay}
         clients={clients}
         onClose={() => setFormOpen(false)}
         onCreated={(visit, note) => {
           setVisits((prev) => [visit, ...prev]);
           setFormOpen(false);
+          setDetailVisit(visit);
+          if (visit.status === "programada" && visit.scheduled_date) {
+            setFilter("agenda");
+            setAgendaDay(visit.scheduled_date);
+          } else if (visit.status === "en_curso") {
+            setFilter("open");
+          }
           if (note) setGpsNote(note);
         }}
       />
@@ -335,6 +513,7 @@ export function VisitsPage() {
           onClosed={(updated) => {
             setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
             setClosingVisit(null);
+            setDetailVisit((cur) => (cur && cur.id === updated.id ? updated : cur));
           }}
         />
       ) : null}
@@ -342,18 +521,32 @@ export function VisitsPage() {
       {mapVisit ? (
         <VisitMapSheet visit={mapVisit} open onClose={() => setMapVisit(null)} />
       ) : null}
-    </>
+
+      {detailVisit ? (
+        <VisitDetailSheet
+          visit={detailVisit}
+          open
+          onClose={() => setDetailVisit(null)}
+          onUpdated={(updated) => {
+            setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+            setDetailVisit(updated);
+          }}
+        />
+      ) : null}
+    </WorkspacePage>
   );
 }
 
 function ActiveVisitCard({
   visit,
   busy,
+  onOpen,
   onClose,
   onMap,
 }: {
   visit: Visit;
   busy: boolean;
+  onOpen: () => void;
   onClose: () => void;
   onMap: () => void;
 }) {
@@ -363,8 +556,15 @@ function ActiveVisitCard({
 
   return (
     <section className="card visit-active-card">
-      <p className="eyebrow">Visita en curso</p>
-      <h2 className="visit-active-title">{clientIdLabel(visit.client, visit.client_id)}</h2>
+      <button type="button" className="visit-active-open" onClick={onOpen}>
+        <div className="ficha-row" style={{ marginBottom: "0.25rem" }}>
+          <p className="eyebrow" style={{ margin: 0 }}>
+            Visita en curso
+          </p>
+          <LiveLed />
+        </div>
+        <h2 className="visit-active-title">{clientIdLabel(visit.client, visit.client_id)}</h2>
+      </button>
       {formatCoords(visit) ? (
         <p className="muted small">
           <MapPin size={14} style={{ verticalAlign: "middle" }} /> Inicio: {formatCoords(visit)}
@@ -386,6 +586,9 @@ function ActiveVisitCard({
       ) : null}
       {lastError ? <p className="form-error">{lastError}</p> : null}
       <div className="visit-actions">
+        <Button variant="ghost" type="button" onClick={onOpen}>
+          Ver detalle
+        </Button>
         <Button variant="secondary" disabled={busy} onClick={onClose}>
           <Square size={16} />
           Cerrar visita
@@ -403,21 +606,34 @@ function ActiveVisitCard({
 
 function VisitForm({
   open,
+  mode: initialMode,
+  initialDate,
   clients,
   onClose,
   onCreated,
 }: {
   open: boolean;
+  mode: "now" | "schedule";
+  initialDate: string;
   clients: Client[];
   onClose: () => void;
   onCreated: (visit: Visit, gpsNote?: string) => void;
 }) {
   const [clientId, setClientId] = useState("");
-  const [mode, setMode] = useState<"now" | "schedule">("now");
-  const [scheduledDate, setScheduledDate] = useState("");
+  const [mode, setMode] = useState<"now" | "schedule">(initialMode);
+  const [scheduledDate, setScheduledDate] = useState(initialDate);
+  const [scheduledTime, setScheduledTime] = useState("09:00");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setMode(initialMode);
+    setScheduledDate(initialDate || calendarTodayISO());
+    setScheduledTime("09:00");
+    setError(null);
+  }, [open, initialMode, initialDate]);
 
   if (!open) return null;
 
@@ -430,6 +646,10 @@ function VisitForm({
     }
     if (mode === "schedule" && !scheduledDate) {
       setError("Indica la fecha programada");
+      return;
+    }
+    if (mode === "schedule" && !scheduledTime) {
+      setError("Indica la hora");
       return;
     }
 
@@ -484,6 +704,7 @@ function VisitForm({
           result: null,
           description: description.trim() || null,
           scheduled_date: null,
+          scheduled_time: null,
           visited_at: created_at,
           latitude: latitude != null ? String(latitude) : null,
           longitude: longitude != null ? String(longitude) : null,
@@ -496,8 +717,6 @@ function VisitForm({
         };
         setClientId("");
         setDescription("");
-        setScheduledDate("");
-        setMode("now");
         onCreated(visit, gpsNote ?? "Visita local: se sincronizará al cerrar (sin red)");
         return;
       }
@@ -506,6 +725,7 @@ function VisitForm({
         client_id: Number(clientId),
         status: mode === "now" ? "en_curso" : "programada",
         scheduled_date: mode === "schedule" ? scheduledDate : null,
+        scheduled_time: mode === "schedule" ? `${scheduledTime}:00` : null,
         description: description.trim() || null,
         latitude: latitude ?? null,
         longitude: longitude ?? null,
@@ -515,8 +735,6 @@ function VisitForm({
       });
       setClientId("");
       setDescription("");
-      setScheduledDate("");
-      setMode("now");
       onCreated(visit, gpsNote);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo crear la visita");
@@ -525,40 +743,32 @@ function VisitForm({
     }
   }
 
-  return (
-    <div className="screen-form" role="dialog" aria-modal="true" aria-labelledby="visit-form-title">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Visitas</p>
-          <h1 id="visit-form-title">Nueva visita</h1>
-          <p className="muted">Si eliges “Ahora”, pediremos tu ubicación al iniciar.</p>
-        </div>
-        <Button variant="ghost" type="button" onClick={onClose}>
-          Cerrar
-        </Button>
-      </header>
+  const formBody = (
+    <form id="visit-create-form" className="sheet-form-stack" onSubmit={onSubmit}>
+      <FormStep step="01" title="Cliente" blurb="Elige el PDV de tu cartera.">
+        <SelectField
+          id="visit-client"
+          label="Cliente (PDV)"
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          required
+        >
+          <option value="">Selecciona…</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {clientIdLabel(c, c.id)}
+            </option>
+          ))}
+        </SelectField>
+      </FormStep>
 
-      <form className="card form-stack" onSubmit={onSubmit}>
+      <FormStep
+        step="02"
+        title="Cuándo"
+        blurb={mode === "now" ? "Inicia ya con evidencia GPS." : "Agenda con día y hora."}
+      >
         <div className="field">
-          <label htmlFor="visit-client">Cliente (PDV)</label>
-          <select
-            id="visit-client"
-            className="input"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            required
-          >
-            <option value="">Selecciona…</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {clientIdLabel(c, c.id)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <span className="field-label">¿Cuándo?</span>
+          <span className="field-label">Modo</span>
           <div className="id-type-toggle" role="group">
             <button
               type="button"
@@ -578,39 +788,67 @@ function VisitForm({
         </div>
 
         {mode === "schedule" ? (
-          <TextField
-            id="visit-date"
-            label="Fecha"
-            type="date"
-            value={scheduledDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-            required
-          />
+          <>
+            <MonthCalendar value={scheduledDate} onChange={setScheduledDate} />
+            <TextField
+              id="visit-time"
+              label="Hora"
+              type="time"
+              value={scheduledTime}
+              onChange={(e) => setScheduledTime(e.target.value)}
+              required
+            />
+          </>
         ) : null}
+      </FormStep>
 
+      <FormStep step="03" title="Nota" blurb="Opcional, visible en la bitácora.">
         <TextField
           id="visit-notes"
           label="Nota / motivo"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+      </FormStep>
 
-        {error ? (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        ) : null}
+      {error ? (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </form>
+  );
 
-        <Button type="submit" variant="accent" block disabled={submitting}>
-          {submitting
-            ? mode === "now"
-              ? "Obteniendo GPS…"
-              : "Guardando…"
-            : mode === "now"
-              ? "Iniciar visita"
-              : "Programar visita"}
-        </Button>
-      </form>
-    </div>
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size={mode === "schedule" ? "wide" : "default"}
+      eyebrow={mode === "schedule" ? "Agenda" : "Visitas"}
+      title={mode === "schedule" ? "Programar visita" : "Nueva visita"}
+      blurb={
+        mode === "schedule"
+          ? "Calendario + hora para dejarla en la ruta."
+          : "Si eliges Ahora, pediremos tu ubicación al iniciar."
+      }
+      footer={
+        <div className="side-sheet-actions">
+          <Button type="button" variant="ghost" disabled={submitting} onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="visit-create-form" variant="accent" disabled={submitting}>
+            {submitting
+              ? mode === "now"
+                ? "Obteniendo GPS…"
+                : "Guardando…"
+              : mode === "now"
+                ? "Iniciar visita"
+                : "Guardar en agenda"}
+          </Button>
+        </div>
+      }
+    >
+      {formBody}
+    </Modal>
   );
 }

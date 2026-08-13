@@ -1,26 +1,13 @@
-import { Package, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { TextField } from "../components/TextField";
+import { AsideStats } from "../components/AsideStats";
+import { ListSearch } from "../components/ListSearch";
+import { StockTable, stockState, type StockState } from "../components/StockTable";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchProducts } from "../lib/api";
 import { getCachedProducts } from "../lib/offlineQueue";
 import type { Product } from "../lib/types";
 
-const LOW_STOCK = 40;
-
-type StockState = "disponible" | "bajo" | "agotado";
-
-function stockState(stock: number): StockState {
-  if (stock <= 0) return "agotado";
-  if (stock < LOW_STOCK) return "bajo";
-  return "disponible";
-}
-
-function stockPct(stock: number): number {
-  const max = Math.max(LOW_STOCK * 2, stock);
-  return Math.min(100, Math.round((stock / max) * 100));
-}
-
-/** Inventario — refresh visual SF-2.6 (móvil + desktop). */
+/** Inventario vendedor — tabla de existencias (sin ajuste rápido). */
 export function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,42 +57,38 @@ export function InventoryPage() {
   }, [products, query, status]);
 
   return (
-    <>
+    <WorkspacePage
+      eyebrow="Campo"
+      title="Inventario"
+      blurb="Consulta el stock disponible para tu ruta."
+      asideExtra={
+        <AsideStats
+          title="Tu stock"
+          eyebrow="Inventario"
+          items={[
+            { label: "Valor", value: `$${valueStock.toFixed(0)}` },
+            { label: "A reponer", value: toRestock },
+          ]}
+        />
+      }
+    >
       <header className="page-header page-header-stack">
         <div>
           <p className="eyebrow">Operación · bodega</p>
-          <h1 className="display-title">Inventario que acompaña la ruta.</h1>
-          <p className="muted">Stock visible según tu rol · precios USD</p>
+          <h1 className="display-title">Existencias actuales</h1>
+          <p className="muted">
+            {filtered.length} productos visibles · ${valueStock.toFixed(0)} en stock
+          </p>
         </div>
       </header>
 
-      <section className="kpi-row" aria-label="Resumen inventario">
-        <article className="kpi-card">
-          <p className="kpi-value">${valueStock.toFixed(0)}</p>
-          <p className="kpi-label">valor en stock</p>
-        </article>
-        <article className="kpi-card">
-          <p className="kpi-value">{products.length}</p>
-          <p className="kpi-label">productos</p>
-        </article>
-        <article className="kpi-card">
-          <p className="kpi-value kpi-accent">{toRestock}</p>
-          <p className="kpi-label">reponer</p>
-        </article>
-      </section>
-
-      <section className="card seller-panel">
-        <div className="search-row">
-          <Search size={18} className="search-icon" aria-hidden />
-          <TextField
-            id="inv-search"
-            label="Buscar producto"
-            placeholder="Nombre o SKU…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-
+      <div className="list-page-tools">
+        <ListSearch
+          id="inv-search"
+          value={query}
+          onChange={setQuery}
+          placeholder="Nombre o SKU…"
+        />
         <div className="filter-chips" role="tablist" aria-label="Estado de stock">
           {(
             [
@@ -125,48 +108,16 @@ export function InventoryPage() {
             </button>
           ))}
         </div>
+      </div>
 
-        {loading ? <p className="muted">Cargando…</p> : null}
-        {error ? <p className="form-error">{error}</p> : null}
+      {loading ? <p className="muted">Cargando…</p> : null}
+      {error ? <p className="form-error">{error}</p> : null}
 
-        <ul className="inv-list">
-          {filtered.map((p) => {
-            const st = stockState(p.stock);
-            return (
-              <li key={p.id} className="inv-row">
-                <span className="inv-icon" aria-hidden>
-                  <Package size={18} />
-                </span>
-                <div className="inv-body">
-                  <div className="inv-top">
-                    <strong>{p.name}</strong>
-                    <span
-                      className={`status-pill ${
-                        st === "disponible" ? "status-ok" : st === "bajo" ? "status-warn" : "status-bad"
-                      }`}
-                    >
-                      {st === "disponible" ? "Disponible" : st === "bajo" ? "Bajo stock" : "Agotado"}
-                    </span>
-                  </div>
-                  <p className="muted small">
-                    {p.sku} · ${Number(p.price_usd).toFixed(2)} / {p.unit}
-                  </p>
-                  <div className="inv-bar-wrap" aria-hidden>
-                    <span
-                      className={`inv-bar inv-bar-${st}`}
-                      style={{ width: `${stockPct(p.stock)}%` }}
-                    />
-                  </div>
-                  <p className="muted small">
-                    Stock {p.stock}
-                    {st !== "agotado" ? ` · mín. ref. ${LOW_STOCK}` : ""}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    </>
+      {!loading && filtered.length ? <StockTable products={filtered} /> : null}
+
+      {!loading && filtered.length === 0 ? (
+        <p className="muted">Sin productos con este filtro.</p>
+      ) : null}
+    </WorkspacePage>
   );
 }

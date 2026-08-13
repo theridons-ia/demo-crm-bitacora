@@ -1,5 +1,54 @@
 # Fase 2 — Supervisor
 
+## SF-2.7 — Shell unificado (sidebar + header)
+
+### Objetivo
+Misma carcasa web para vendedor y supervisor: sidebar a la izquierda, header con perfil arriba a la derecha, y área de trabajo con panel lateral para no estirar el contenido.
+
+### Qué se hizo
+- `AppShell` + `AppSidebar` + `AppHeader` compartidos.
+- Nav por rol (`appNav.ts`); badge de alertas en supervisor.
+- Vista actual (pill Supervisor / Vendedor) informativa según rol.
+- Workspace `main + aside` en Inicio vendedor y Hoy supervisor.
+- Otras páginas limitadas a ~920px de ancho útil.
+- Móvil: bottom nav (vendedor) / chips (supervisor); sidebar desde ≥900px.
+
+### Archivos
+| Pieza | Ruta |
+|-------|------|
+| Shell | `web/src/layout/AppShell.tsx` |
+| Sidebar / Header | `AppSidebar.tsx`, `AppHeader.tsx` |
+| Nav | `web/src/layout/appNav.ts` |
+| CSS | `base.css` bloque SF-2.7 |
+| Homepages | `HomePage.tsx`, `SupervisorHomePage.tsx` |
+
+---
+
+## SF-2.6c — UI estilo export (cards / gráficos)
+
+### Objetivo
+Acercar Inicio vendedor, Hoy supervisor y Cobranza a los patrones del mock estático `demo-crm-bitacora-export/` (ruta, métricas con iconos, CTA coral, ring, barras).
+
+### Qué se hizo
+- Tokens alineados al export (`#18312f`, `#f7f3ed`, `#f16b5f`, `#f5c965`, radios 18/24).
+- Vendedor: `route-card` + progress, métricas 2×2 con chips rose/gray/sand/purple, CTA «Registrar actividad».
+- Supervisor: métricas, `goal-card` con anillo conic, ranking del día (barras por vendedor).
+- Cobranza: `sales-summary` + chart «Top deudores».
+
+### Archivos
+| Pieza | Ruta |
+|-------|------|
+| Tokens | `web/src/styles/tokens.css` |
+| Patrones CSS | `web/src/styles/base.css` (bloque SF-2.6c) |
+| Inicio | `web/src/pages/HomePage.tsx` |
+| Supervisor | `web/src/pages/SupervisorHomePage.tsx` |
+| Cobranza | `web/src/pages/ReceivablesPage.tsx` |
+
+### Tipografía
+Se mantiene **DM Sans** (no Inter del export).
+
+---
+
 ## SF-2.6 — Refresh visual (móvil + desktop)
 
 ### Objetivo

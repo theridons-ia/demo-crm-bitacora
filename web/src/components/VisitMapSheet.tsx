@@ -1,7 +1,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "./Button";
+import { Modal } from "./Modal";
 import { ApiError, fetchVisitGpsPoints } from "../lib/api";
 import { clientPdvIconFor, trailIconForSource } from "../lib/mapMarkers";
 import type { Visit, VisitGpsPoint } from "../lib/types";
@@ -152,26 +152,22 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
     Number.isFinite(Number(visit.client.latitude));
 
   return (
-    <div className="screen-form" role="dialog" aria-modal="true" aria-labelledby="visit-map-title">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Evidencia GPS</p>
-          <h1 id="visit-map-title">{clientName}</h1>
-          <p className="muted">
-            {loading
-              ? "Cargando puntos…"
-              : points.length
-                ? `${points.length} punto(s) vendedor${hasPdv ? " · PDV en mapa" : ""}`
-                : hasPdv
-                  ? "Solo pin del PDV (sin trail aún)"
-                  : "Sin coordenadas"}
-          </p>
-        </div>
-        <Button variant="ghost" type="button" onClick={onClose}>
-          Volver
-        </Button>
-      </header>
-
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="wide"
+      eyebrow="Evidencia GPS"
+      title={clientName}
+      blurb={
+        loading
+          ? "Cargando puntos…"
+          : points.length
+            ? `${points.length} punto(s) vendedor${hasPdv ? " · PDV en mapa" : ""}`
+            : hasPdv
+              ? "Solo pin del PDV (sin trail aún)"
+              : "Sin coordenadas"
+      }
+    >
       {error ? <p className="form-error">{error}</p> : null}
 
       <div className="map-legend" aria-hidden>
@@ -192,6 +188,6 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       <div className="card visit-map-card">
         <div ref={mapEl} className="visit-map" />
       </div>
-    </div>
+    </Modal>
   );
 }

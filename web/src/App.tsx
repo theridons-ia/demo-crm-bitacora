@@ -5,19 +5,28 @@ import { RequireRole } from "./auth/RequireRole";
 import { RoleHomeRedirect } from "./auth/RoleHomeRedirect";
 import { SellerShell } from "./layout/SellerShell";
 import { SupervisorShell } from "./layout/SupervisorShell";
+import { AccountPage } from "./pages/AccountPage";
 import { AlertsInboxPage } from "./pages/AlertsInboxPage";
+import { BanksPage } from "./pages/BanksPage";
 import { CatalogVisibilityPage } from "./pages/CatalogVisibilityPage";
+import { ClientAssignmentsPage } from "./pages/ClientAssignmentsPage";
+import { ClientsPage } from "./pages/ClientsPage";
+import { FinanceHubPage } from "./pages/FinanceHubPage";
 import { FxRatePage } from "./pages/FxRatePage";
 import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { PayablesPage } from "./pages/PayablesPage";
 import { ReceivablesPage } from "./pages/ReceivablesPage";
 import { RouteDayPage } from "./pages/RouteDayPage";
 import { SalesPage } from "./pages/SalesPage";
+import { SellerDashboardPage } from "./pages/SellerDashboardPage";
+import { SellerRouteMapPage } from "./pages/SellerRouteMapPage";
+import { SellersPage } from "./pages/SellersPage";
 import { SupervisorHomePage } from "./pages/SupervisorHomePage";
 import { SupervisorStockPage } from "./pages/SupervisorStockPage";
 import { TeamMapPage } from "./pages/TeamMapPage";
+import { TeamVisitsPage } from "./pages/TeamVisitsPage";
 import { VisitsPage } from "./pages/VisitsPage";
 
 export default function App() {
@@ -43,16 +52,24 @@ export default function App() {
             <Route path="visitas" element={<VisitsPage />} />
             <Route path="ventas" element={<SalesPage />} />
             <Route path="inventario" element={<InventoryPage />} />
+            <Route path="clientes" element={<ClientsPage />} />
+            <Route path="ruta" element={<SellerRouteMapPage />} />
+            <Route path="desempeno" element={<SellerDashboardPage />} />
             <Route
-              path="resumen"
+              path="perfil"
+              element={<AccountPage title="Perfil" blurb="Tu ficha y datos de cuenta." />}
+            />
+            <Route
+              path="ajustes"
+              element={<AccountPage title="Ajustes" blurb="Opciones de la app y sesión." />}
+            />
+            <Route
+              path="preferencias"
               element={
-                <PlaceholderPage
-                  title="Resumen"
-                  nextSf="SF-1.x"
-                  blurb="KPIs del día: visitas, ventas y evidencias."
-                />
+                <AccountPage title="Preferencias" blurb="Idioma, notificaciones y preferencias de campo." />
               }
             />
+            <Route path="resumen" element={<Navigate to="/app/desempeno" replace />} />
           </Route>
 
           <Route
@@ -68,15 +85,36 @@ export default function App() {
             <Route index element={<Navigate to="hoy" replace />} />
             <Route path="hoy" element={<SupervisorHomePage />} />
             <Route path="ruta" element={<RouteDayPage />} />
+            <Route path="visitas" element={<TeamVisitsPage />} />
+            <Route path="ventas" element={<SalesPage teamView />} />
+            <Route path="vendedores" element={<SellersPage />} />
             <Route path="alertas" element={<AlertsInboxPage />} />
+            <Route path="clientes" element={<ClientAssignmentsPage />} />
             <Route path="catalogo" element={<CatalogVisibilityPage />} />
             <Route path="inventario" element={<SupervisorStockPage />} />
+            <Route path="finanzas" element={<FinanceHubPage />} />
             <Route path="cobranza" element={<ReceivablesPage />} />
+            <Route path="bancos" element={<BanksPage />} />
+            <Route path="por-pagar" element={<PayablesPage />} />
             <Route path="fx" element={<FxRatePage />} />
             <Route path="mapa" element={<TeamMapPage />} />
+            <Route
+              path="perfil"
+              element={<AccountPage title="Perfil" blurb="Tu ficha y datos de cuenta." />}
+            />
+            <Route
+              path="ajustes"
+              element={<AccountPage title="Ajustes" blurb="Opciones de la app y sesión." />}
+            />
+            <Route
+              path="preferencias"
+              element={
+                <AccountPage title="Preferencias" blurb="Idioma, notificaciones y preferencias." />
+              }
+            />
           </Route>
 
-          <Route path="/clientes" element={<Navigate to="/app/inicio" replace />} />
+          <Route path="/clientes" element={<Navigate to="/app/clientes" replace />} />
           <Route path="*" element={<RoleHomeRedirect />} />
         </Routes>
       </BrowserRouter>

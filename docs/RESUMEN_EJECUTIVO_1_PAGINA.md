@@ -1,33 +1,38 @@
-# Resumen ejecutivo — Bitácora Campo (1 página)
+# Resumen ejecutivo — EnRutas (1 página)
 
 **Para:** [Cliente]  
 **De:** Theridon  
-**Fecha:** [Completar]
+**Fecha:** [Completar]  
+**Validez:** 15 días · **Moneda:** USD
 
 ## Qué resolvemos
-Pasar de Excel a una app web/PWA donde el vendedor registra visitas con **prueba GPS** y ventas asociadas, y la administración puede auditar que la visita ocurrió.
+Pasar de Excel/WhatsApp a una app web donde el vendedor registra visitas con **prueba GPS** y ventas, el supervisor ve ruta/alertas/stock/cobranza, y la empresa **gestiona comisiones** del equipo.
 
-## MVP (Fase 1)
-- Usuarios: vendedor / supervisor / admin  
-- Clientes, proveedores, inventario básico  
-- Visitas + GPS + descripción  
-- Venta ligada a visita (productos/cantidades)  
-- Offline mínimo: guarda visita+GPS(+venta) y sincroniza al volver internet  
-- Hosting en VPS económico  
+## Entrega mínima (piloto go-live)
+Publicamos y endurecemos EnRutas (ya demostrable) + **módulo nuevo de comisiones básicas** + datos + capacitación.
 
-## No entra aún
-ERP completo, créditos avanzados, multimoneda completa, offline total, app nativa de tiendas.
+- Visitas + GPS + ruta del día (mapa)
+- Ventas con/sin visita · inventario · cobranza básica · FX
+- Supervisor: asignar ruta, alertas, mapa equipo
+- **Comisiones:** % configurable (global y/o por vendedor), cálculo desde ventas, consulta vendedor/supervisor, export CSV
+- Offline mínimo · hasta 15–20 usuarios
+- VPS + HTTPS + backups · **mes 1 de hosting incluido**
+- 1 carga asistida de maestros + reglas de comisión · 1 capacitación remota (2 h)
 
-## Inversión estimada (USD, mercado VE)
-- **MVP arranque:** USD **1.950 – 3.500**  
-- **Operación mensual:** USD **100 – 240** (VPS + soporte ligero)  
-- **MVP + créditos/multimoneda (Fase 1+2):** USD **3.800 – 6.500**
+## Inversión
+| Concepto | Monto |
+|---|---|
+| **Arranque** (go-live + comisiones básicas + hosting mes 1) | **USD 1.200 – 1.400** (ref. **1.300**) |
+| **Mensual** desde mes 2 (hosting + soporte hasta 5 h) | **USD 70** |
 
-## Pago sugerido
-40% inicio · 40% staging · 20% producción
+## Pago
+50% inicio · 30% staging · 20% producción + capacitación
 
 ## Tiempo
-4 a 6 semanas para MVP
+3 a 5 semanas
+
+## No entra
+ERP, app nativa de tiendas, IA de rutas, integraciones bancarias, offline total, redesign completo, **comisiones avanzadas** (escalones, por SKU/familia, bonos, nómina), soporte ilimitado.
 
 ## Siguiente paso
-Confirmar Opción A (solo MVP) u Opción B (MVP + Fase 2) para emitir orden de inicio.
+Confirmar monto cerrado (1.200 / 1.300 / 1.400), definir % de comisión del piloto y anticipo para kickoff.

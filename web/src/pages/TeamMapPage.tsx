@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchSellers, fetchVisits } from "../lib/api";
 import { clientPdvIconFor, teamVisitIcon } from "../lib/mapMarkers";
 import type { User, Visit, VisitStatus } from "../lib/types";
@@ -161,7 +162,11 @@ export function TeamMapPage() {
   }, []);
 
   return (
-    <>
+    <WorkspacePage
+      eyebrow="Operación"
+      title="Mapa"
+      blurb="Ubica PDVs y el estado del equipo en el mapa."
+    >
       <header className="page-header">
         <div>
           <p className="eyebrow">Supervisor</p>
@@ -252,6 +257,6 @@ export function TeamMapPage() {
           </li>
         ))}
       </ul>
-    </>
+    </WorkspacePage>
   );
 }

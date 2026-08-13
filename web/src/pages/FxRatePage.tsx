@@ -2,6 +2,7 @@ import { DollarSign } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchFxRates, fetchFxToday, upsertFxRate, type FxRate } from "../lib/api";
 
 function todayISO(): string {
@@ -73,7 +74,11 @@ export function FxRatePage() {
   }
 
   return (
-    <>
+    <WorkspacePage
+      eyebrow="Finanzas"
+      title="FX"
+      blurb="Carga y consulta la tasa USD→VES del día."
+    >
       <header className="page-header page-header-stack">
         <div>
           <p className="eyebrow">Supervisor · finanzas</p>
@@ -169,6 +174,6 @@ export function FxRatePage() {
           </ul>
         )}
       </section>
-    </>
+    </WorkspacePage>
   );
 }

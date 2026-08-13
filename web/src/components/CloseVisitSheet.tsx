@@ -1,35 +1,42 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { Button } from "./Button";
+import { Modal } from "./Modal";
 import { TextField } from "./TextField";
-import { ApiError, closeVisit, fetchProducts, type VisitCloseInput } from "../lib/api";
+import { ApiError, closeVisit, type VisitCloseInput } from "../lib/api";
 import { getCurrentPosition, GPS_ACCURACY_WARN_M } from "../lib/gps";
 import { fileToCompressedDataUrl } from "../lib/imageEvidence";
-import { newLocalUuid, removeLocalVisit } from "../lib/offlineDb";
-import {
-  enqueueCloseVisit,
-  enqueueOfflineVisitSync,
-  getCachedProducts,
-} from "../lib/offlineQueue";
-import type { CurrencyCode, Product, Visit } from "../lib/types";
+import { removeLocalVisit } from "../lib/offlineDb";
+import { enqueueCloseVisit, enqueueOfflineVisitSync } from "../lib/offlineQueue";
+import type { Visit } from "../lib/types";
 
 type Props = {
   visit: Visit;
   open: boolean;
   onClose: () => void;
   onClosed: (visit: Visit) => void;
+  /** Si no hay OV: volver a la ficha para registrar venta. */
+  onGoRegisterSale?: () => void;
 };
-
-type QtyMap = Record<number, number>;
 
 function isLocalPendingVisit(visit: Visit): boolean {
   return visit.id < 0 || Boolean(visit.local_uuid?.startsWith("local-"));
 }
 
-export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [mode, setMode] = useState<"sin_venta" | "con_venta">("sin_venta");
-  const [qty, setQty] = useState<QtyMap>({});
-  const [currency, setCurrency] = useState<CurrencyCode>("USD");
+/**
+ * Cierre de visita: solo evidencia GPS/foto.
+ * La venta se registra antes, en la visita abierta — aquí no se cotiza de nuevo.
+ */
+export function CloseVisitSheet({
+  visit,
+  open,
+  onClose,
+  onClosed,
+  onGoRegisterSale,
+}: Props) {
+  const existingSale = visit.sale ?? null;
+  const [phase, setPhase] = useState<"warn" | "close">(
+    existingSale ? "close" : "warn",
+  );
   const [notes, setNotes] = useState("");
   const [skipGps, setSkipGps] = useState(false);
   const [skipReason, setSkipReason] = useState("Sin señal / GPS no disponible");
@@ -38,53 +45,19 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
   const [accuracyWarn, setAccuracyWarn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [loadingProducts, setLoadingProducts] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    setLoadingProducts(true);
-    (async () => {
-      try {
-        const data = navigator.onLine ? await fetchProducts() : await getCachedProducts();
-        if (!cancelled) setProducts(data.length ? data : await getCachedProducts());
-      } catch {
-        const cached = await getCachedProducts();
-        if (!cancelled) {
-          setProducts(cached);
-          if (!cached.length) {
-            setError("Sin inventario en cache. Conéctate una vez para sincronizar catálogo.");
-          }
-        }
-      } finally {
-        if (!cancelled) setLoadingProducts(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-
-  const lines = useMemo(
-    () =>
-      products
-        .filter((p) => (qty[p.id] ?? 0) > 0)
-        .map((p) => ({
-          product: p,
-          quantity: qty[p.id] ?? 0,
-          lineTotal: Number(p.price_usd) * (qty[p.id] ?? 0),
-        })),
-    [products, qty],
-  );
-
-  const total = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    setPhase(visit.sale ? "close" : "warn");
+    setNotes("");
+    setSkipGps(false);
+    setSkipReason("Sin señal / GPS no disponible");
+    setPhotoDataUrl(null);
+    setAccuracyWarn(null);
+    setError(null);
+  }, [open, visit.sale]);
 
   if (!open) return null;
-
-  function setProductQty(productId: number, value: number, maxStock: number) {
-    const next = Math.max(0, Math.min(maxStock, value));
-    setQty((prev) => ({ ...prev, [productId]: next }));
-  }
 
   async function onPhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -95,8 +68,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
     setPhotoBusy(true);
     setError(null);
     try {
-      const dataUrl = await fileToCompressedDataUrl(file);
-      setPhotoDataUrl(dataUrl);
+      setPhotoDataUrl(await fileToCompressedDataUrl(file));
     } catch (err) {
       setPhotoDataUrl(null);
       setError(err instanceof Error ? err.message : "No se pudo leer la foto");
@@ -105,15 +77,10 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
     }
   }
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function submitClose(result: "sin_venta" | "venta_cerrada") {
     setError(null);
     setAccuracyWarn(null);
 
-    if (mode === "con_venta" && lines.length === 0) {
-      setError("Agrega al menos un producto o cierra sin venta");
-      return;
-    }
     if (skipGps && !photoDataUrl) {
       setError("Si omites el GPS, espera a que diga «Foto lista» y vuelve a confirmar");
       return;
@@ -137,7 +104,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
           const acc = geo.fix.accuracy_m;
           if (acc != null && acc > GPS_ACCURACY_WARN_M) {
             setAccuracyWarn(
-              `GPS poco preciso (±${Math.round(acc)} m). Se guardará con alerta para el supervisor. En el diálogo del sistema elige «Precise» si puedes.`,
+              `GPS poco preciso (±${Math.round(acc)} m). Se guardará con alerta para el supervisor.`,
             );
           }
           gpsFields = {
@@ -149,9 +116,8 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
             gps_skipped: false,
           };
         } else {
-          // Falló GPS: exigir foto como skip
           if (!photoDataUrl) {
-            setError(`${geo.reason}. Adjunta foto o activa GPS de prueba / HTTPS.`);
+            setError(`${geo.reason}. Adjunta foto o usa HTTPS para GPS.`);
             setSubmitting(false);
             return;
           }
@@ -176,34 +142,22 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
       }
 
       const payload: VisitCloseInput = {
-        result: mode === "sin_venta" ? "sin_venta" : "venta_cerrada",
-        description: notes.trim() || (mode === "sin_venta" ? "Cerrada sin venta" : "Venta en visita"),
+        result,
+        description:
+          notes.trim() ||
+          (existingSale
+            ? `Cierre con OV-${existingSale.id}`
+            : "Cerrada sin venta"),
         ...gpsFields,
       };
-
-      if (mode === "con_venta") {
-        payload.sale = {
-          origin: "visita",
-          currency,
-          payment_method: currency === "VES" ? "cash_ves" : "cash_usd",
-          items: lines.map((line) => ({
-            product_id: line.product.id,
-            quantity: line.quantity,
-          })),
-          local_uuid: newLocalUuid("sale"),
-          created_offline: !navigator.onLine,
-        };
-      }
 
       const finished: Visit = {
         ...visit,
         status: "completada",
         result: payload.result,
         description: payload.description ?? visit.description,
-        latitude:
-          payload.latitude != null ? String(payload.latitude) : visit.latitude,
-        longitude:
-          payload.longitude != null ? String(payload.longitude) : visit.longitude,
+        latitude: payload.latitude != null ? String(payload.latitude) : visit.latitude,
+        longitude: payload.longitude != null ? String(payload.longitude) : visit.longitude,
         gps_accuracy_m:
           payload.gps_accuracy_m != null
             ? String(payload.gps_accuracy_m)
@@ -227,12 +181,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
           gps_skipped: payload.gps_skipped ?? false,
           gps_skip_reason: payload.gps_skip_reason ?? null,
           photo_evidence: payload.photo_evidence ?? null,
-          sale: payload.sale
-            ? {
-                ...payload.sale,
-                created_offline: true,
-              }
-            : null,
+          sale: null,
         });
         await removeLocalVisit(visit.local_uuid);
       } else if (!navigator.onLine) {
@@ -240,19 +189,12 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
       } else {
         try {
           const updated = await closeVisit(visit.id, payload);
-          setQty({});
-          setNotes("");
-          setMode("sin_venta");
-          setSkipGps(false);
-          setSkipReason("Sin señal / GPS no disponible");
-          setPhotoDataUrl(null);
           onClosed(updated);
           onClose();
           return;
         } catch (err) {
           if (err instanceof ApiError && err.status >= 500) throw err;
-          // Red caída a mitad: encolar
-          if (!navigator.onLine || (err instanceof TypeError)) {
+          if (!navigator.onLine || err instanceof TypeError) {
             await enqueueCloseVisit(visit.id, payload);
           } else {
             throw err;
@@ -260,12 +202,6 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
         }
       }
 
-      setQty({});
-      setNotes("");
-      setMode("sin_venta");
-      setSkipGps(false);
-      setSkipReason("Sin señal / GPS no disponible");
-      setPhotoDataUrl(null);
       onClosed(finished);
       onClose();
     } catch (err) {
@@ -275,108 +211,102 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
     }
   }
 
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    await submitClose(existingSale ? "venta_cerrada" : "sin_venta");
+  }
+
   const clientName = visit.client?.name ?? `Cliente #${visit.client_id}`;
+  const itemCount = existingSale?.items?.length ?? 0;
 
-  return (
-    <div className="screen-form" role="dialog" aria-modal="true" aria-labelledby="close-visit-title">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Cerrar visita</p>
-          <h1 id="close-visit-title">{clientName}</h1>
-          <p className="muted">Venta opcional · GPS / foto de evidencia</p>
-        </div>
-        <Button variant="ghost" type="button" onClick={onClose}>
-          Volver
-        </Button>
-      </header>
-
-      <form className="card form-stack" onSubmit={onSubmit}>
-        <div className="field">
-          <span className="field-label">Resultado</span>
-          <div className="id-type-toggle" role="group">
-            <button
+  if (phase === "warn" && !existingSale) {
+    return (
+      <Modal
+        open={open}
+        onClose={onClose}
+        eyebrow="Cerrar visita"
+        title={clientName}
+        blurb="Esta visita aún no tiene orden de venta"
+        footer={
+          <div className="side-sheet-actions">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
               type="button"
-              className={mode === "sin_venta" ? "chip active" : "chip"}
-              onClick={() => setMode("sin_venta")}
+              variant="secondary"
+              onClick={() => {
+                onClose();
+                onGoRegisterSale?.();
+              }}
             >
-              Sin venta
-            </button>
-            <button
-              type="button"
-              className={mode === "con_venta" ? "chip active" : "chip"}
-              onClick={() => setMode("con_venta")}
-            >
-              Con venta
-            </button>
+              Registrar venta
+            </Button>
+            <Button type="button" variant="accent" onClick={() => setPhase("close")}>
+              Cerrar sin venta
+            </Button>
+          </div>
+        }
+      >
+        <div className="sheet-form-stack">
+          <div className="visit-close-warn" role="status">
+            <p className="eyebrow">Advertencia</p>
+            <strong>No hay OV registrada</strong>
+            <p className="muted">
+              Lo habitual es registrar la venta en la visita abierta y luego cerrar.
+              Puedes volver a cotizar o confirmar el cierre sin venta.
+            </p>
           </div>
         </div>
+      </Modal>
+    );
+  }
 
-        {mode === "con_venta" ? (
-          <>
-            <div className="field">
-              <span className="field-label">Moneda</span>
-              <div className="id-type-toggle" role="group">
-                <button
-                  type="button"
-                  className={currency === "USD" ? "chip active" : "chip"}
-                  onClick={() => setCurrency("USD")}
-                >
-                  USD
-                </button>
-                <button
-                  type="button"
-                  className={currency === "VES" ? "chip active" : "chip"}
-                  onClick={() => setCurrency("VES")}
-                >
-                  Bs (VES)
-                </button>
-              </div>
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      eyebrow="Cerrar visita"
+      title={clientName}
+      blurb={
+        existingSale
+          ? `OV-${existingSale.id} · evidencia de cierre`
+          : "Cierre sin venta · evidencia GPS / foto"
+      }
+      footer={
+        <div className="side-sheet-actions">
+          <Button type="button" variant="ghost" disabled={submitting || photoBusy} onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="close-visit-form"
+            variant="accent"
+            disabled={submitting || photoBusy}
+          >
+            {submitting ? "Cerrando…" : photoBusy ? "Procesando foto…" : "Confirmar cierre"}
+          </Button>
+        </div>
+      }
+    >
+      <form id="close-visit-form" className="sheet-form-stack" onSubmit={(e) => void onSubmit(e)}>
+        {existingSale ? (
+          <div className="visit-sale-confirmed" role="status">
+            <div className="visit-sale-confirmed-copy">
+              <p className="eyebrow">Orden de venta</p>
+              <strong>OV-{existingSale.id}</strong>
+              <p className="muted small">
+                ${Number(existingSale.total_amount).toFixed(2)} {existingSale.currency}
+                {" · "}
+                {itemCount} ítem{itemCount === 1 ? "" : "s"}
+              </p>
             </div>
-
-            {loadingProducts ? <p className="muted">Cargando productos…</p> : null}
-
-            <ul className="product-pick-list">
-              {products.map((product) => {
-                const q = qty[product.id] ?? 0;
-                return (
-                  <li key={product.id} className="product-pick-row">
-                    <div>
-                      <strong>{product.name}</strong>
-                      <p className="muted small">
-                        {product.sku} · ${Number(product.price_usd).toFixed(2)} / {product.unit} · stock{" "}
-                        {product.stock}
-                      </p>
-                    </div>
-                    <div className="qty-controls">
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        onClick={() => setProductQty(product.id, q - 1, product.stock)}
-                        disabled={q <= 0}
-                      >
-                        −
-                      </button>
-                      <span className="qty-value">{q}</span>
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        onClick={() => setProductQty(product.id, q + 1, product.stock)}
-                        disabled={q >= product.stock}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <p className="sale-total">
-              Total estimado: <strong>${total.toFixed(2)} USD</strong>
-              {currency === "VES" ? " · liquidar en Bs" : ""}
-            </p>
-          </>
-        ) : null}
+          </div>
+        ) : (
+          <p className="muted small" style={{ margin: 0 }}>
+            Confirmaste cerrar <strong>sin venta</strong>. Solo falta la evidencia.
+          </p>
+        )}
 
         <div className="field">
           <span className="field-label">Evidencia GPS</span>
@@ -434,11 +364,7 @@ export function CloseVisitSheet({ visit, open, onClose, onClosed }: Props) {
             {error}
           </p>
         ) : null}
-
-        <Button type="submit" variant="accent" block disabled={submitting || photoBusy}>
-          {submitting ? "Cerrando…" : photoBusy ? "Procesando foto…" : "Confirmar cierre"}
-        </Button>
       </form>
-    </div>
+    </Modal>
   );
 }
