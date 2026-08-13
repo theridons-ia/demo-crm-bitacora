@@ -10,6 +10,7 @@ from app.models import (
     AlertType,
     Client,
     CurrencyCode,
+    FxRate,
     PaymentMethod,
     Product,
     Sale,
@@ -288,6 +289,20 @@ def run() -> None:
                     )
                 ]
                 db.add(sale)
+
+        # Demo SF-3.3: tasa del día si no hay ninguna
+        if db.query(FxRate).count() == 0:
+            supervisor = db.query(User).filter(User.email == "supervisor@bitacora.local").first()
+            from datetime import date as date_cls
+
+            db.add(
+                FxRate(
+                    rate_date=date_cls.today(),
+                    usd_to_ves=Decimal("36.5000"),
+                    notes="Tasa demo SF-3.3",
+                    created_by_id=supervisor.id if supervisor else None,
+                )
+            )
 
         db.commit()
         print("Seed OK")

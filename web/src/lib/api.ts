@@ -441,6 +441,38 @@ export function registerReceivablePayment(
   });
 }
 
+export type FxRate = {
+  id: number;
+  rate_date: string;
+  usd_to_ves: string;
+  notes: string | null;
+  created_by_id: number | null;
+  created_at: string;
+  updated_at: string;
+  created_by_name: string | null;
+};
+
+export function fetchFxToday(onDate?: string): Promise<FxRate> {
+  const q = onDate ? `?on_date=${onDate}` : "";
+  return request<FxRate>(`/api/fx/today${q}`);
+}
+
+export function fetchFxRates(): Promise<FxRate[]> {
+  return request<FxRate[]>("/api/fx");
+}
+
+export function upsertFxRate(payload: {
+  rate_date: string;
+  usd_to_ves: number;
+  notes?: string | null;
+}): Promise<FxRate> {
+  return request<FxRate>("/api/fx", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export type Supplier = {
   id: number;
   name: string;

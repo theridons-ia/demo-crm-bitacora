@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Banknote, Map, Package, PackagePlus, Route, Users } from "lucide-react";
+import { AlertTriangle, Banknote, DollarSign, Map, Package, PackagePlus, Route, Users } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, fetchAlerts, fetchSellers, fetchVisits } from "../lib/api";
 import type { VisitAlert } from "../lib/types";
@@ -35,6 +35,12 @@ const LINKS = [
     title: "Cobranza",
     blurb: "Créditos abiertos y abonos.",
     icon: Banknote,
+  },
+  {
+    to: "/sup/fx",
+    title: "Tasa FX",
+    blurb: "USD → VES del día.",
+    icon: DollarSign,
   },
   {
     to: "/sup/mapa",

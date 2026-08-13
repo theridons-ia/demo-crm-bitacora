@@ -83,7 +83,7 @@ No mezclar varias SF en un solo commit si se puede evitar.
 |----|----------|------------|--------|
 | **SF-3.1** | Inventario e ingresos | Compras/ajustes stock (supervisor) | hecho |
 | **SF-3.2** | Crédito / cobranza | Estado de cuenta básico | hecho |
-| **SF-3.3** | FX diario | Tasa USD/VES del día | pendiente |
+| **SF-3.3** | FX diario | Tasa USD/VES del día | hecho |
 | **SF-3.4** | Import Excel | Maestros clientes/productos | pendiente |
 | **SF-3.5** | Alembic formal | Migraciones DB (pre-prod) | pendiente |
 
@@ -93,9 +93,14 @@ Detalle: [`implementacion/FASE-3-ENDURECER.md`](implementacion/FASE-3-ENDURECER.
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-3.2** (crédito / cobranza).
+**Listo para commit / tu push:** **SF-3.3** (tasa FX del día).
 
-**Siguiente:** **SF-3.3** FX diario (o Contabo al final).
+**Siguiente:** **SF-3.4** import Excel (o Contabo al final).
+
+### Cómo verificar SF-3.3
+
+1. Supervisor → Tasa FX → guardar.
+2. Vendedor → Ventas en VES → ve Bs equivalentes; sin tasa el API rechaza.
 
 ### Cómo verificar SF-3.2
 

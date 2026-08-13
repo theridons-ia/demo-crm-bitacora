@@ -38,3 +38,4 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "visits", "gps_skipped", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(engine, "visits", "gps_skip_reason", "VARCHAR(255)")
     _add_column_if_missing(engine, "visits", "photo_evidence", "TEXT")
+    _add_column_if_missing(engine, "sales", "fx_rate_usd_ves", "NUMERIC(14,4)")

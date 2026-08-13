@@ -88,6 +88,7 @@ export type Sale = {
   payment_method: PaymentMethod;
   total_amount: string;
   is_credit: boolean;
+  fx_rate_usd_ves?: string | null;
   notes: string | null;
   created_offline: boolean;
   created_at: string;

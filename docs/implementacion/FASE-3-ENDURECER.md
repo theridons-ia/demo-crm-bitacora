@@ -38,3 +38,22 @@ Estado de cuenta básico: ventas `is_credit` + abonos hasta saldar.
 1. Marina → Ventas → Nueva → marcar crédito → confirmar.
 2. Supervisor → **Cobranza** → ver saldo → Registrar abono parcial/total.
 3. Con saldo 0 desaparece de «Con saldo».
+
+---
+
+## SF-3.3 — FX diario
+
+### Objetivo
+Tasa **USD → VES** del día (Bs por 1 USD), cargada por supervisor; se congela en la venta si liquidan en Bs.
+
+### Qué se hizo
+- Tabla `fx_rates` + columna `sales.fx_rate_usd_ves`.
+- `GET /api/fx/today`, `GET /api/fx`, `PUT /api/fx`.
+- UI `/sup/fx`.
+- Ventas en VES requieren tasa; muestran equivalente en Bs.
+- Seed: tasa demo 36.50 si no hay filas.
+
+### Cómo verificar
+1. Supervisor → **Tasa FX** → guardar Bs/USD.
+2. Marina → Ventas → moneda VES → ver equivalente.
+3. Confirmar venta VES → queda `fx_rate_usd_ves` en la venta.

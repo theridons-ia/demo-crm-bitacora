@@ -7,6 +7,7 @@ import { SellerShell } from "./layout/SellerShell";
 import { SupervisorShell } from "./layout/SupervisorShell";
 import { AlertsInboxPage } from "./pages/AlertsInboxPage";
 import { CatalogVisibilityPage } from "./pages/CatalogVisibilityPage";
+import { FxRatePage } from "./pages/FxRatePage";
 import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="catalogo" element={<CatalogVisibilityPage />} />
             <Route path="inventario" element={<SupervisorStockPage />} />
             <Route path="cobranza" element={<ReceivablesPage />} />
+            <Route path="fx" element={<FxRatePage />} />
             <Route path="mapa" element={<TeamMapPage />} />
           </Route>
 

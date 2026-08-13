@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..models import (
     AlertSeverity,
     AlertType,
+    CurrencyCode,
     GpsPointSource,
     Product,
     Sale,
@@ -21,6 +22,7 @@ from ..models import (
 )
 from ..schemas import SaleIn
 from .catalog_visibility import assert_seller_can_use_products
+from .fx import resolve_usd_to_ves
 
 # Umbrales evidencia (metros)
 GPS_ACCURACY_WARN_M = Decimal("100")
@@ -213,6 +215,14 @@ def close_visit_with_optional_sale(
         if seller:
             assert_seller_can_use_products(db, seller, [line.product_id for line in sale_in.items])
         total, items = apply_sale_to_inventory(db, sale_in)
+        fx_rate = None
+        if sale_in.currency == CurrencyCode.VES:
+            fx_rate = resolve_usd_to_ves(db)
+            if fx_rate is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No hay tasa FX del día: el supervisor debe cargarla",
+                )
         sale = Sale(
             visit_id=visit.id,
             seller_id=seller_id,
@@ -222,6 +232,7 @@ def close_visit_with_optional_sale(
             payment_method=sale_in.payment_method,
             total_amount=total,
             is_credit=sale_in.is_credit,
+            fx_rate_usd_ves=fx_rate,
             notes=sale_in.notes,
             local_uuid=sale_in.local_uuid,
             created_offline=sale_in.created_offline,

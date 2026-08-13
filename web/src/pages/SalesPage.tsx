@@ -6,6 +6,7 @@ import {
   ApiError,
   createSale,
   fetchClients,
+  fetchFxToday,
   fetchProducts,
   fetchSales,
   type SaleCreateInput,
@@ -55,6 +56,7 @@ export function SalesPage() {
   const [qty, setQty] = useState<QtyMap>({});
   const [notes, setNotes] = useState("");
   const [isCredit, setIsCredit] = useState(false);
+  const [fxRate, setFxRate] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
@@ -95,6 +97,14 @@ export function SalesPage() {
           if (c.length && clientId === "") setClientId(c[0].id);
           if (!c.length || !p.length) {
             setFormError("Catálogo incompleto en cache. Conéctate para sincronizar.");
+          }
+        }
+        if (navigator.onLine) {
+          try {
+            const fx = await fetchFxToday();
+            if (!cancelled) setFxRate(Number(fx.usd_to_ves));
+          } catch {
+            if (!cancelled) setFxRate(null);
           }
         }
       } catch (err) {
@@ -327,7 +337,13 @@ export function SalesPage() {
 
           <p className="sale-total">
             Total estimado: <strong>${total.toFixed(2)} USD</strong>
-            {currency === "VES" ? " · liquidar en Bs" : ""}
+            {currency === "VES" ? (
+              fxRate ? (
+                <> · ≈ {(total * fxRate).toLocaleString("es-VE", { maximumFractionDigits: 2 })} Bs (tasa {fxRate})</>
+              ) : (
+                <> · liquidar en Bs (falta tasa FX del supervisor)</>
+              )
+            ) : null}
           </p>
 
           <TextField

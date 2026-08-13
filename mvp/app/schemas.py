@@ -247,6 +247,7 @@ class SaleOut(ORMModel):
     payment_method: PaymentMethod
     total_amount: Decimal
     is_credit: bool
+    fx_rate_usd_ves: Decimal | None = None
     notes: str | None
     created_offline: bool
     created_at: datetime
@@ -412,3 +413,20 @@ class VisitAlertOut(ORMModel):
     seller_name: str | None = None
     client_name: str | None = None
     client_id: int | None = None
+
+
+class FxRateOut(ORMModel):
+    id: int
+    rate_date: date
+    usd_to_ves: Decimal
+    notes: str | None
+    created_by_id: int | None
+    created_at: datetime
+    updated_at: datetime
+    created_by_name: str | None = None
+
+
+class FxRateUpsert(BaseModel):
+    rate_date: date
+    usd_to_ves: Decimal = Field(gt=0)
+    notes: str | None = Field(default=None, max_length=255)

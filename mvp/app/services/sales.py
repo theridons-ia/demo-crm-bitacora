@@ -3,9 +3,10 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Client, PaymentMethod, Sale, SaleOrigin, User, UserRole
+from ..models import Client, CurrencyCode, PaymentMethod, Sale, SaleOrigin, User, UserRole
 from ..schemas import SaleCreate, SaleIn
 from .catalog_visibility import assert_seller_can_use_products
+from .fx import resolve_usd_to_ves
 from .visits import apply_sale_to_inventory
 
 
@@ -37,6 +38,14 @@ def create_sale_without_visit(db: Session, payload: SaleCreate, *, seller: User)
     sale_in = SaleIn(**payload.model_dump(exclude={"client_id"}))
     total, items = apply_sale_to_inventory(db, sale_in)
     payment_method = PaymentMethod.credit if payload.is_credit else payload.payment_method
+    fx_rate = None
+    if payload.currency == CurrencyCode.VES:
+        fx_rate = resolve_usd_to_ves(db)
+        if fx_rate is None:
+            raise HTTPException(
+                status_code=400,
+                detail="No hay tasa FX del día: el supervisor debe cargarla en /api/fx",
+            )
     sale = Sale(
         visit_id=None,
         seller_id=seller.id,
@@ -46,6 +55,7 @@ def create_sale_without_visit(db: Session, payload: SaleCreate, *, seller: User)
         payment_method=payment_method,
         total_amount=total,
         is_credit=payload.is_credit,
+        fx_rate_usd_ves=fx_rate,
         notes=payload.notes,
         local_uuid=payload.local_uuid,
         created_offline=payload.created_offline,

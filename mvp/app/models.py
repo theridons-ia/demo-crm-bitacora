@@ -229,6 +229,7 @@ class Sale(Base):
     )
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     is_credit: Mapped[bool] = mapped_column(Boolean, default=False)
+    fx_rate_usd_ves: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     local_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     created_offline: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -343,3 +344,21 @@ class StockMovement(Base):
     product: Mapped[Product] = relationship(back_populates="stock_movements")
     supplier: Mapped[Supplier | None] = relationship()
     created_by: Mapped[User] = relationship()
+
+
+class FxRate(Base):
+    """Tasa USD→VES del día (SF-3.3). Cuántos bolívares por 1 USD."""
+
+    __tablename__ = "fx_rates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rate_date: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    usd_to_ves: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    created_by: Mapped["User | None"] = relationship()
