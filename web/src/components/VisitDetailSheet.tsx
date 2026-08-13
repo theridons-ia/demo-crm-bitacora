@@ -1,4 +1,4 @@
-import { Calendar, Clock, MapPin, Play, ShoppingCart, Square } from "lucide-react";
+import { Calendar, Clock, Crosshair, MapPin, Play, ShoppingCart, Square, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
@@ -8,8 +8,8 @@ import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
 import { VisitMapSheet } from "./VisitMapSheet";
 import { VisitSaleWizard } from "./VisitSaleWizard";
-import { ApiError, startVisit } from "../lib/api";
-import { getCurrentPosition } from "../lib/gps";
+import { ApiError, cancelVisit, pinVisitGps, startVisit } from "../lib/api";
+import { coordsFromClient, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
 import type { Visit, VisitStatus } from "../lib/types";
 
 type Props = {
@@ -40,15 +40,25 @@ function formatWhen(iso: string | null | undefined): string {
   }
 }
 
-/** Ficha de visita: hero + OV destacada + cierre sin re-vender. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+/** Ficha de visita: identidad, GPS accionable, OV y cierre. */
 export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [gpsBusy, setGpsBusy] = useState(false);
+  const [gpsOk, setGpsOk] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [selling, setSelling] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [viewSaleDoc, setViewSaleDoc] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [current, setCurrent] = useState(visit);
   const [saleJustConfirmed, setSaleJustConfirmed] = useState(false);
 
@@ -56,31 +66,41 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
     if (!open) return;
     setCurrent(visit);
     setError(null);
+    setGpsOk(null);
     setClosing(false);
     setSelling(false);
     setShowMap(false);
     setViewSaleDoc(false);
+    setConfirmCancel(false);
     setSaleJustConfirmed(false);
   }, [open, visit]);
 
   const clientName = current.client?.name ?? `Cliente #${current.client_id}`;
+  const clientId =
+    current.client?.rif ?? (current.client?.ci ? `CI ${current.client.ci}` : null);
   const timeLabel =
     current.scheduled_time != null ? String(current.scheduled_time).slice(0, 5) : null;
   const live = current.status === "en_curso";
   const sale = current.sale ?? null;
   const itemCount = sale?.items?.length ?? 0;
+  const hasGps = current.latitude != null && current.longitude != null;
+  const canPinGps =
+    current.id > 0 &&
+    (current.status === "programada" || current.status === "en_curso");
   const heroClass =
     current.status === "en_curso"
       ? ""
       : current.status === "completada"
         ? "is-done"
-        : "is-planned";
+        : current.status === "cancelada"
+          ? "is-cancelled"
+          : "is-planned";
 
   async function onStart() {
     setBusy(true);
     setError(null);
     try {
-      const geo = await getCurrentPosition();
+      const geo = await getCurrentPosition(15_000, coordsFromClient(current.client));
       const updated = await startVisit(current.id, {
         latitude: geo.ok ? geo.fix.latitude : null,
         longitude: geo.ok ? geo.fix.longitude : null,
@@ -97,6 +117,60 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
     }
   }
 
+  async function onPinGps() {
+    setGpsBusy(true);
+    setError(null);
+    setGpsOk(null);
+    try {
+      const geo = await getCurrentPosition(15_000, coordsFromClient(current.client));
+      if (!geo.ok) {
+        setError(geo.reason);
+        return;
+      }
+      const updated = await pinVisitGps(current.id, {
+        latitude: geo.fix.latitude,
+        longitude: geo.fix.longitude,
+        gps_accuracy_m: geo.fix.accuracy_m,
+        gps_offline: Boolean(geo.fix.mocked),
+      });
+      setCurrent(updated);
+      onUpdated(updated);
+      const acc =
+        geo.fix.accuracy_m != null ? ` · ±${Math.round(geo.fix.accuracy_m)} m` : "";
+      setGpsOk(
+        `${geo.fix.mocked ? "GPS de prueba" : "GPS"} guardado${acc}`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar el GPS");
+    } finally {
+      setGpsBusy(false);
+    }
+  }
+
+  async function onCancel() {
+    if (!confirmCancel) {
+      setConfirmCancel(true);
+      setError(null);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await cancelVisit(current.id, { description: "Cancelada" });
+      setCurrent(updated);
+      setConfirmCancel(false);
+      onUpdated(updated);
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo cancelar la visita");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canCancel =
+    !sale && (current.status === "programada" || current.status === "en_curso");
+
   const overlayOpen = closing || selling || showMap || viewSaleDoc;
 
   return (
@@ -106,12 +180,22 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
         onClose={onClose}
         eyebrow="Visita"
         title={clientName}
-        blurb={live ? undefined : STATUS_LABEL[current.status]}
         footer={
-          <div className="side-sheet-actions">
+          <div className="side-sheet-actions visit-ficha-actions">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cerrar ficha
             </Button>
+            {canCancel ? (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => void onCancel()}
+              >
+                <XCircle size={16} />
+                {confirmCancel ? "Confirmar" : "Cancelar visita"}
+              </Button>
+            ) : null}
             {current.status === "programada" ? (
               <Button type="button" variant="accent" disabled={busy} onClick={() => void onStart()}>
                 <Play size={16} />
@@ -138,21 +222,42 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
         }
       >
         <div className="visit-detail">
+          <div className="visit-ficha-id">
+            <span className="visit-ficha-avatar" aria-hidden>
+              {initials(clientName)}
+            </span>
+            <div className="visit-ficha-id-copy">
+              <p className="eyebrow">Punto de venta</p>
+              <strong>{clientName}</strong>
+              <span className="muted small">
+                {clientId ?? "Sin RIF/CI"}
+                {current.client?.state ? ` · ${current.client.state}` : ""}
+              </span>
+            </div>
+            {live ? <LiveLed size="sm" /> : (
+              <span className={`badge badge-${current.status}`}>{STATUS_LABEL[current.status]}</span>
+            )}
+          </div>
+
           <div className={`visit-detail-hero ${heroClass}`.trim()}>
             <div className="visit-detail-hero-copy">
               <p className="eyebrow">Estado</p>
-              {live ? (
-                <LiveLed size="md" />
-              ) : (
-                <strong>{STATUS_LABEL[current.status]}</strong>
-              )}
+              {live ? <LiveLed size="md" /> : <strong>{STATUS_LABEL[current.status]}</strong>}
               {current.result ? (
                 <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
                   {current.result === "sin_venta" ? "Cerrada sin venta" : "Cerrada con venta"}
                 </p>
+              ) : live && !sale ? (
+                <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                  Registra la OV y luego cierra con evidencia.
+                </p>
+              ) : null}
+              {confirmCancel ? (
+                <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
+                  Se marcará como cancelada. Pulsa de nuevo para confirmar.
+                </p>
               ) : null}
             </div>
-            <span className={`badge badge-${current.status}`}>{STATUS_LABEL[current.status]}</span>
           </div>
 
           {sale ? (
@@ -190,97 +295,96 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
                   </Button>
                 </div>
               </div>
-              {live ? <LiveLed size="sm" label="En curso" /> : null}
             </div>
-          ) : live ? (
-            <p className="muted small" style={{ margin: 0 }}>
-              Registra la venta aquí. El cierre solo pide evidencia GPS/foto.
-            </p>
           ) : null}
 
-          <dl className="visit-detail-grid">
-            {current.client?.rif || current.client?.ci ? (
-              <div className="visit-detail-row">
-                <dt>ID</dt>
-                <dd>{current.client.rif ?? `CI ${current.client.ci}`}</dd>
-              </div>
+          <div className="visit-ficha-facts">
+            {current.client?.address ? (
+              <article className="visit-ficha-fact">
+                <span className="muted small">Dirección</span>
+                <strong>{current.client.address}</strong>
+              </article>
             ) : null}
-
-            {current.client?.address || current.client?.state ? (
-              <div className="visit-detail-row">
-                <dt>Dirección</dt>
-                <dd>
-                  {current.client.address ?? "—"}
-                  {current.client.state ? ` · ${current.client.state}` : ""}
-                </dd>
-              </div>
-            ) : null}
-
             {current.scheduled_date ? (
-              <div className="visit-detail-row">
-                <dt>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <Calendar size={12} /> Agenda
-                  </span>
-                </dt>
-                <dd>
+              <article className="visit-ficha-fact">
+                <span className="muted small">
+                  <Calendar size={12} /> Agenda
+                </span>
+                <strong>
                   {current.scheduled_date}
                   {timeLabel ? ` · ${timeLabel}` : ""}
-                </dd>
-              </div>
+                </strong>
+              </article>
             ) : null}
-
             {current.visited_at ? (
-              <div className="visit-detail-row">
-                <dt>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <Clock size={12} /> Inicio
-                  </span>
-                </dt>
-                <dd>{formatWhen(current.visited_at)}</dd>
-              </div>
+              <article className="visit-ficha-fact">
+                <span className="muted small">
+                  <Clock size={12} /> Inicio
+                </span>
+                <strong>{formatWhen(current.visited_at)}</strong>
+              </article>
             ) : null}
-
             {current.description ? (
-              <div className="visit-detail-row">
-                <dt>Nota</dt>
-                <dd>{current.description}</dd>
-              </div>
+              <article className="visit-ficha-fact">
+                <span className="muted small">Nota</span>
+                <strong>{current.description}</strong>
+              </article>
             ) : null}
+          </div>
 
-            {current.latitude != null && current.longitude != null ? (
-              <div className="visit-detail-row">
-                <dt>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <MapPin size={12} /> GPS
+          <section className={`visit-gps-card ${hasGps ? "has-fix" : "needs-fix"}`.trim()}>
+            <div className="visit-gps-copy">
+              <p className="eyebrow">Ubicación GPS</p>
+              {hasGps ? (
+                <>
+                  <strong>
+                    {Number(current.latitude).toFixed(5)}, {Number(current.longitude).toFixed(5)}
+                  </strong>
+                  <span className="muted small">
+                    {current.gps_accuracy_m
+                      ? `±${Number(current.gps_accuracy_m).toFixed(0)} m`
+                      : "Precisión no reportada"}
+                    {current.gps_offline ? " · prueba / offline" : ""}
+                    {current.gps_captured_at ? ` · ${formatWhen(current.gps_captured_at)}` : ""}
                   </span>
-                </dt>
-                <dd className="muted" style={{ fontWeight: 600 }}>
-                  {Number(current.latitude).toFixed(5)}, {Number(current.longitude).toFixed(5)}
-                  {current.gps_offline ? " · offline" : ""}
-                </dd>
-              </div>
-            ) : (
-              <div className="visit-detail-row">
-                <dt>GPS</dt>
-                <dd className="muted" style={{ fontWeight: 600 }}>
-                  Sin coordenada aún
-                </dd>
-              </div>
-            )}
-          </dl>
+                </>
+              ) : (
+                <>
+                  <strong>Sin coordenada aún</strong>
+                  <span className="muted small">
+                    {isMockGpsEnabled()
+                      ? "GPS de prueba activo en el header. Pulsa guardar para fijar el punto."
+                      : "Captura ahora para dejar evidencia en la visita."}
+                  </span>
+                </>
+              )}
+              {gpsOk ? <p className="gps-ok-note">{gpsOk}</p> : null}
+            </div>
+            <div className="visit-gps-actions">
+              {canPinGps ? (
+                <Button
+                  type="button"
+                  variant={hasGps ? "secondary" : "accent"}
+                  disabled={gpsBusy}
+                  onClick={() => void onPinGps()}
+                >
+                  <Crosshair size={16} />
+                  {gpsBusy ? "Obteniendo…" : hasGps ? "Actualizar GPS" : "Guardar GPS ahora"}
+                </Button>
+              ) : null}
+              {current.id > 0 ? (
+                <Button type="button" variant="secondary" onClick={() => setShowMap(true)}>
+                  <MapPin size={16} />
+                  Ver mapa
+                </Button>
+              ) : null}
+            </div>
+          </section>
 
           {error ? (
             <p className="form-error" role="alert">
               {error}
             </p>
-          ) : null}
-
-          {current.id > 0 ? (
-            <Button type="button" variant="secondary" onClick={() => setShowMap(true)}>
-              <MapPin size={16} />
-              Ver mapa / trail
-            </Button>
           ) : null}
         </div>
       </Modal>
@@ -314,6 +418,10 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
             setClosing(false);
             onUpdated(updated);
             onClose();
+          }}
+          onVisitPatched={(updated) => {
+            setCurrent(updated);
+            onUpdated(updated);
           }}
         />
       ) : null}

@@ -1,7 +1,7 @@
 import { Package, Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
-import type { Product } from "../lib/types";
-import { Button } from "./Button";
+import { formatQuoteAmount, IVA_RATE, quoteMoney, roundMoney } from "../lib/quoteMoney";
+import type { CurrencyCode, Product } from "../lib/types";
 
 export type QuoteLine = {
   key: string;
@@ -14,9 +14,10 @@ type Props = {
   lines: QuoteLine[];
   onChange: (lines: QuoteLine[]) => void;
   disabled?: boolean;
-  /** Mostrar bloque de total bajo la tabla. */
-  totalUsd?: number;
-  fxHint?: string | null;
+  applyIva: boolean;
+  onApplyIvaChange: (value: boolean) => void;
+  currency: CurrencyCode;
+  fxRate?: number | null;
 };
 
 let lineSeq = 0;
@@ -30,14 +31,16 @@ export function newQuoteLine(partial?: Partial<QuoteLine>): QuoteLine {
   };
 }
 
-/** Cotizador serio: filas + subtotales (elige producto en cada línea). */
+/** Cotizador: código, cant, precio unit., subtotal — en la moneda elegida. */
 export function SaleQuoter({
   products,
   lines,
   onChange,
   disabled,
-  totalUsd,
-  fxHint,
+  applyIva,
+  onApplyIvaChange,
+  currency,
+  fxRate,
 }: Props) {
   const byId = useMemo(() => {
     const map = new Map<number, Product>();
@@ -52,6 +55,11 @@ export function SaleQuoter({
     }
     return set;
   }, [lines]);
+
+  const fx = fxRate != null && fxRate > 0 ? fxRate : null;
+  const subtotal = quoteLinesTotal(lines, products);
+  const money = quoteMoney(subtotal, applyIva);
+  const moneyLabel = currency === "VES" ? "Bs" : "$";
 
   function updateLine(key: string, patch: Partial<QuoteLine>) {
     onChange(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -74,6 +82,10 @@ export function SaleQuoter({
     });
   }
 
+  function amount(usd: number): string {
+    return formatQuoteAmount(usd, currency, fx);
+  }
+
   return (
     <div className="sale-quoter">
       <div className="sale-quoter-head">
@@ -85,11 +97,10 @@ export function SaleQuoter({
 
       <div className="sale-quoter-table">
         <div className="sale-quoter-cols" aria-hidden>
-          <span>Producto</span>
-          <span>Precio</span>
+          <span>Código</span>
           <span>Cant.</span>
+          <span>Precio unit.</span>
           <span>Subtotal</span>
-          <span />
         </div>
 
         <ul className="sale-quoter-body">
@@ -97,9 +108,8 @@ export function SaleQuoter({
             const product = line.productId != null ? byId.get(line.productId) : undefined;
             const maxStock = product?.stock ?? 0;
             const opts = optionsFor(line);
-            const lineTotal = product
-              ? line.quantity * Number(product.price_usd)
-              : 0;
+            const unitUsd = product ? Number(product.price_usd) : 0;
+            const lineUsd = product ? roundMoney(line.quantity * unitUsd) : 0;
 
             return (
               <li key={line.key} className="sale-quoter-row">
@@ -126,22 +136,24 @@ export function SaleQuoter({
                     <option value="">Elegir producto…</option>
                     {opts.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} · {p.sku} (stock {p.stock})
+                        {p.sku} · {p.name} (stock {p.stock})
                       </option>
                     ))}
                     {product && !opts.some((p) => p.id === product.id) ? (
                       <option value={product.id}>
-                        {product.name} · {product.sku}
+                        {product.sku} · {product.name}
                       </option>
                     ) : null}
                   </select>
-                </div>
-
-                <div className="sale-quoter-meta">
-                  <span className="sale-quoter-label">Precio</span>
-                  <strong>
-                    {product ? `$${Number(product.price_usd).toFixed(2)}` : "—"}
-                  </strong>
+                  <button
+                    type="button"
+                    className="sale-quoter-remove"
+                    disabled={disabled}
+                    aria-label="Quitar línea"
+                    onClick={() => removeLine(line.key)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
 
                 <div className="sale-quoter-qty">
@@ -177,48 +189,71 @@ export function SaleQuoter({
                   </div>
                 </div>
 
-                <div className="sale-quoter-meta">
-                  <span className="sale-quoter-label">Subtotal</span>
-                  <strong>{product ? `$${lineTotal.toFixed(2)}` : "—"}</strong>
+                <div className="sale-quoter-meta is-num">
+                  <span className="sale-quoter-label">Precio unit.</span>
+                  <strong>{product ? amount(unitUsd) : "—"}</strong>
                 </div>
 
-                <button
-                  type="button"
-                  className="sale-quoter-remove"
-                  disabled={disabled}
-                  aria-label="Quitar línea"
-                  onClick={() => removeLine(line.key)}
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="sale-quoter-meta is-num">
+                  <span className="sale-quoter-label">Subtotal</span>
+                  <strong>{product ? amount(lineUsd) : "—"}</strong>
+                </div>
               </li>
             );
           })}
         </ul>
+
+        <button
+          type="button"
+          className="sale-quoter-add"
+          disabled={
+            disabled || products.every((p) => p.stock <= 0 || selectedIds.has(p.id))
+          }
+          onClick={addLine}
+        >
+          <Plus size={16} aria-hidden />
+          Agregar producto
+        </button>
+
+        <div className="sale-quoter-foot">
+          <label className="sale-quoter-iva">
+            <input
+              type="checkbox"
+              checked={applyIva}
+              disabled={disabled}
+              onChange={(e) => onApplyIvaChange(e.target.checked)}
+            />
+            <span>
+              Incluir IVA <strong>{(IVA_RATE * 100).toFixed(0)}%</strong>
+            </span>
+          </label>
+          <div className="sale-quoter-totals" aria-label="Totales">
+            <div>
+              <span>Subtotal</span>
+              <strong>{amount(money.subtotal)}</strong>
+            </div>
+            <div>
+              <span>IVA {(IVA_RATE * 100).toFixed(0)}%</span>
+              <strong>{applyIva ? amount(money.iva) : "—"}</strong>
+            </div>
+            <div className="is-total">
+              <span>Total {moneyLabel}</span>
+              <strong>{amount(money.total)}</strong>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Button
-        type="button"
-        variant="secondary"
-        className="sale-quoter-add"
-        disabled={
-          disabled || products.every((p) => p.stock <= 0 || selectedIds.has(p.id))
-        }
-        onClick={addLine}
-      >
-        <Plus size={16} aria-hidden />
-        Agregar producto
-      </Button>
-
-      {totalUsd != null ? (
-        <div className="sale-quoter-summary">
-          <div>
-            <span className="muted">Total cotizado</span>
-            <strong>${totalUsd.toFixed(2)} USD</strong>
-          </div>
-          {fxHint ? <p className="muted small">{fxHint}</p> : null}
-        </div>
-      ) : null}
+      <div className="sale-quoter-notes">
+        <p className="muted small">
+          {applyIva
+            ? "Precios de línea sin IVA. El total de la OV incluye el 16%."
+            : "Montos mostrados sin IVA."}
+        </p>
+        {fx != null ? (
+          <p className="muted small">Tasa del día: {fx.toFixed(2)} Bs/$</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -236,10 +271,12 @@ export function quoteLinesToItems(
 
 export function quoteLinesTotal(lines: QuoteLine[], products: Product[]): number {
   const byId = new Map(products.map((p) => [p.id, p]));
-  return lines.reduce((sum, line) => {
-    if (line.productId == null) return sum;
-    const p = byId.get(line.productId);
-    if (!p) return sum;
-    return sum + line.quantity * Number(p.price_usd);
-  }, 0);
+  return roundMoney(
+    lines.reduce((sum, line) => {
+      if (line.productId == null) return sum;
+      const p = byId.get(line.productId);
+      if (!p) return sum;
+      return sum + line.quantity * Number(p.price_usd);
+    }, 0),
+  );
 }

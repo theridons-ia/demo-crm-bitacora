@@ -7,12 +7,14 @@ import {
   ChevronDown,
   DollarSign,
   LogOut,
+  Radio,
   Settings,
   SlidersHorizontal,
   UserRound,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
+import { canUseMockGps, isMockGpsEnabled, setMockGpsEnabled } from "../lib/gps";
 import type { VisitAlert } from "../lib/types";
 import { accountBasePath, crumbForPath, roleLabel } from "./appNav";
 import { HeaderQuickRegister } from "../components/HeaderQuickRegister";
@@ -39,6 +41,7 @@ export function AppHeader() {
   const [alertCount, setAlertCount] = useState(0);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [ackBusy, setAckBusy] = useState<number | null>(null);
+  const [mockGps, setMockGps] = useState(() => isMockGpsEnabled());
   const menuRef = useRef<HTMLDivElement>(null);
   const alertsRef = useRef<HTMLDivElement>(null);
   const base = accountBasePath(user?.role);
@@ -148,6 +151,27 @@ export function AppHeader() {
 
       <div className="app-header-actions">
         {user?.role === "vendedor" ? <HeaderQuickRegister /> : null}
+
+        {canUseMockGps() ? (
+          <button
+            type="button"
+            className={`app-header-gps ${mockGps ? "is-on" : ""}`.trim()}
+            aria-pressed={mockGps}
+            title={
+              mockGps
+                ? "GPS de prueba: te coloca junto al cliente. No genera un trail en movimiento."
+                : "Simular GPS junto al PDV (solo demo / sin HTTPS)"
+            }
+            onClick={() => {
+              const next = !mockGps;
+              setMockGpsEnabled(next);
+              setMockGps(next);
+            }}
+          >
+            <Radio size={16} strokeWidth={2.2} />
+            <span>{mockGps ? "GPS prueba" : "GPS simular"}</span>
+          </button>
+        ) : null}
 
         {isSupervisor ? (
           <div className="app-header-alerts" ref={alertsRef}>

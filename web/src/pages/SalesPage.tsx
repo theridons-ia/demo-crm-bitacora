@@ -41,7 +41,8 @@ import {
 } from "../lib/offlineQueue";
 import { sortSalesNewestFirst } from "../lib/saleLabels";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
-import { draftQuoteCode, buildQuoteLines } from "../components/QuoteDocument";
+import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
+import { draftQuoteCode, buildQuoteLines, QuoteDocument } from "../components/QuoteDocument";
 import { useAuth } from "../auth/AuthContext";
 import type {
   BankAccount,
@@ -79,6 +80,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [lines, setLines] = useState<QuoteLine[]>(() => [newQuoteLine()]);
   const [notes, setNotes] = useState("");
   const [isCredit, setIsCredit] = useState(false);
+  const [applyIva, setApplyIva] = useState(false);
   const [payment, setPayment] = useState<PaymentCaptureValue>(() => emptyPaymentCapture());
   const [fxRate, setFxRate] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -201,13 +203,43 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composing]);
 
-  const total = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
+  const subtotal = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
+  const money = useMemo(() => quoteMoney(subtotal, applyIva), [subtotal, applyIva]);
+  const selectedClient = useMemo(
+    () => (clientId === "" ? null : clients.find((c) => c.id === clientId) ?? null),
+    [clientId, clients],
+  );
+  const quoteData = useMemo(
+    () => ({
+      code: draftQuoteCode(0),
+      issuedAt: new Date(),
+      sellerName: user?.full_name ?? "Vendedor",
+      client: selectedClient,
+      clientFallback: selectedClient?.name ?? (clientId === "" ? "Cliente" : `Cliente #${clientId}`),
+      currency,
+      fxRate,
+      lines: buildQuoteLines(lines, products),
+      notes: notes.trim() || null,
+      isCredit,
+      applyIva,
+    }),
+    [
+      selectedClient,
+      clientId,
+      user?.full_name,
+      currency,
+      fxRate,
+      lines,
+      products,
+      notes,
+      isCredit,
+      applyIva,
+    ],
+  );
 
   const fxHint =
-    currency === "VES"
-      ? fxRate
-        ? `≈ ${(total * fxRate).toLocaleString("es-VE", { maximumFractionDigits: 2 })} Bs (tasa ${fxRate})`
-        : "Liquidar en Bs (falta tasa FX)"
+    currency === "VES" && (fxRate == null || fxRate <= 0)
+      ? "Liquidar en Bs (falta tasa FX)"
       : null;
 
   function canAdvanceFrom(step: number): string | null {
@@ -217,6 +249,9 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     }
     if (step === 1) {
       if (!quoteLinesToItems(lines).length) return "Agrega al menos un producto";
+      if (currency === "VES" && fxRate == null && navigator.onLine) {
+        return "No hay tasa FX del día; el supervisor debe cargarla o usa USD";
+      }
       return null;
     }
     return null;
@@ -241,6 +276,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     setLines([newQuoteLine()]);
     setNotes("");
     setIsCredit(false);
+    setApplyIva(false);
     setOrigin("mostrador");
     setCurrency("USD");
     setPayment(emptyPaymentCapture());
@@ -270,7 +306,9 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
             (p ? Number(p.price_usd) : 0) * it.quantity
           ).toFixed(2)}`;
         }),
-        `Total: $${total.toFixed(2)} USD`,
+        `Subtotal: ${formatQuoteAmount(money.subtotal, currency, fxRate)}`,
+        applyIva ? `IVA 16%: ${formatQuoteAmount(money.iva, currency, fxRate)}` : "Sin IVA",
+        `Total: ${formatQuoteAmount(money.total, currency, fxRate)}`,
         notes.trim() ? `Nota: ${notes.trim()}` : "",
       ]
         .filter(Boolean)
@@ -292,18 +330,9 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       return;
     }
 
-    const client = clients.find((c) => c.id === clientId) ?? null;
     const quote_snapshot = serializeQuoteSnapshot({
-      code: draftQuoteCode(0),
+      ...quoteData,
       issuedAt: new Date(),
-      sellerName: user?.full_name ?? "Vendedor",
-      client,
-      clientFallback: client?.name ?? `Cliente #${clientId}`,
-      currency,
-      fxRate,
-      lines: buildQuoteLines(lines, products),
-      notes: notes.trim() || null,
-      isCredit,
     });
 
     const payload: SaleCreateInput = {
@@ -316,6 +345,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       payment_reference: isCredit ? null : payment.payment_reference.trim() || null,
       payment_evidence: isCredit ? null : payment.payment_evidence,
       notes: notes.trim() || null,
+      apply_iva: applyIva,
       quote_snapshot,
       items,
       local_uuid: newLocalUuid("sale"),
@@ -550,40 +580,6 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   </div>
                 </div>
 
-                <div className="field">
-                  <span className="field-label">Moneda</span>
-                  <div className="choice-group" role="group" aria-label="Moneda">
-                    <button
-                      type="button"
-                      className={currency === "USD" ? "chip active" : "chip"}
-                      onClick={() => {
-                        setCurrency("USD");
-                        setPayment((prev) => ({
-                          ...prev,
-                          payment_method:
-                            prev.payment_method === "cash_ves" ? "cash_usd" : prev.payment_method,
-                        }));
-                      }}
-                    >
-                      USD
-                    </button>
-                    <button
-                      type="button"
-                      className={currency === "VES" ? "chip active" : "chip"}
-                      onClick={() => {
-                        setCurrency("VES");
-                        setPayment((prev) => ({
-                          ...prev,
-                          payment_method:
-                            prev.payment_method === "cash_usd" ? "cash_ves" : prev.payment_method,
-                        }));
-                      }}
-                    >
-                      Bs (VES)
-                    </button>
-                  </div>
-                </div>
-
                 <label className="credit-check">
                   <input
                     type="checkbox"
@@ -597,6 +593,41 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
             {wizardStep === 1 ? (
               <>
+                <div className="quote-currency-row">
+                  <div className="field">
+                    <span className="field-label">Moneda</span>
+                    <div className="choice-group" role="group" aria-label="Moneda">
+                      <button
+                        type="button"
+                        className={currency === "USD" ? "chip active" : "chip"}
+                        onClick={() => {
+                          setCurrency("USD");
+                          setPayment((prev) => ({
+                            ...prev,
+                            payment_method:
+                              prev.payment_method === "cash_ves" ? "cash_usd" : prev.payment_method,
+                          }));
+                        }}
+                      >
+                        USD
+                      </button>
+                      <button
+                        type="button"
+                        className={currency === "VES" ? "chip active" : "chip"}
+                        onClick={() => {
+                          setCurrency("VES");
+                          setPayment((prev) => ({
+                            ...prev,
+                            payment_method:
+                              prev.payment_method === "cash_usd" ? "cash_ves" : prev.payment_method,
+                          }));
+                        }}
+                      >
+                        Bs (VES)
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 {loadingCatalog ? <p className="muted">Cargando productos…</p> : null}
                 {!loadingCatalog ? (
                   <SaleQuoter
@@ -604,8 +635,10 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                     lines={lines}
                     onChange={setLines}
                     disabled={submitting}
-                    totalUsd={total}
-                    fxHint={fxHint}
+                    applyIva={applyIva}
+                    onApplyIvaChange={setApplyIva}
+                    currency={currency}
+                    fxRate={fxRate}
                   />
                 ) : null}
               </>
@@ -614,7 +647,17 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
             {wizardStep === 2 ? (
               <>
                 <p className="sale-total">
-                  Total: <strong>${total.toFixed(2)} USD</strong>
+                  Total:{" "}
+                  <strong>{formatQuoteAmount(money.total, currency, fxRate)}</strong>
+                  {applyIva ? (
+                    <span className="muted">
+                      {" "}
+                      · subtotal {formatQuoteAmount(money.subtotal, currency, fxRate)} + IVA{" "}
+                      {formatQuoteAmount(money.iva, currency, fxRate)}
+                    </span>
+                  ) : (
+                    <span className="muted"> · sin IVA</span>
+                  )}
                   {fxHint ? <> · {fxHint}</> : null}
                 </p>
                 {!isCredit ? (
@@ -634,6 +677,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
+                <QuoteDocument data={quoteData} asImage />
               </>
             ) : null}
 

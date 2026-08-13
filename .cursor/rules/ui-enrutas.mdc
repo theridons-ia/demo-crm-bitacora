@@ -56,30 +56,67 @@ Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pant
 2. Si hay screenshot del usuario: listar inconsistencias y arreglar solo esas.
 3. No regenerar layouts “bonitos” desde cero.
 
+## Inicio (vendedor)
+
+- Orden: tarjeta de ruta → **4 KPIs en una fila** (`.home-kpis`, desktop) → **agenda a ancho completo** (`.home-agenda`, hasta 3 paradas).
+- Móvil: KPIs en 2×2. No meter KPIs y agenda en una sola fila apretada.
+
 ## Ficha de visita + LED en curso
 
-- Detalle: `VisitDetailSheet` — hero de estado + `dl` denso (`visit-detail-row`), no lista suelta con mucho aire.
+- Detalle: `VisitDetailSheet` — identidad PDV + hero de estado + hechos en tiles + **tarjeta GPS** (guardar/actualizar coordenada).
 - **En curso:** componente `LiveLed` (punto coral parpadeante) en ficha, card activa, lista y agenda.
 - Al crear visita (ahora/programada): cerrar form y **abrir la ficha** de esa visita (`setDetailVisit`), no solo dejar el listado.
-- No mostrar UI de «Activar GPS de prueba» en producción/demo vendedor.
+- Cancelar visita: `POST /api/visits/{id}/cancel` desde la ficha (programada o en curso **sin OV**).
+- **Lista «Tus visitas»:** chips **Abiertas → Agenda → Hechas → Canceladas** (default Abiertas). En curso en card hero, no duplicada en la lista. Orden **más reciente primero**. Ficha: avatar + nombre a la izquierda y fecha a la derecha (como el bloque cliente del documento). Sin GPS/Trail en la fila; clic abre la ficha.
+- **GPS de prueba (solo `npm run dev`):** toggle en el **header** (`GPS simular`). Simula estar **junto al PDV** (coords del cliente ± ~20 m) al iniciar, guardar GPS o cerrar. **No** genera un trail de puntos en movimiento. Al apagarlo, el muestreo continuo se detiene.
+- Mapa de evidencia (`VisitMapSheet`): PDV fucsia · Inicio negro · Trail coral · **Ahora** teal con etiqueta (posición actual, distinto del trail) · Cierre rojo.
 
 ## Venta en visita (flujo principal)
 
 1. Visita **en curso** → **Registrar venta** (`VisitSaleWizard` en `Modal` wide):  
-   **1 Productos+moneda → 2 Pago → 3 Resumen** (`QuoteDocument` descargable PNG/PDF).
-2. Confirmar OV → se guarda `quote_snapshot` (documento) y vuelves a la ficha con banner **OV-#**, total e ítems; la visita **sigue abierta**.
-   - Ver después: ficha visita «Ver cotización / OV» o Ventas → clic fila → pestaña **Cotización / documento** (PNG/PDF).
-3. **Cerrar visita** (`CloseVisitSheet`): **solo evidencia** GPS/foto.  
-   - Si no hay OV: advertencia → «Registrar venta» o «Cerrar sin venta».  
-   - **No** volver a cotizar en el cierre.
+   **1 Productos+moneda → 2 Pago → 3 Resumen** (`QuoteDocument` **como imagen**, PNG/PDF descargable).
+2. Confirmar OV → se guarda `quote_snapshot` + `apply_iva` y vuelves a la ficha con banner **OV-#**, total e ítems; la visita **sigue abierta**.
+   - Ver después: ficha visita «Ver cotización / OV» o Ventas → clic fila → pestaña **Cotización / documento** (imagen + PNG/PDF).
+3. **Cerrar visita** (`CloseVisitSheet`): ver sección **Cerrar visita** más abajo. No cotizar de nuevo.
 4. API: `POST /api/visits/{id}/sale`. Cierre con OV existente no reenvía productos.
-5. Cotizador: `SaleQuoter` por select (sin barra de búsqueda redundante).
+5. Cotizador: `SaleQuoter` por select (sin barra de búsqueda redundante). Columnas: código, cant., precio unit., subtotal. **Una sola moneda** (USD o Bs), nunca ambas a la vez.
 6. Overlay: wizard largo = `Modal`; no inventar pantalla full-page.
+7. **IVA 16% opcional**: checkbox **debajo de productos**, a la izquierda. Líneas sin IVA; `total = subtotal + IVA` si está activo. El mismo total en paso 1, paso 2, documento y `sale.total_amount`.
+8. Totales del documento: subtotal, IVA, total **en la moneda elegida**. Barra TOTAL en `--primary` con `border-radius: var(--radius)` (no cantos cuadrados).
+
+## Cerrar visita (`CloseVisitSheet`)
+
+Modal compacto. **No** volver a cotizar ni pedir evidencia de más si ya está capturada.
+
+Layout si hay OV y GPS (formato canónico):
+
+1. Card OV (`.visit-sale-confirmed`, borde coral): eyebrow **ORDEN DE VENTA** · `OV-#` · total e ítems.
+2. Card GPS (`.visit-gps-card.has-fix`): pin + **GPS EN ESTA VISITA** · coords · precisión (prueba/offline si aplica).
+3. Acciones en la card GPS (`.visit-gps-actions`): **Ver mapa** (`VisitMapSheet`) y **Actualizar GPS** (`pinVisitGps` / recaptura). El usuario revisa el punto y puede refrescarlo antes de confirmar.
+4. **Nota (opcional)** con `TextField`.
+5. Footer: Cancelar + Confirmar cierre.
+
+Reglas de evidencia:
+
+- Si la visita **ya tiene lat/lng** (inicio o pin): reutilizar ese punto. No pedir foto ni “Omitir GPS”.
+- Si **no hay GPS**: al confirmar se intenta capturar; o omitir con `PhotoDrop` (español, nunca “Choose File”).
+- Sin OV: advertencia → «Registrar venta» o «Cerrar sin venta».
 
 ## Wizard de venta standalone
 
 - Alta sin visita: rail `WizardSteps` **1 Cliente → 2 Productos → 3 Pago**.
+- Mismo `SaleQuoter` + IVA + documento imagen en el paso 3.
 - Cotizar / confirmar solo en el paso 3.
+
+## Documento de cotización / OV
+
+- `QuoteDocument` con `asImage`: rasteriza a PNG y **muestra la imagen** (no solo HTML).
+- Encabezado tipo membrete: **logo | NOMBRE EMPRESA (grande) · RIF · slogan + dirección (pequeño)**. Demo: `DEFAULT_QUOTE_ISSUER` (Carabobo).
+- Bloque cliente: renglones **Cliente | Válido hasta**, **RIF/CI | Tasa o moneda**, **Dirección | Condición**. Etiqueta en negrita + valor; metadatos **pegados a la derecha** del mismo renglón.
+- Totales **dentro de la tabla** (`tfoot`): etiquetas bajo Precio unit., montos bajo Subtotal, barra TOTAL alineada al borde derecho. No una caja suelta desfasada.
+- Una moneda: si USD todo en $; si Bs todo en Bs. Columnas: código, descripción, cant., precio unit., subtotal.
+- Paleta EnRutas (teal/coral/cream). No copiar verdes/morados de cotizaciones de terceros.
+- Helper único: `quoteMoney()` / IVA 16%. Snapshot guarda `applyIva`.
 
 ## Lista de Ventas
 
@@ -109,12 +146,25 @@ Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pant
 - Solo usar `.id-type-toggle` (grid 1fr 1fr) cuando las dos opciones deban ocupar el mismo ancho (ej. CI / RIF).
 - Prohibido: chips o botones de 2 opciones estirados a 100% del modal sin necesidad.
 
-## Cotizador de venta
+## Cotizador de venta (paso 1)
 
 - No listar todo el catálogo con qty en cada fila.
-- Usar `SaleQuoter`: filas producto (select) + precio + stock + cantidad + quitar; botón **Agregar producto**.
-- Misma UI en venta sin visita y cierre de visita con venta.
-- Visual alineado a columnas de inventario (`StockTable`).
+- `SaleQuoter`: tabla comercial (header oscuro, zebra). Columnas **Código · Cant. · Precio unit. · Subtotal**.
+- Select de producto **ancho** (columna Código `~3.6fr`); basura **dentro** de la celda del producto, no como 5ª columna.
+- **+ Agregar producto**: fila al final, borde superior **discontinuo**, no un botón suelto.
+- Chips de moneda pegados a la tabla. **Tasa del día** en la misma línea que “Precios de línea sin IVA…”.
+- IVA a la izquierda del pie; etiquetas de totales bajo Precio unit. y montos bajo Subtotal.
+- Barra TOTAL redondeada (`--radius`), pegada a la tabla (sin hueco).
+- Misma UI en venta sin visita y venta en visita.
+
+## Paso 2 Pago (`PaymentCapture`)
+
+- Resumen compacto del total (subtotal / IVA / barra TOTAL) arriba, misma estética que el cotizador.
+- Crédito: checkbox con texto de ayuda (“sin cobro ahora; va a cobranza”). Si está activo, ocultar captura de cobro y mostrar nota, no un vacío.
+- Métodos: chips/botones del design system (`.choice-group` / `.pay-method`), no radios nativos.
+- **Nunca** `<input type="file">` nativo a la vista (sale “Choose File” en inglés). Usar `PhotoDrop` (`.pay-photo-drop`): input oculto + label en español (“Subir foto”) + miniatura y Quitar.
+- Cuenta destino con `SelectField`; referencia y nota con `TextField`.
+- Mismo componente en OV de visita, venta standalone y abonos de cobranza.
 
 ## Panel derecho (métricas)
 

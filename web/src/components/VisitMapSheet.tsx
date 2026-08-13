@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "./Modal";
 import { ApiError, fetchVisitGpsPoints } from "../lib/api";
-import { clientPdvIconFor, trailIconForSource } from "../lib/mapMarkers";
+import { clientPdvIconFor, sellerNowIcon, trailIconForSource } from "../lib/mapMarkers";
 import type { Visit, VisitGpsPoint } from "../lib/types";
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -108,6 +108,18 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       }
     }
 
+    const nowLat = visit.latitude != null ? Number(visit.latitude) : NaN;
+    const nowLng = visit.longitude != null ? Number(visit.longitude) : NaN;
+    const showNow =
+      (visit.status === "en_curso" || visit.status === "programada") &&
+      Number.isFinite(nowLat) &&
+      Number.isFinite(nowLng);
+
+    function isCurrentFix(lat: number, lng: number): boolean {
+      if (!showNow) return false;
+      return Math.abs(lat - nowLat) < 1e-5 && Math.abs(lng - nowLng) < 1e-5;
+    }
+
     const latLngs: L.LatLngExpression[] = [];
     for (const p of points) {
       const lat = Number(p.latitude);
@@ -116,11 +128,24 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       const ll: L.LatLngExpression = [lat, lng];
       latLngs.push(ll);
       bounds.push(ll);
+      if (isCurrentFix(lat, lng) && p.source !== "start" && p.source !== "end") {
+        continue;
+      }
       const label = SOURCE_LABEL[p.source] ?? p.source;
       const acc = p.accuracy_m ? ` · ±${Number(p.accuracy_m).toFixed(0)} m` : "";
       L.marker(ll, { icon: trailIconForSource(p.source) })
         .addTo(map)
         .bindPopup(`<strong>${label}</strong>${acc}<br/><small>${p.captured_at}</small>`);
+    }
+
+    if (showNow) {
+      const acc = visit.gps_accuracy_m
+        ? ` · ±${Number(visit.gps_accuracy_m).toFixed(0)} m`
+        : "";
+      bounds.push([nowLat, nowLng]);
+      L.marker([nowLat, nowLng], { icon: sellerNowIcon, zIndexOffset: 1200 })
+        .addTo(map)
+        .bindPopup(`<strong>Posición actual</strong>${acc}`);
     }
 
     if (latLngs.length >= 2) {
@@ -141,7 +166,7 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       map.remove();
       mapRef.current = null;
     };
-  }, [open, points, visit.client]);
+  }, [open, points, visit]);
 
   if (!open) return null;
 
@@ -179,6 +204,9 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
         </span>
         <span>
           <i className="map-marker-dot map-marker-dot-seller" /> Trail
+        </span>
+        <span>
+          <i className="map-marker-dot map-marker-dot-now" /> Ahora
         </span>
         <span>
           <i className="map-marker-dot map-marker-dot-end" /> Cierre

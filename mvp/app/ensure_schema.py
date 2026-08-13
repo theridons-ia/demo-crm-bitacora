@@ -44,6 +44,7 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "sales", "payment_reference", "VARCHAR(64)")
     _add_column_if_missing(engine, "sales", "payment_evidence", "TEXT")
     _add_column_if_missing(engine, "sales", "quote_snapshot", "TEXT")
+    _add_column_if_missing(engine, "sales", "apply_iva", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(engine, "sale_payments", "bank_account_id", "INTEGER")
     _add_column_if_missing(engine, "sale_payments", "payment_reference", "VARCHAR(64)")
     _add_column_if_missing(engine, "sale_payments", "payment_evidence", "TEXT")

@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import {
+  Banknote,
+  CircleDollarSign,
+  Landmark,
+  Send,
+  Smartphone,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useMemo } from "react";
 import type { BankAccount, CurrencyCode, PaymentMethod } from "../lib/types";
-import { fileToCompressedDataUrl } from "../lib/imageEvidence";
-import { TextField } from "./TextField";
+import { PhotoDrop } from "./PhotoDrop";
+import { SelectField, TextField } from "./TextField";
 
 export type PaymentCaptureValue = {
   payment_method: PaymentMethod;
@@ -20,13 +28,13 @@ type Props = {
   hideCredit?: boolean;
 };
 
-const METHOD_OPTIONS: { id: PaymentMethod; label: string; cash?: boolean }[] = [
-  { id: "cash_usd", label: "Efectivo USD", cash: true },
-  { id: "cash_ves", label: "Efectivo Bs", cash: true },
-  { id: "pago_movil", label: "Pago móvil" },
-  { id: "transfer_ves", label: "Transferencia" },
-  { id: "zelle", label: "Zelle" },
-  { id: "usdt", label: "USDT" },
+const METHOD_OPTIONS: { id: PaymentMethod; label: string; cash?: boolean; icon: LucideIcon }[] = [
+  { id: "cash_usd", label: "Efectivo USD", cash: true, icon: Banknote },
+  { id: "cash_ves", label: "Efectivo Bs", cash: true, icon: Banknote },
+  { id: "pago_movil", label: "Pago móvil", icon: Smartphone },
+  { id: "transfer_ves", label: "Transferencia", icon: Landmark },
+  { id: "zelle", label: "Zelle", icon: Send },
+  { id: "usdt", label: "USDT", icon: CircleDollarSign },
 ];
 
 function methodMatchesAccount(method: PaymentMethod, account: BankAccount): boolean {
@@ -47,9 +55,6 @@ export function PaymentCapture({
   currency,
   disabled,
 }: Props) {
-  const [photoBusy, setPhotoBusy] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-
   const filteredAccounts = useMemo(() => {
     return accounts.filter(
       (a) =>
@@ -78,79 +83,58 @@ export function PaymentCapture({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync cuenta al cambiar método/moneda
   }, [needsAccount, value.payment_method, currency, filteredAccounts.length, value.bank_account_id]);
 
-  async function onPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      onChange({ ...value, payment_evidence: null });
-      return;
-    }
-    setPhotoBusy(true);
-    setPhotoError(null);
-    try {
-      const dataUrl = await fileToCompressedDataUrl(file);
-      onChange({ ...value, payment_evidence: dataUrl });
-    } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : "No se pudo leer la foto");
-      onChange({ ...value, payment_evidence: null });
-    } finally {
-      setPhotoBusy(false);
-    }
-  }
-
   const selected = filteredAccounts.find((a) => a.id === value.bank_account_id);
 
   return (
     <div className="payment-capture">
       <div className="field">
         <span className="field-label">Forma de pago</span>
-        <div className="choice-group" role="group" aria-label="Forma de pago">
-          {METHOD_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className={value.payment_method === opt.id ? "chip active" : "chip"}
-              disabled={disabled}
-              onClick={() => onChange({ ...value, payment_method: opt.id })}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="pay-methods" role="group" aria-label="Forma de pago">
+          {METHOD_OPTIONS.map((opt) => {
+            const Icon = opt.icon;
+            const active = value.payment_method === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={active ? "pay-method is-active" : "pay-method"}
+                disabled={disabled}
+                onClick={() => onChange({ ...value, payment_method: opt.id })}
+              >
+                <Icon size={16} aria-hidden />
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {needsAccount ? (
-        <div className="field">
-          <label htmlFor="pay-account">Cuenta destino</label>
-          <select
-            id="pay-account"
-            className="input"
-            disabled={disabled || !filteredAccounts.length}
-            value={value.bank_account_id ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                bank_account_id: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-          >
-            {!filteredAccounts.length ? (
-              <option value="">Sin cuentas para este método</option>
-            ) : null}
-            {filteredAccounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-                {a.pay_hint ? ` · ${a.pay_hint}` : ""}
-              </option>
-            ))}
-          </select>
-          {selected?.pay_hint ? (
-            <p className="muted small" style={{ marginTop: "0.35rem" }}>
-              {selected.pay_hint}
-            </p>
+        <SelectField
+          id="pay-account"
+          label="Cuenta destino"
+          disabled={disabled || !filteredAccounts.length}
+          value={value.bank_account_id ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              bank_account_id: e.target.value ? Number(e.target.value) : null,
+            })
+          }
+          hint={selected?.pay_hint || undefined}
+        >
+          {!filteredAccounts.length ? (
+            <option value="">Sin cuentas para este método</option>
           ) : null}
-        </div>
+          {filteredAccounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+              {a.pay_hint ? ` · ${a.pay_hint}` : ""}
+            </option>
+          ))}
+        </SelectField>
       ) : (
-        <p className="muted small">El efectivo se registra en caja {currency}.</p>
+        <p className="muted small pay-hint">El efectivo se registra en caja {currency}.</p>
       )}
 
       <TextField
@@ -162,28 +146,15 @@ export function PaymentCapture({
         placeholder="Ej. 00123456"
       />
 
-      <div className="field">
-        <label htmlFor="pay-photo">Comprobante (foto opcional)</label>
-        <input
-          id="pay-photo"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          disabled={disabled || photoBusy}
-          onChange={(e) => void onPhoto(e)}
-        />
-        {photoBusy ? <p className="muted small">Procesando foto…</p> : null}
-        {value.payment_evidence ? (
-          <p className="muted small" style={{ marginTop: "0.35rem" }}>
-            Comprobante listo
-          </p>
-        ) : null}
-        {photoError ? (
-          <p className="form-error" role="alert">
-            {photoError}
-          </p>
-        ) : null}
-      </div>
+      <PhotoDrop
+        id="pay-photo"
+        label="Comprobante"
+        hint="Opcional · JPG o PNG"
+        readyHint="Se adjunta a la OV"
+        value={value.payment_evidence}
+        disabled={disabled}
+        onChange={(next) => onChange({ ...value, payment_evidence: next })}
+      />
     </div>
   );
 }

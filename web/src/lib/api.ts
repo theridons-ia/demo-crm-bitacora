@@ -224,6 +224,26 @@ export function startVisit(visitId: number, payload: VisitStartInput = {}): Prom
   });
 }
 
+/** Fuerza guardar lat/lng actuales en la visita abierta. */
+export function pinVisitGps(visitId: number, payload: VisitStartInput): Promise<Visit> {
+  return request<Visit>(`/api/visits/${visitId}/gps`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelVisit(
+  visitId: number,
+  payload: { description?: string | null } = {},
+): Promise<Visit> {
+  return request<Visit>(`/api/visits/${visitId}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export type VisitCloseInput = {
   result: SaleResult;
   description?: string | null;
@@ -244,6 +264,7 @@ export type VisitCloseInput = {
     payment_reference?: string | null;
     payment_evidence?: string | null;
     notes?: string | null;
+    apply_iva?: boolean;
     items: { product_id: number; quantity: number }[];
     local_uuid?: string | null;
     created_offline?: boolean;
@@ -267,6 +288,7 @@ export type VisitSaleInput = {
   payment_reference?: string | null;
   payment_evidence?: string | null;
   notes?: string | null;
+  apply_iva?: boolean;
   quote_snapshot?: string | null;
   items: { product_id: number; quantity: number }[];
   local_uuid?: string | null;
@@ -321,6 +343,7 @@ export type SaleCreateInput = {
   payment_reference?: string | null;
   payment_evidence?: string | null;
   notes?: string | null;
+  apply_iva?: boolean;
   quote_snapshot?: string | null;
   items: { product_id: number; quantity: number }[];
   local_uuid?: string | null;
@@ -377,6 +400,7 @@ export type OfflineVisitSyncPayload = {
     payment_method?: PaymentMethod;
     is_credit?: boolean;
     notes?: string | null;
+    apply_iva?: boolean;
     items: { product_id: number; quantity: number }[];
     local_uuid?: string | null;
     created_offline?: boolean;

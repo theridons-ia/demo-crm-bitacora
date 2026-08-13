@@ -32,6 +32,7 @@ import {
 } from "./SaleQuoter";
 import { TextField } from "./TextField";
 import { WizardSteps } from "./WizardSteps";
+import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
 
 type Props = {
@@ -59,6 +60,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
   const [lines, setLines] = useState<QuoteLine[]>(() => [newQuoteLine()]);
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [isCredit, setIsCredit] = useState(false);
+  const [applyIva, setApplyIva] = useState(false);
   const [payment, setPayment] = useState<PaymentCaptureValue>(() => emptyPaymentCapture());
   const [notes, setNotes] = useState("");
   const [fxRate, setFxRate] = useState<number | null>(null);
@@ -74,6 +76,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
     setLines([newQuoteLine()]);
     setCurrency("USD");
     setIsCredit(false);
+    setApplyIva(false);
     setPayment(emptyPaymentCapture());
     setNotes("");
     setError(null);
@@ -115,7 +118,8 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
   }, [open]);
 
   const items = useMemo(() => quoteLinesToItems(lines), [lines]);
-  const total = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
+  const subtotal = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
+  const money = useMemo(() => quoteMoney(subtotal, applyIva), [subtotal, applyIva]);
   const clientName = visit.client?.name ?? `Cliente #${visit.client_id}`;
   const quoteCode = draftQuoteCode(Math.max(visit.id, 0), issuedAt);
 
@@ -131,6 +135,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
       lines: buildQuoteLines(lines, products),
       notes: notes.trim() || null,
       isCredit,
+      applyIva,
     }),
     [
       quoteCode,
@@ -144,6 +149,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
       products,
       notes,
       isCredit,
+      applyIva,
     ],
   );
 
@@ -186,6 +192,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
         payment_reference: isCredit ? null : payment.payment_reference.trim() || null,
         payment_evidence: isCredit ? null : payment.payment_evidence,
         notes: notes.trim() || null,
+        apply_iva: applyIva,
         quote_snapshot: serializeQuoteSnapshot(quoteData),
         items,
         local_uuid: newLocalUuid("sale"),
@@ -240,35 +247,32 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
 
         {step === 0 ? (
           <>
-            <div className="field">
-              <span className="field-label">Moneda</span>
-              <div className="choice-group" role="group" aria-label="Moneda">
-                <button
-                  type="button"
-                  className={currency === "USD" ? "chip active" : "chip"}
-                  onClick={() => {
-                    setCurrency("USD");
-                    setPayment(emptyPaymentCapture("cash_usd"));
-                  }}
-                >
-                  USD
-                </button>
-                <button
-                  type="button"
-                  className={currency === "VES" ? "chip active" : "chip"}
-                  onClick={() => {
-                    setCurrency("VES");
-                    setPayment(emptyPaymentCapture("cash_ves"));
-                  }}
-                >
-                  Bs (VES)
-                </button>
+            <div className="quote-currency-row">
+              <div className="field">
+                <span className="field-label">Moneda</span>
+                <div className="choice-group" role="group" aria-label="Moneda">
+                  <button
+                    type="button"
+                    className={currency === "USD" ? "chip active" : "chip"}
+                    onClick={() => {
+                      setCurrency("USD");
+                      setPayment(emptyPaymentCapture("cash_usd"));
+                    }}
+                  >
+                    USD
+                  </button>
+                  <button
+                    type="button"
+                    className={currency === "VES" ? "chip active" : "chip"}
+                    onClick={() => {
+                      setCurrency("VES");
+                      setPayment(emptyPaymentCapture("cash_ves"));
+                    }}
+                  >
+                    Bs (VES)
+                  </button>
+                </div>
               </div>
-              {fxRate != null ? (
-                <p className="muted small" style={{ marginTop: "0.35rem" }}>
-                  Tasa del día: {fxRate.toFixed(2)} Bs/$
-                </p>
-              ) : null}
             </div>
 
             {loading ? <p className="muted">Cargando productos…</p> : null}
@@ -278,27 +282,31 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
                 lines={lines}
                 onChange={setLines}
                 disabled={submitting}
-                totalUsd={total}
-                fxHint={currency === "VES" ? "Se liquidará en bolívares" : null}
+                applyIva={applyIva}
+                onApplyIvaChange={setApplyIva}
+                currency={currency}
+                fxRate={fxRate}
               />
             ) : null}
           </>
         ) : null}
 
         {step === 1 ? (
-          <>
+          <div className="visit-sale-pay">
             <div className="visit-sale-quote-summary" role="status">
               <div>
+                <span className="muted small">Subtotal</span>
+                <strong>{formatQuoteAmount(money.subtotal, currency, fxRate)}</strong>
+              </div>
+              <div>
+                <span className="muted small">{applyIva ? "IVA 16%" : "IVA"}</span>
+                <strong>
+                  {applyIva ? formatQuoteAmount(money.iva, currency, fxRate) : "Sin IVA"}
+                </strong>
+              </div>
+              <div className="is-total">
                 <span className="muted small">Total</span>
-                <strong>${total.toFixed(2)} USD</strong>
-              </div>
-              <div>
-                <span className="muted small">Moneda</span>
-                <strong>{currency}</strong>
-              </div>
-              <div>
-                <span className="muted small">Ítems</span>
-                <strong>{items.length}</strong>
+                <strong>{formatQuoteAmount(money.total, currency, fxRate)}</strong>
               </div>
             </div>
 
@@ -309,7 +317,10 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
                 onChange={(e) => setIsCredit(e.target.checked)}
                 disabled={submitting}
               />
-              <span>Venta a crédito</span>
+              <span>
+                Venta a crédito
+                <small>Sin cobro ahora; el saldo queda en cobranza.</small>
+              </span>
             </label>
 
             {!isCredit ? (
@@ -320,19 +331,25 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
                 currency={currency}
                 disabled={submitting}
               />
-            ) : null}
+            ) : (
+              <p className="pay-credit-note">
+                Esta OV se registra a crédito. No hace falta comprobante ni referencia de
+                pago.
+              </p>
+            )}
 
             <TextField
               id="visit-sale-notes"
               label="Nota (opcional)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ej. entrega parcial, horario…"
             />
-          </>
+          </div>
         ) : null}
 
         {step === 2 ? (
-          <QuoteDocument data={quoteData} />
+          <QuoteDocument data={quoteData} asImage />
         ) : null}
 
         {error ? (

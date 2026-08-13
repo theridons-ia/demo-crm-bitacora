@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { fetchVisitGpsPoints, postVisitGpsPoint } from "../lib/api";
-import { watchPositionTrail } from "../lib/gps";
+import { isMockGpsEnabled, subscribeMockGps, watchPositionTrail } from "../lib/gps";
 import type { VisitGpsPoint } from "../lib/types";
 
 /**
- * Mientras la visita está en_curso, muestrea GPS y lo envía al API.
- * Al desmontar (o al cerrar la visita) detiene el watch.
+ * Trail GPS real mientras la visita está en_curso.
+ * Con «GPS simular» no se muestrean puntos en movimiento.
  */
 export function useVisitGpsTrail(visitId: number | null, active: boolean) {
   const [points, setPoints] = useState<VisitGpsPoint[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
   const [tracking, setTracking] = useState(false);
+  const [mockGps, setMockGps] = useState(() => isMockGpsEnabled());
+
+  useEffect(() => subscribeMockGps(() => setMockGps(isMockGpsEnabled())), []);
 
   useEffect(() => {
     if (!visitId || visitId < 0 || !active) {
@@ -26,6 +29,13 @@ export function useVisitGpsTrail(visitId: number | null, active: boolean) {
         if (!cancelled) setPoints(data);
       })
       .catch(() => undefined);
+
+    if (mockGps) {
+      setTracking(false);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     setTracking(true);
     const handle = watchPositionTrail(async (fix) => {
@@ -51,7 +61,7 @@ export function useVisitGpsTrail(visitId: number | null, active: boolean) {
       handle.stop();
       setTracking(false);
     };
-  }, [visitId, active]);
+  }, [visitId, active, mockGps]);
 
-  return { points, tracking, lastError };
+  return { points, tracking, lastError, mockGps };
 }

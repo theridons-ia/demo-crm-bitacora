@@ -274,6 +274,7 @@ class Sale(Base):
     payment_evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     is_credit: Mapped[bool] = mapped_column(Boolean, default=False)
+    apply_iva: Mapped[bool] = mapped_column(Boolean, default=False)
     fx_rate_usd_ves: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     quote_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)

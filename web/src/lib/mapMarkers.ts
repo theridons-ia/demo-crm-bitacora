@@ -73,6 +73,19 @@ export const sellerEndIcon = L.divIcon({
   popupAnchor: [0, -10],
 });
 
+/** Posición actual del vendedor: no usar el mismo punto del trail. */
+export const sellerNowIcon = L.divIcon({
+  className: "map-marker map-marker-now",
+  html: `<div class="map-marker-now-wrap" title="Posición actual">
+    <span class="map-marker-now-pulse"></span>
+    <span class="map-marker-dot map-marker-dot-now"></span>
+    <span class="map-marker-now-label">Ahora</span>
+  </div>`,
+  iconSize: [52, 40],
+  iconAnchor: [11, 14],
+  popupAnchor: [0, -16],
+});
+
 export function trailIconForSource(source: string): L.DivIcon {
   if (source === "start") return sellerStartIcon;
   if (source === "end") return sellerEndIcon;

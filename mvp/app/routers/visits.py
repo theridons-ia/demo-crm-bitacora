@@ -8,7 +8,7 @@ from ..auth import get_current_user, require_supervisor
 from ..database import get_db
 from ..services.client_assignments import assign_client_to_seller, seller_can_see_client
 from ..models import Client, GpsPointSource, Sale, User, UserRole, Visit, VisitGpsPoint, VisitStatus
-from ..schemas import SaleIn, SaleOut, VisitAssign, VisitClose, VisitCreate, VisitOut, VisitStart
+from ..schemas import SaleIn, SaleOut, VisitAssign, VisitCancel, VisitClose, VisitCreate, VisitOut, VisitStart
 from ..services.sales import create_sale_for_open_visit
 from ..services.visits import close_visit_with_optional_sale
 
@@ -196,6 +196,83 @@ def start_visit(
                 source=GpsPointSource.start,
             )
         )
+    db.add(visit)
+    db.commit()
+    return _visit_query(db).filter(Visit.id == visit_id).one()
+
+
+@router.post("/{visit_id}/gps", response_model=VisitOut)
+def pin_visit_gps(
+    visit_id: int,
+    payload: VisitStart,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fuerza guardar coordenadas en la visita (ficha) y deja un punto en el trail."""
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visita no encontrada")
+    if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes actualizar GPS de otro vendedor")
+    if visit.status not in (VisitStatus.programada, VisitStatus.en_curso):
+        raise HTTPException(status_code=400, detail="Solo puedes fijar GPS en visitas abiertas")
+    if payload.latitude is None or payload.longitude is None:
+        raise HTTPException(status_code=400, detail="No hay coordenada para guardar")
+
+    now = datetime.now(timezone.utc)
+    had_fix = visit.latitude is not None and visit.longitude is not None
+    visit.latitude = payload.latitude
+    visit.longitude = payload.longitude
+    visit.gps_accuracy_m = payload.gps_accuracy_m
+    visit.gps_offline = payload.gps_offline
+    visit.gps_captured_at = now
+    db.add(
+        VisitGpsPoint(
+            visit_id=visit.id,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            accuracy_m=payload.gps_accuracy_m,
+            captured_at=now,
+            source=GpsPointSource.watch if had_fix else GpsPointSource.start,
+        )
+    )
+    db.add(visit)
+    db.commit()
+    return _visit_query(db).filter(Visit.id == visit_id).one()
+
+
+@router.post("/{visit_id}/cancel", response_model=VisitOut)
+def cancel_visit(
+    visit_id: int,
+    payload: VisitCancel | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancela una visita programada o en curso sin OV."""
+    body = payload or VisitCancel()
+    visit = (
+        db.query(Visit)
+        .options(joinedload(Visit.sale), joinedload(Visit.client))
+        .filter(Visit.id == visit_id)
+        .first()
+    )
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visita no encontrada")
+    if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes cancelar visitas de otro vendedor")
+    if visit.status in (VisitStatus.completada, VisitStatus.cancelada):
+        raise HTTPException(status_code=400, detail="Esta visita ya está cerrada o cancelada")
+    if visit.sale is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Esta visita ya tiene OV; ciérrala en lugar de cancelarla",
+        )
+
+    visit.status = VisitStatus.cancelada
+    if body.description:
+        visit.description = body.description
+    elif not visit.description:
+        visit.description = "Cancelada"
     db.add(visit)
     db.commit()
     return _visit_query(db).filter(Visit.id == visit_id).one()

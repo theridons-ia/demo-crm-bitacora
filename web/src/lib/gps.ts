@@ -8,6 +8,7 @@
  */
 
 const MOCK_KEY = "bitacora.dev_mock_gps";
+const MOCK_EVENT = "bitacora-mock-gps";
 
 /** Punto demo cerca de Barquisimeto (Lara) — zona del seed. */
 export const DEMO_GPS_FIX = {
@@ -15,6 +16,8 @@ export const DEMO_GPS_FIX = {
   longitude: -69.3474,
   accuracy_m: 12,
 };
+
+export type GeoNear = { latitude: number; longitude: number };
 
 export type GeoFix = {
   latitude: number;
@@ -51,31 +54,52 @@ export function setMockGpsEnabled(enabled: boolean): void {
   if (!canUseMockGps() || typeof sessionStorage === "undefined") return;
   if (enabled) sessionStorage.setItem(MOCK_KEY, "1");
   else sessionStorage.removeItem(MOCK_KEY);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(MOCK_EVENT));
+  }
 }
 
-export function mockCurrentPosition(
-  override?: Partial<typeof DEMO_GPS_FIX>,
-): GeoResult {
-  const latitude = override?.latitude ?? DEMO_GPS_FIX.latitude;
-  const longitude = override?.longitude ?? DEMO_GPS_FIX.longitude;
-  const accuracy_m = override?.accuracy_m ?? DEMO_GPS_FIX.accuracy_m;
-  // Pequeña variación para que inicio/cierre no sean idénticos
-  const jitter = (Math.random() - 0.5) * 0.0003;
+/** Reacciona al toggle «GPS simular» del header. */
+export function subscribeMockGps(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(MOCK_EVENT, listener);
+  return () => window.removeEventListener(MOCK_EVENT, listener);
+}
+
+export function coordsFromClient(client?: {
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+} | null): GeoNear | null {
+  if (client?.latitude == null || client?.longitude == null) return null;
+  const latitude = Number(client.latitude);
+  const longitude = Number(client.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
+}
+
+export function mockCurrentPosition(near?: GeoNear | null): GeoResult {
+  const latitude = near?.latitude ?? DEMO_GPS_FIX.latitude;
+  const longitude = near?.longitude ?? DEMO_GPS_FIX.longitude;
+  // ~15–20 m alrededor del PDV (no un recorrido)
+  const jitter = (Math.random() - 0.5) * 0.00018;
   return {
     ok: true,
     fix: {
       latitude: latitude + jitter,
       longitude: longitude + jitter,
-      accuracy_m,
+      accuracy_m: DEMO_GPS_FIX.accuracy_m,
       captured_at: new Date().toISOString(),
       mocked: true,
     },
   };
 }
 
-export function getCurrentPosition(timeoutMs = 15000): Promise<GeoResult> {
+export function getCurrentPosition(
+  timeoutMs = 15000,
+  near?: GeoNear | null,
+): Promise<GeoResult> {
   if (isMockGpsEnabled()) {
-    return Promise.resolve(mockCurrentPosition());
+    return Promise.resolve(mockCurrentPosition(near));
   }
 
   if (!isGeolocationAvailable()) {
@@ -130,15 +154,19 @@ export function mapsUrl(lat: string | number, lng: string | number): string {
 export type WatchHandle = { stop: () => void };
 
 /**
- * Trail ligero mientras la visita está en curso.
- * - Real: watchPosition del navegador (filtramos por tiempo mínimo).
- * - Mock: intervalo con jitter (útil sin HTTPS).
+ * Trail ligero mientras la visita está en curso (GPS real).
+ * El modo «GPS simular» NO genera puntos en movimiento: solo fija
+ * una coordenada cerca del PDV al iniciar / guardar GPS / cerrar.
  */
 export function watchPositionTrail(
   onFix: (fix: GeoFix) => void,
   options?: { minIntervalMs?: number },
 ): WatchHandle {
-  const minIntervalMs = options?.minIntervalMs ?? (isMockGpsEnabled() ? 12_000 : 45_000);
+  if (isMockGpsEnabled()) {
+    return { stop: () => undefined };
+  }
+
+  const minIntervalMs = options?.minIntervalMs ?? 45_000;
   let lastSentAt = 0;
   let stopped = false;
 
@@ -149,20 +177,6 @@ export function watchPositionTrail(
     lastSentAt = now;
     onFix(result.fix);
   };
-
-  if (isMockGpsEnabled()) {
-    // Primera muestra pronto para ver el trail en demos
-    emit(mockCurrentPosition());
-    const id = window.setInterval(() => {
-      emit(mockCurrentPosition());
-    }, Math.max(5_000, minIntervalMs));
-    return {
-      stop: () => {
-        stopped = true;
-        window.clearInterval(id);
-      },
-    };
-  }
 
   if (!isGeolocationAvailable() || !isSecureGeoContext()) {
     return { stop: () => undefined };

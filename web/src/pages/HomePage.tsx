@@ -157,9 +157,10 @@ export function HomePage() {
   }, [sales, day]);
 
   const upcoming = useMemo(
-    () => dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso").slice(0, 5),
+    () => dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso"),
     [dayVisits],
   );
+  const agendaPreview = upcoming.slice(0, 3);
 
   const visitStatusByClient = useMemo(() => {
     const map = new Map<number, VisitStatus>();
@@ -215,7 +216,7 @@ export function HomePage() {
           </Link>
         </section>
 
-        <MetricGrid aria-label="Resumen del día">
+        <MetricGrid aria-label="Resumen del día" className="home-kpis">
           <MetricTile
             label="Ventas hoy"
             value={`$${salesToday.toFixed(0)}`}
@@ -242,7 +243,7 @@ export function HomePage() {
           />
         </MetricGrid>
 
-        <section className="card seller-panel">
+        <section className="card seller-panel home-agenda">
           <div className="seller-panel-head">
             <div>
               <h2 className="section-heading">Agenda de hoy</h2>
@@ -251,48 +252,28 @@ export function HomePage() {
             <Calendar size={18} aria-hidden color="var(--muted-foreground)" />
           </div>
 
-          {upcoming.length === 0 ? (
+          {agendaPreview.length === 0 ? (
             <p className="muted">No hay visitas abiertas para hoy.</p>
           ) : (
-            <ol className="visit-timeline">
-              {upcoming.map((v) => (
-                <li key={v.id} className="visit-timeline-item">
-                  <span className="visit-timeline-time">
-                    {formatVisitTime(v.visited_at ?? v.created_at, v.scheduled_date)}
-                  </span>
-                  <span className="visit-timeline-rail" aria-hidden>
-                    <span
-                      className={`visit-timeline-dot${
-                        v.status === "en_curso"
-                          ? " is-now"
-                          : v.status === "completada"
-                            ? " is-done"
-                            : ""
-                      }`}
-                    />
-                  </span>
-                  <div className="visit-timeline-copy">
+            <ol className="home-agenda-list">
+              {agendaPreview.map((v) => (
+                <li key={v.id}>
+                  <Link to="/app/visitas" className="home-agenda-stop">
+                    <span className="home-agenda-time">
+                      {formatVisitTime(v.visited_at ?? v.created_at, v.scheduled_date)}
+                    </span>
                     <strong>{v.client?.name ?? `Cliente #${v.client_id}`}</strong>
-                    <span>
-                      {v.status === "en_curso" ? (
-                        <LiveLed />
-                      ) : (
-                        "Programada"
-                      )}
+                    <span className="muted small">
+                      {v.status === "en_curso" ? <LiveLed /> : "Programada"}
                       {v.client?.address ? ` · ${v.client.address}` : ""}
                     </span>
-                  </div>
-                  <ChevronRight size={16} aria-hidden color="var(--muted-foreground)" />
+                  </Link>
                 </li>
               ))}
             </ol>
           )}
 
-          <Link
-            to="/app/ruta"
-            className="btn btn-secondary btn-block"
-            style={{ marginTop: "0.85rem" }}
-          >
+          <Link to="/app/ruta" className="btn btn-secondary">
             <MapPin size={18} />
             Ver recorrido completo
           </Link>

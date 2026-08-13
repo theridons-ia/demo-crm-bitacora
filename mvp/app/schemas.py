@@ -226,6 +226,7 @@ class SaleIn(BaseModel):
     payment_reference: str | None = Field(default=None, max_length=64)
     payment_evidence: str | None = Field(default=None, max_length=600_000)
     notes: str | None = None
+    apply_iva: bool = False
     quote_snapshot: str | None = Field(default=None, max_length=200_000)
     items: list[SaleItemIn] = Field(default_factory=list)
     local_uuid: str | None = None
@@ -264,6 +265,7 @@ class SaleOut(ORMModel):
     payment_reference: str | None = None
     total_amount: Decimal
     is_credit: bool
+    apply_iva: bool = False
     fx_rate_usd_ves: Decimal | None = None
     notes: str | None
     quote_snapshot: str | None = None
@@ -389,6 +391,10 @@ class VisitStart(BaseModel):
     longitude: Decimal | None = None
     gps_accuracy_m: Decimal | None = None
     gps_offline: bool = False
+
+
+class VisitCancel(BaseModel):
+    description: str | None = None
 
 
 class VisitClose(BaseModel):

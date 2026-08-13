@@ -1,8 +1,4 @@
 import {
-  Calendar,
-  CheckCircle2,
-  ClipboardList,
-  Clock,
   MapPin,
   Play,
   Plus,
@@ -35,7 +31,7 @@ import {
   fetchVisits,
   startVisit,
 } from "../lib/api";
-import { getCurrentPosition } from "../lib/gps";
+import { coordsFromClient, getCurrentPosition } from "../lib/gps";
 import {
   listLocalVisits,
   newLocalUuid,
@@ -52,7 +48,14 @@ const statusLabel: Record<VisitStatus, string> = {
   cancelada: "Cancelada",
 };
 
-type VisitFilter = "all" | "open" | "done" | "agenda" | "sale";
+type VisitFilter = "open" | "done" | "agenda" | "cancelada";
+
+const FILTER_CHIPS: { key: VisitFilter; label: string }[] = [
+  { key: "open", label: "Abiertas" },
+  { key: "agenda", label: "Agenda" },
+  { key: "done", label: "Hechas" },
+  { key: "cancelada", label: "Canceladas" },
+];
 
 function clientIdLabel(client: Client | null | undefined, clientId: number): string {
   if (!client) return `Cliente #${clientId}`;
@@ -86,18 +89,43 @@ function formatWhen(iso: string | null | undefined): string {
   }
 }
 
-function visitIconTone(status: VisitStatus): string {
-  if (status === "en_curso") return "tone-progress";
-  if (status === "programada") return "tone-accent";
-  if (status === "completada") return "tone-ok";
-  return "tone-muted";
+function formatScheduled(date: string, time: string | null | undefined): string {
+  const [y, m, d] = date.split("-").map(Number);
+  if (!y || !m || !d) return date;
+  const day = new Date(y, m - 1, d).toLocaleDateString("es-VE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const t = time ? String(time).slice(0, 5) : "";
+  return t ? `${day}, ${t}` : day;
 }
 
-function VisitStatusIcon({ status }: { status: VisitStatus }) {
-  if (status === "en_curso") return <Clock size={16} />;
-  if (status === "programada") return <Calendar size={16} />;
-  if (status === "completada") return <CheckCircle2 size={16} />;
-  return <ClipboardList size={16} />;
+function visitWhenMs(visit: Visit): number {
+  if (visit.status === "programada" && visit.scheduled_date) {
+    const t = (visit.scheduled_time ? String(visit.scheduled_time) : "00:00").slice(0, 8);
+    const stamp = t.length === 5 ? `${visit.scheduled_date}T${t}:00` : `${visit.scheduled_date}T${t}`;
+    const ms = Date.parse(stamp);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  const iso = visit.visited_at || visit.created_at;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+function sortVisitsNewestFirst(list: Visit[]): Visit[] {
+  return [...list].sort((a, b) => {
+    if (a.status === "en_curso" && b.status !== "en_curso") return -1;
+    if (b.status === "en_curso" && a.status !== "en_curso") return 1;
+    return visitWhenMs(b) - visitWhenMs(a);
+  });
+}
+
+function clientInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
 function localVisitToVisit(local: LocalPendingVisit): Visit {
@@ -200,7 +228,7 @@ export function VisitsPage() {
     };
   }, [reload]);
 
-  async function captureGps(): Promise<{
+  async function captureGps(near?: { latitude: number; longitude: number } | null): Promise<{
     latitude?: number;
     longitude?: number;
     gps_accuracy_m?: number;
@@ -208,7 +236,7 @@ export function VisitsPage() {
     gps_captured_at?: string;
     note?: string;
   }> {
-    const geo = await getCurrentPosition();
+    const geo = await getCurrentPosition(15_000, near);
     if (geo.ok) {
       return {
         latitude: geo.fix.latitude,
@@ -226,7 +254,8 @@ export function VisitsPage() {
     setError(null);
     setGpsNote(null);
     try {
-      const gps = await captureGps();
+      const visit = visits.find((v) => v.id === visitId);
+      const gps = await captureGps(coordsFromClient(visit?.client));
       if (gps.note) setGpsNote(`Inicio sin GPS: ${gps.note}`);
       const updated = await startVisit(visitId, {
         latitude: gps.latitude ?? null,
@@ -253,24 +282,31 @@ export function VisitsPage() {
     const open = visits.filter((v) => v.status === "programada" || v.status === "en_curso");
     const done = visits.filter((v) => v.status === "completada");
     const agenda = visits.filter((v) => v.status === "programada");
-    const sale = visits.filter((v) => v.result && v.result !== "sin_venta");
-    return { open: open.length, done: done.length, agenda: agenda.length, sale: sale.length };
+    const cancelled = visits.filter((v) => v.status === "cancelada");
+    return {
+      open: open.length,
+      done: done.length,
+      agenda: agenda.length,
+      cancelled: cancelled.length,
+    };
   }, [visits]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return visits.filter((v) => {
-      if (filter === "open" && !(v.status === "programada" || v.status === "en_curso")) return false;
+    const next = visits.filter((v) => {
+      if (v.status === "en_curso") return false;
+      if (filter === "open" && v.status !== "programada") return false;
       if (filter === "done" && v.status !== "completada") return false;
       if (filter === "agenda") {
         if (v.status !== "programada") return false;
         if (v.scheduled_date !== agendaDay) return false;
       }
-      if (filter === "sale" && !(v.result && v.result !== "sin_venta")) return false;
+      if (filter === "cancelada" && v.status !== "cancelada") return false;
       if (!q) return true;
-      const blob = `${v.client?.name ?? ""} ${v.client?.rif ?? ""} ${v.client?.ci ?? ""} ${v.description ?? ""}`.toLowerCase();
+      const blob = `${v.client?.name ?? ""} ${v.client?.rif ?? ""} ${v.client?.ci ?? ""} ${v.client?.address ?? ""} ${v.description ?? ""}`.toLowerCase();
       return blob.includes(q);
     });
+    return sortVisitsNewestFirst(next);
   }, [visits, filter, query, agendaDay]);
 
   const weekDays = useMemo(() => {
@@ -309,7 +345,7 @@ export function VisitsPage() {
           <p className="eyebrow">Bitácora</p>
           <h1 className="display-title">Tus visitas</h1>
           <p className="muted">
-            {counts.done} hechas · {active.length} en curso · {counts.agenda} en agenda
+            {counts.open} abiertas · {counts.done} hechas · {counts.cancelled} canceladas
           </p>
         </div>
         <Button variant="primary" aria-label="Nueva visita" onClick={openNow}>
@@ -339,14 +375,7 @@ export function VisitsPage() {
       />
 
       <div className="chips-row" role="tablist" aria-label="Filtros">
-        {(
-          [
-            ["done", "Hechas"],
-            ["open", "Abiertas"],
-            ["agenda", "Agenda"],
-            ["sale", "Con venta"],
-          ] as const
-        ).map(([key, label]) => (
+        {FILTER_CHIPS.map(({ key, label }) => (
           <button
             key={key}
             type="button"
@@ -354,6 +383,15 @@ export function VisitsPage() {
             onClick={() => setFilter(key)}
           >
             {label}
+            <span className="chip-count">
+              {key === "open"
+                ? counts.open
+                : key === "agenda"
+                  ? counts.agenda
+                  : key === "done"
+                    ? counts.done
+                    : counts.cancelled}
+            </span>
           </button>
         ))}
       </div>
@@ -393,20 +431,23 @@ export function VisitsPage() {
 
       <ul className="ficha-stack">
         {filtered.map((visit) => {
-          const coords = formatCoords(visit);
+          const name = clientIdLabel(visit.client, visit.client_id);
           const idMeta = clientIdMeta(visit.client);
-          const timeLabel =
-            visit.scheduled_time != null
-              ? String(visit.scheduled_time).slice(0, 5)
-              : null;
+          const address = visit.client?.address ?? "";
           const when =
             visit.status === "programada" && visit.scheduled_date
-              ? [visit.scheduled_date, timeLabel].filter(Boolean).join(" · ")
+              ? formatScheduled(visit.scheduled_date, visit.scheduled_time)
               : formatWhen(visit.visited_at || visit.created_at);
+          const resultLabel =
+            visit.result === "sin_venta"
+              ? "Sin venta"
+              : visit.result
+                ? "Con venta"
+                : null;
           return (
             <li key={visit.id}>
               <article
-                className="ficha ficha-openable"
+                className="ficha ficha-openable visit-list-card"
                 role="button"
                 tabIndex={0}
                 onClick={() => setDetailVisit(visit)}
@@ -417,34 +458,27 @@ export function VisitsPage() {
                   }
                 }}
               >
-                <span className={`ficha-icon ${visitIconTone(visit.status)}`} aria-hidden>
-                  <VisitStatusIcon status={visit.status} />
+                <span className="ficha-avatar" aria-hidden>
+                  {clientInitials(name)}
                 </span>
                 <div className="ficha-body">
                   <div className="ficha-row">
-                    <h3 className="ficha-title">{clientIdLabel(visit.client, visit.client_id)}</h3>
+                    <h3 className="ficha-title">{name}</h3>
                     {visit.status === "en_curso" ? (
                       <LiveLed />
                     ) : (
                       <span className={`badge badge-${visit.status}`}>{statusLabel[visit.status]}</span>
                     )}
                   </div>
-                  <p className="ficha-meta">
-                    {[idMeta, when].filter(Boolean).join(" · ")}
+                  <p className="ficha-meta visit-list-sub">
+                    <span>{[idMeta, address].filter(Boolean).join(" · ") || "Sin RIF / dirección"}</span>
+                    <span className="is-end">{when}</span>
                   </p>
-                  {visit.description ? <p className="ficha-note">{visit.description}</p> : null}
-                  {visit.result ? (
-                    <p className="ficha-note">
-                      Resultado: {visit.result === "sin_venta" ? "Sin venta" : "Con venta"}
-                    </p>
+                  {resultLabel ? (
+                    <p className="ficha-note visit-list-result">{resultLabel}</p>
                   ) : null}
-                  {coords ? (
-                    <p className="ficha-meta">
-                      <MapPin size={12} style={{ verticalAlign: "middle" }} /> {coords}
-                    </p>
-                  ) : null}
-                  <div className="ficha-actions" onClick={(e) => e.stopPropagation()}>
-                    {visit.status === "programada" ? (
+                  {visit.status === "programada" ? (
+                    <div className="ficha-actions" onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="primary"
                         disabled={busyId === visit.id}
@@ -453,27 +487,8 @@ export function VisitsPage() {
                         <Play size={16} />
                         {busyId === visit.id ? "Obteniendo GPS…" : "Iniciar"}
                       </Button>
-                    ) : null}
-                    {visit.status === "en_curso" ? (
-                      <Button
-                        variant="secondary"
-                        disabled={busyId === visit.id}
-                        onClick={() => onCloseNoSale(visit.id)}
-                      >
-                        <Square size={16} />
-                        Cerrar
-                      </Button>
-                    ) : null}
-                    {visit.id > 0 && (coords || visit.status !== "programada") ? (
-                      <Button variant="ghost" type="button" onClick={() => setMapVisit(visit)}>
-                        <MapPin size={16} />
-                        Trail
-                      </Button>
-                    ) : null}
-                    <Button variant="ghost" type="button" onClick={() => setDetailVisit(visit)}>
-                      Ver
-                    </Button>
-                  </div>
+                    </div>
+                  ) : null}
                 </div>
               </article>
             </li>
@@ -482,7 +497,11 @@ export function VisitsPage() {
       </ul>
 
       {!loading && filtered.length === 0 ? (
-        <p className="muted">Sin coincidencias. Prueba otro filtro o crea una visita.</p>
+        <p className="muted">
+          {filter === "open" && active.length
+            ? "No hay más pendientes. La visita en curso está arriba."
+            : "Sin coincidencias. Prueba otro filtro o crea una visita."}
+        </p>
       ) : null}
 
       <VisitForm
@@ -513,6 +532,11 @@ export function VisitsPage() {
           onClosed={(updated) => {
             setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
             setClosingVisit(null);
+            setDetailVisit((cur) => (cur && cur.id === updated.id ? updated : cur));
+          }}
+          onVisitPatched={(updated) => {
+            setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+            setClosingVisit(updated);
             setDetailVisit((cur) => (cur && cur.id === updated.id ? updated : cur));
           }}
         />
@@ -550,7 +574,7 @@ function ActiveVisitCard({
   onClose: () => void;
   onMap: () => void;
 }) {
-  const { points, tracking, lastError } = useVisitGpsTrail(visit.id, true);
+  const { points, tracking, lastError, mockGps } = useVisitGpsTrail(visit.id, true);
   const watchCount = points.filter((p) => p.source === "watch").length;
   const last = points.length ? points[points.length - 1] : null;
 
@@ -574,9 +598,13 @@ function ActiveVisitCard({
       )}
       <p className="trail-status">
         <Radio size={14} />{" "}
-        {tracking
-          ? `Trail activo · ${points.length} punto(s) (${watchCount} en movimiento)`
-          : "Trail detenido"}
+        {mockGps
+          ? "GPS de prueba · junto al PDV (sin puntos en movimiento)"
+          : tracking
+            ? `Trail activo · ${points.length} punto(s)${
+                watchCount ? ` (${watchCount} en movimiento)` : ""
+              }`
+            : "Trail detenido"}
       </p>
       {last ? (
         <p className="muted small">
@@ -662,7 +690,8 @@ function VisitForm({
       let gps_offline = false;
 
       if (mode === "now") {
-        const geo = await getCurrentPosition();
+        const client = clients.find((c) => c.id === Number(clientId));
+        const geo = await getCurrentPosition(15_000, coordsFromClient(client));
         if (geo.ok) {
           latitude = geo.fix.latitude;
           longitude = geo.fix.longitude;

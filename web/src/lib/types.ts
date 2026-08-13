@@ -136,6 +136,7 @@ export type Sale = {
   payment_reference?: string | null;
   total_amount: string;
   is_credit: boolean;
+  apply_iva?: boolean;
   fx_rate_usd_ves?: string | null;
   notes: string | null;
   quote_snapshot?: string | null;

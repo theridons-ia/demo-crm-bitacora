@@ -129,6 +129,10 @@ export function SaleDetailSheet({
                 </strong>
               </div>
               <div>
+                <span className="muted small">IVA</span>
+                <strong>{sale.apply_iva || quoteData?.applyIva ? "16%" : "Sin IVA"}</strong>
+              </div>
+              <div>
                 <span className="muted small">Ítems</span>
                 <strong>
                   {items} · {units} ud
@@ -214,7 +218,7 @@ export function SaleDetailSheet({
         ) : null}
 
         {tab === "documento" && quoteData ? (
-          <QuoteDocument data={quoteData} />
+          <QuoteDocument data={quoteData} asImage />
         ) : null}
       </div>
     </Modal>

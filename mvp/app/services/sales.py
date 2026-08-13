@@ -88,6 +88,7 @@ def _persist_sale(
         payment_evidence=None if sale_in.is_credit else sale_in.payment_evidence,
         total_amount=total,
         is_credit=sale_in.is_credit,
+        apply_iva=sale_in.apply_iva,
         fx_rate_usd_ves=fx_rate,
         notes=sale_in.notes,
         quote_snapshot=sale_in.quote_snapshot,

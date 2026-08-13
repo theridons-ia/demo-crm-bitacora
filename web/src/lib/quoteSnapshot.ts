@@ -1,7 +1,7 @@
 import type { Client, CurrencyCode, Product, Sale } from "../lib/types";
 import type { QuoteDocLine, QuoteDocumentData } from "../components/QuoteDocument";
 import type { QuoteLine } from "../components/SaleQuoter";
-import { buildQuoteLines } from "../components/QuoteDocument";
+import { buildQuoteLines, DEFAULT_QUOTE_ISSUER } from "../components/QuoteDocument";
 
 /** Snapshot serializable guardado en Sale.quote_snapshot. */
 export type QuoteSnapshot = {
@@ -15,6 +15,13 @@ export type QuoteSnapshot = {
   fxRate: number | null;
   notes: string | null;
   isCredit: boolean;
+  applyIva?: boolean;
+  issuer?: {
+    companyName?: string | null;
+    rif?: string | null;
+    slogan?: string | null;
+    address?: string | null;
+  };
   lines: QuoteDocLine[];
   confirmed?: boolean;
 };
@@ -32,6 +39,8 @@ export function serializeQuoteSnapshot(data: QuoteDocumentData): string {
     fxRate: data.fxRate,
     notes: data.notes ?? null,
     isCredit: Boolean(data.isCredit),
+    applyIva: Boolean(data.applyIva),
+    issuer: data.issuer ?? DEFAULT_QUOTE_ISSUER,
     lines: data.lines,
   };
   return JSON.stringify(snap);
@@ -73,6 +82,8 @@ export function snapshotToQuoteDocumentData(snap: QuoteSnapshot): QuoteDocumentD
     lines: snap.lines,
     notes: snap.notes,
     isCredit: snap.isCredit,
+    applyIva: Boolean(snap.applyIva),
+    issuer: snap.issuer ?? null,
   };
 }
 
@@ -105,6 +116,7 @@ export function buildQuoteDataFromSale(
     lines,
     notes: sale.notes,
     isCredit: sale.is_credit,
+    applyIva: Boolean(sale.apply_iva),
   };
 }
 
@@ -120,6 +132,7 @@ export function buildQuoteDataFromDraft(input: {
   products: Product[];
   notes?: string | null;
   isCredit?: boolean;
+  applyIva?: boolean;
 }): QuoteDocumentData {
   return {
     code: input.code,
@@ -132,5 +145,6 @@ export function buildQuoteDataFromDraft(input: {
     lines: buildQuoteLines(input.lines, input.products),
     notes: input.notes ?? null,
     isCredit: input.isCredit,
+    applyIva: input.applyIva,
   };
 }

@@ -38,6 +38,9 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * asin(sqrt(a))
 
 
+IVA_RATE = Decimal("0.16")
+
+
 def apply_sale_to_inventory(db: Session, sale_in: SaleIn) -> tuple[Decimal, list[SaleItem]]:
     if not sale_in.items:
         raise HTTPException(status_code=400, detail="La venta requiere al menos un producto")
@@ -68,6 +71,9 @@ def apply_sale_to_inventory(db: Session, sale_in: SaleIn) -> tuple[Decimal, list
             )
         )
 
+    total = total.quantize(Decimal("0.01"))
+    if sale_in.apply_iva:
+        total = (total * (Decimal("1") + IVA_RATE)).quantize(Decimal("0.01"))
     return total, items
 
 
@@ -252,6 +258,7 @@ def close_visit_with_optional_sale(
             payment_evidence=None if sale_in.is_credit else sale_in.payment_evidence,
             total_amount=total,
             is_credit=sale_in.is_credit,
+            apply_iva=sale_in.apply_iva,
             fx_rate_usd_ves=fx_rate,
             notes=sale_in.notes,
             quote_snapshot=sale_in.quote_snapshot,
