@@ -8,6 +8,7 @@ import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchSellers, fetchVisits } from "../lib/api";
 import { todayISO } from "../lib/caracasTime";
 import { clientPdvIconFor, teamVisitIcon } from "../lib/mapMarkers";
+import { isOnDayAgenda, sortVisitsRoute } from "../lib/visitOrder";
 import type { User, Visit, VisitStatus } from "../lib/types";
 
 const STATUS_LABEL: Record<VisitStatus, string> = {
@@ -56,10 +57,10 @@ export function TeamMapPage() {
     setError(null);
     try {
       const list = await fetchVisits({
-        day,
+        scheduled_date: day,
         seller_id: sellerId === "" ? undefined : sellerId,
       });
-      setVisits(list.filter((v) => v.status !== "cancelada"));
+      setVisits(list.filter((v) => isOnDayAgenda(v, day)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar el mapa");
       setVisits([]);
@@ -107,6 +108,23 @@ export function TeamMapPage() {
 
     const bounds: L.LatLngExpression[] = [];
 
+    if (sellerId !== "") {
+      const pinned: { pt: L.LatLngExpression; status: Visit["status"] }[] = [];
+      for (const v of sortVisitsRoute(visits)) {
+        const pt = clientCoords(v) ?? visitCoords(v);
+        if (pt) pinned.push({ pt, status: v.status });
+      }
+      for (let i = 0; i < pinned.length - 1; i++) {
+        const doneSeg = pinned[i].status === "completada" && pinned[i + 1].status === "completada";
+        L.polyline([pinned[i].pt, pinned[i + 1].pt], {
+          color: doneSeg ? "#18312f" : "#f16b5f",
+          weight: doneSeg ? 5 : 3.5,
+          dashArray: doneSeg ? undefined : "10 12",
+          opacity: 0.85,
+        }).addTo(layer);
+      }
+    }
+
     for (const visit of visits) {
       const pdv = clientCoords(visit);
       const sellerPoint = visitCoords(visit);
@@ -145,7 +163,7 @@ export function TeamMapPage() {
 
     // Leaflet necesita invalidar tamaño al montar en layout con sidebar
     setTimeout(() => map.invalidateSize(), 80);
-  }, [visits]);
+  }, [visits, sellerId]);
 
   useEffect(() => {
     return () => {
@@ -218,22 +236,22 @@ export function TeamMapPage() {
             }`}
       </div>
 
-      <div className="team-map-frame card">
-        <div ref={mapEl} className="team-map-canvas" role="img" aria-label="Mapa de visitas del equipo" />
-        <ul className="team-map-legend">
-          <li>
+      <div className="map-stage is-bleed">
+        <div ref={mapEl} className="map-stage-canvas" role="img" aria-label="Mapa de visitas del equipo" />
+        <div className="map-stage-legend">
+          <span>
             <span className="map-marker-store-legend" aria-hidden /> PDV
-          </li>
-          <li>
+          </span>
+          <span>
             <span className="team-legend-dot" style={{ background: "#71807b" }} /> Programada
-          </li>
-          <li>
+          </span>
+          <span>
             <span className="team-legend-dot" style={{ background: "#f16b5f" }} /> En curso
-          </li>
-          <li>
-            <span className="team-legend-dot" style={{ background: "#18312f" }} /> Completada
-          </li>
-        </ul>
+          </span>
+          <span>
+            <span className="team-legend-dot" style={{ background: "#18312f" }} /> Culminada
+          </span>
+        </div>
       </div>
 
       {!loading && visits.length === 0 ? (

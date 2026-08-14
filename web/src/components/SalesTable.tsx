@@ -4,6 +4,7 @@ import {
   PAYMENT_METHOD_LABEL,
   SALE_ORIGIN_LABEL,
   saleItemCount,
+  saleOrderCode,
   saleUnitCount,
 } from "../lib/saleLabels";
 
@@ -42,7 +43,7 @@ export function SalesTable({ sales, sellerNameById, showSeller, onRowClick }: Pr
                 onClick={() => onRowClick(sale)}
               >
                 <div className="sales-col sales-col-ov">
-                  <strong>OV-{sale.id}</strong>
+                  <strong>{saleOrderCode(sale)}</strong>
                   <span className="muted small">
                     {items} ítem{items === 1 ? "" : "s"} · {units} ud
                   </span>

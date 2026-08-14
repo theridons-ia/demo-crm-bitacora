@@ -270,9 +270,11 @@ def close_visit_with_optional_sale(
         )
         db.add(sale)
         db.flush()
-        from .sales import _stamp_quote_snapshot
+        from .sales import _allocate_sale_code, _stamp_quote_snapshot
 
-        sale.quote_snapshot = _stamp_quote_snapshot(sale_in.quote_snapshot, sale_id=sale.id)
+        sale.quote_snapshot = _stamp_quote_snapshot(
+            sale_in.quote_snapshot, code=_allocate_sale_code(db, sale_id=sale.id)
+        )
         if not sale_in.is_credit:
             from .banks import record_sale_collection
 

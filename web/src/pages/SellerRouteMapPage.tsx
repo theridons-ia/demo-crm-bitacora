@@ -10,11 +10,13 @@ import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchVisits } from "../lib/api";
 import { todayISO } from "../lib/caracasTime";
 import { teamVisitIcon } from "../lib/mapMarkers";
-import { orderDayRoute, type LatLng } from "../lib/routeOrder";
-import { sortVisitsAgenda } from "../lib/visitOrder";
+import type { LatLng } from "../lib/routeOrder";
+import { isOnDayAgenda, sortVisitsRoute } from "../lib/visitOrder";
 import type { Visit, VisitStatus } from "../lib/types";
 
 const DEFAULT_CENTER: LatLng = { lat: 10.07, lng: -69.32 };
+const LINE_DONE = "#18312f";
+const LINE_TODO = "#f16b5f";
 
 function stopCoords(v: Visit): LatLng | null {
   const lat = v.client?.latitude != null ? Number(v.client.latitude) : NaN;
@@ -27,16 +29,13 @@ function stopCoords(v: Visit): LatLng | null {
 }
 
 const STATUS_LABEL: Record<VisitStatus, string> = {
-  programada: "Pendiente",
+  programada: "Programada",
   en_curso: "En curso",
-  completada: "Cerrada",
+  completada: "Culminada",
   cancelada: "Cancelada",
 };
 
-/**
- * Mapa de recorrido del vendedor.
- * Cerradas primero (línea sólida) → pendientes como ruta sugerida (punteada).
- */
+/** Mapa del día = agenda (`scheduled_time`), no vecino más cercano. */
 export function SellerRouteMapPage() {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -52,8 +51,8 @@ export function SellerRouteMapPage() {
     setLoading(true);
     setError(null);
     try {
-      const list = await fetchVisits({ day });
-      setVisits(list.filter((v) => v.status !== "cancelada"));
+      const list = await fetchVisits({ scheduled_date: day });
+      setVisits(list.filter((v) => isOnDayAgenda(v, day)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar la ruta");
       setVisits([]);
@@ -66,7 +65,6 @@ export function SellerRouteMapPage() {
     void reload();
   }, [reload]);
 
-  // Al volver a la pestaña / foco: refrescar (p. ej. tras cerrar en Visitas)
   useEffect(() => {
     const onFocus = () => {
       void reload();
@@ -82,17 +80,7 @@ export function SellerRouteMapPage() {
     };
   }, [reload]);
 
-  const ordered = useMemo(() => {
-    const withCoords = visits.filter((v) => stopCoords(v));
-    return orderDayRoute(
-      withCoords,
-      stopCoords,
-      (v) => v.status === "completada",
-      DEFAULT_CENTER,
-    );
-  }, [visits]);
-
-  const listStops = useMemo(() => sortVisitsAgenda(visits, todayISO()), [visits]);
+  const ordered = useMemo(() => sortVisitsRoute(visits), [visits]);
   const doneCount = ordered.filter((v) => v.status === "completada").length;
   const pendingCount = ordered.length - doneCount;
   const progressPct = ordered.length ? Math.round((doneCount / ordered.length) * 100) : 0;
@@ -113,38 +101,52 @@ export function SellerRouteMapPage() {
     const layer = layerRef.current!;
     layer.clearLayers();
 
-    const points: L.LatLngExpression[] = [];
+    const pinned: { v: Visit; n: number; c: LatLng }[] = [];
     ordered.forEach((v, idx) => {
       const c = stopCoords(v);
       if (!c) return;
-      points.push([c.lat, c.lng]);
+      pinned.push({ v, n: idx + 1, c });
+    });
+
+    for (let i = 0; i < pinned.length - 1; i++) {
+      const a = pinned[i];
+      const b = pinned[i + 1];
+      const doneSeg = a.v.status === "completada" && b.v.status === "completada";
+      L.polyline(
+        [
+          [a.c.lat, a.c.lng],
+          [b.c.lat, b.c.lng],
+        ],
+        {
+          color: doneSeg ? LINE_DONE : LINE_TODO,
+          weight: doneSeg ? 5 : 3.5,
+          dashArray: doneSeg ? undefined : "10 12",
+          opacity: doneSeg ? 0.95 : 0.85,
+          lineCap: "round",
+          lineJoin: "round",
+        },
+      ).addTo(layer);
+    }
+
+    pinned.forEach(({ v, n, c }) => {
       const marker = L.marker([c.lat, c.lng], {
-        icon: teamVisitIcon(v.status, String(idx + 1)),
+        icon: teamVisitIcon(v.status, String(n)),
       });
       marker.bindPopup(
-        `<strong>${idx + 1}. ${v.client?.name ?? `Cliente #${v.client_id}`}</strong><br/>${STATUS_LABEL[v.status]}`,
+        `<strong>${n}. ${v.client?.name ?? `Cliente #${v.client_id}`}</strong><br/>${STATUS_LABEL[v.status]}`,
       );
       marker.on("click", () => setSelected(v));
       marker.addTo(layer);
     });
 
-    for (let i = 0; i < points.length - 1; i++) {
-      const srcDone = ordered[i]?.status === "completada";
-      const destDone = ordered[i + 1]?.status === "completada";
-      const completedSeg = srcDone && destDone;
-      L.polyline([points[i], points[i + 1]], {
-        color: completedSeg ? "#18312f" : "#E6007A",
-        weight: completedSeg ? 5 : 3.5,
-        dashArray: completedSeg ? undefined : "10 12",
-        opacity: completedSeg ? 0.95 : 0.85,
-        lineCap: "round",
-        lineJoin: "round",
-      }).addTo(layer);
+    const map = mapRef.current;
+    if (pinned.length) {
+      map.fitBounds(
+        L.latLngBounds(pinned.map((p) => [p.c.lat, p.c.lng] as L.LatLngExpression)),
+        { padding: [36, 36], maxZoom: 15 },
+      );
     }
-
-    if (points.length) {
-      mapRef.current.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
-    }
+    window.setTimeout(() => map.invalidateSize(), 80);
   }, [ordered]);
 
   useEffect(() => {
@@ -156,22 +158,30 @@ export function SellerRouteMapPage() {
   }, []);
 
   function applyVisitUpdate(updated: Visit) {
-    setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+    setVisits((prev) =>
+      prev
+        .map((v) => (v.id === updated.id ? updated : v))
+        .filter((v) => isOnDayAgenda(v, day)),
+    );
     setSelected((cur) => (cur && cur.id === updated.id ? updated : cur));
   }
 
   return (
     <WorkspacePage
       eyebrow="Ruta"
-      title="Mi recorrido"
-      blurb="Cerradas en línea continua; pendientes en punteado (ruta sugerida)."
+      title="Hoy"
+      blurb="El trazo sigue el horario agendado."
     >
-      <header className="page-header page-header-stack">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Hoy · {day}</p>
-          <h1 className="display-title">Recorrido del día.</h1>
+          <h1 className="display-title">Recorrido</h1>
           <p className="muted">
-            {doneCount} cerradas · {pendingCount} pendientes · {progressPct}% del trazo
+            {loading
+              ? "Cargando…"
+              : ordered.length
+                ? `${doneCount} culminadas · ${pendingCount} pendientes · ${progressPct}%`
+                : "Nada agendado hoy"}
           </p>
         </div>
         <div className="page-header-actions">
@@ -192,30 +202,32 @@ export function SellerRouteMapPage() {
         </p>
       ) : null}
 
-      <div className="route-map-shell card">
-        <div ref={mapEl} className="route-map-canvas" role="img" aria-label="Mapa de ruta del día" />
-        <div className="route-map-legend" aria-hidden>
+      <div className="map-stage is-bleed">
+        <div ref={mapEl} className="map-stage-canvas" role="img" aria-label="Mapa de ruta del día" />
+        <div className="map-stage-legend" aria-hidden>
           <span className="route-map-legend-item">
-            <i className="route-map-swatch is-done" /> Recorrido hecho
+            <i className="route-map-swatch is-done" /> Hecho
           </span>
           <span className="route-map-legend-item">
-            <i className="route-map-swatch is-todo" /> Ruta sugerida
+            <i className="route-map-swatch is-todo" /> Pendiente
           </span>
         </div>
       </div>
 
-      <section className="card">
+      <section className="card route-day-list">
         <h2 className="section-heading">Orden del día</h2>
         {loading ? <p className="muted list-loading">Cargando…</p> : null}
-        {!loading && listStops.length === 0 ? (
-          <p className="muted">No hay visitas para hoy.</p>
+        {!loading && ordered.length === 0 ? (
+          <p className="muted">No hay visitas agendadas hoy.</p>
         ) : (
           <ul className="visit-row-list">
-            {listStops.map((v, i) => (
+            {ordered.map((v, i) => (
               <VisitRow
                 key={v.id}
                 visit={v}
                 index={i + 1}
+                clock="agenda"
+                pinMissing={!stopCoords(v)}
                 onClick={() => setSelected(v)}
               />
             ))}

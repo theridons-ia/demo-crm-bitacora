@@ -10,6 +10,7 @@ import { coordsFromClient, getCurrentPosition, GPS_ACCURACY_WARN_M } from "../li
 import { removeLocalVisit } from "../lib/offlineDb";
 import { enqueueCloseVisit, enqueueOfflineVisitSync } from "../lib/offlineQueue";
 import { formatDateTime } from "../lib/caracasTime";
+import { saleOrderCode } from "../lib/saleLabels";
 import type { Visit } from "../lib/types";
 
 type Props = {
@@ -243,7 +244,7 @@ export function CloseVisitSheet({
         description:
           notes.trim() ||
           (existingSale
-            ? `Cierre con OV-${existingSale.id}`
+            ? `Cierre con ${saleOrderCode(existingSale)}`
             : "Cerrada sin venta"),
         ...gpsFields,
       };
@@ -372,7 +373,7 @@ export function CloseVisitSheet({
       title={clientName}
       blurb={
         existingSale
-          ? `OV-${existingSale.id}${hasGps ? " · GPS ya capturado" : " · falta evidencia GPS"}`
+          ? `${saleOrderCode(existingSale)}${hasGps ? " · GPS ya capturado" : " · falta evidencia GPS"}`
           : hasGps
             ? "Cierre sin venta · GPS ya capturado"
             : "Cierre sin venta · falta GPS"
@@ -400,7 +401,7 @@ export function CloseVisitSheet({
           <div className="visit-sale-confirmed" role="status">
             <div className="visit-sale-confirmed-copy">
               <p className="eyebrow">Orden de venta</p>
-              <strong>OV-{existingSale.id}</strong>
+              <strong>{saleOrderCode(existingSale)}</strong>
               <p className="muted small">
                 ${Number(existingSale.total_amount).toFixed(2)} {existingSale.currency}
                 {" · "}

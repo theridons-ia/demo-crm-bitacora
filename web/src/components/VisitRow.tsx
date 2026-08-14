@@ -16,9 +16,17 @@ type Props = {
   onClick: () => void;
   /** Número de parada (mapa / orden del día). */
   index?: number;
+  /** Reloj = hora agendada (mapa), no hora de cierre. */
+  clock?: "agenda";
+  /** PDV sin lat/lng: la fila se queda; el polyline salta el hueco. */
+  pinMissing?: boolean;
 };
 
-function whenLabel(visit: Visit): string {
+function whenLabel(visit: Visit, clock?: "agenda"): string {
+  if (clock === "agenda") {
+    const t = visit.scheduled_time ? String(visit.scheduled_time).slice(0, 5) : "";
+    return t || "Sin hora";
+  }
   if (visit.status === "en_curso") return "En curso";
   if (visit.status === "cancelada") return "Cancelada";
   if (visit.status === "completada") {
@@ -33,24 +41,25 @@ function whenLabel(visit: Visit): string {
   return "Sin hora";
 }
 
-function metaLabel(visit: Visit): string {
+function metaLabel(visit: Visit, pinMissing?: boolean): string {
+  let base = STATUS_LABEL[visit.status];
   if (visit.status === "completada") {
-    if (visit.result === "sin_venta") return "Sin venta";
-    if (visit.result) return "Con venta";
-    return STATUS_LABEL.completada;
+    if (visit.result === "sin_venta") base = "Sin venta";
+    else if (visit.result) base = "Con venta";
+    else base = STATUS_LABEL.completada;
+  } else if (visit.status === "en_curso") {
+    base = "Toca para continuar";
+  } else if (visit.status === "programada") {
+    base = isVisitOverdue(visit, todayISO()) ? "Sin asistir" : "Programada";
   }
-  if (visit.status === "en_curso") return "Toca para continuar";
-  if (visit.status === "programada") {
-    return isVisitOverdue(visit, todayISO()) ? "Sin asistir" : "Programada";
-  }
-  return STATUS_LABEL[visit.status];
+  return pinMissing ? `${base} · Sin pin` : base;
 }
 
 /**
  * Fila única de visita (SF-4.3): LED/punto · PDV · hora o estado · chevron.
  * Toda la fila abre la ficha. Sin GPS, coords ni botones.
  */
-export function VisitRow({ visit, onClick, index }: Props) {
+export function VisitRow({ visit, onClick, index, clock, pinMissing }: Props) {
   const name = visit.client?.name ?? `Cliente #${visit.client_id}`;
   const live = visit.status === "en_curso";
   const overdue = isVisitOverdue(visit, todayISO());
@@ -74,9 +83,9 @@ export function VisitRow({ visit, onClick, index }: Props) {
         </span>
         <span className="visit-row-copy">
           <span className="visit-row-name">{title}</span>
-          <span className="visit-row-meta">{metaLabel(visit)}</span>
+          <span className="visit-row-meta">{metaLabel(visit, pinMissing)}</span>
         </span>
-        <span className="visit-row-when">{whenLabel(visit)}</span>
+        <span className="visit-row-when">{whenLabel(visit, clock)}</span>
         <ChevronRight size={18} className="visit-row-chevron" aria-hidden />
       </button>
     </li>

@@ -8,7 +8,7 @@ Decisiones y pendientes hablados en chat, para no perderlos.
 
 - Referencia visual: mock Replit + logo **EnRutas** (pin verde, check coral, ruta).
 - **Fraunces descartada**; tipografía **DM Sans**.
-- Marca en UI: **EnRutas** (logo SVG en `web/public/brand/enrutas-logo.svg`).
+- Marca en UI: **EnRutas** (logo PNG en `web/public/brand/enrutas-logo.png`).
 - Consistencia SF-2.6b: logo en login/topbar/sidebar; sin doble «Salir» en desktop vendedor; marks de barra sustituidos por logo.
 
 - **Homogeneización móvil (2026-08-13):** plan por SF en [`FASE-4-UI-MOVIL.md`](./FASE-4-UI-MOVIL.md). Contrato: una fila de visita, chrome corto, mapa = hora agendada, foto desde galería. Regla Cursor: `.cursor/rules/ui-movil.mdc`.

@@ -165,7 +165,7 @@ Reglas de evidencia:
 - Resumen compacto del total (subtotal / IVA / barra TOTAL) arriba, misma estética que el cotizador.
 - Crédito: checkbox con texto de ayuda (“sin cobro ahora; va a cobranza”). Si está activo, ocultar captura de cobro y mostrar nota, no un vacío.
 - Métodos: chips/botones del design system (`.choice-group` / `.pay-method`), no radios nativos.
-- **Nunca** `<input type="file">` nativo a la vista (sale “Choose File” en inglés). Usar `PhotoDrop`: **Galería** (sin `capture`) y **Cámara** (`capture="environment"`) como dos botones. Cancelar el picker no cierra el wizard.
+- **Nunca** `<input type="file">` nativo a la vista (sale “Choose File” en inglés). Usar `PhotoDrop`: tap **Subir foto** → Galería o Cámara trasera. Cancelar el picker no cierra el wizard.
 - Métodos según moneda: **USD** → Efectivo USD, Zelle, USDT. **Bs** → Efectivo Bs, Pago móvil, Transferencia. No mezclar.
 - Cuenta destino con `SelectField`; referencia y nota con `TextField`.
 - Mismo componente en OV de visita, venta standalone y abonos de cobranza.

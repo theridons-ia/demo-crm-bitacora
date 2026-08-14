@@ -1,5 +1,14 @@
 import L from "leaflet";
 
+/** Evita el triángulo naranja de Leaflet (marker-icon.png 404) en el primer paint. */
+const silentIcon = L.divIcon({
+  className: "map-marker",
+  html: "",
+  iconSize: [1, 1],
+  iconAnchor: [0, 0],
+});
+L.Marker.mergeOptions({ icon: silentIcon });
+
 /** Iconos Leaflet: PDV (cliente) vs vendedor/trail. */
 
 const PDV_FUCHSIA = "#E6007A";

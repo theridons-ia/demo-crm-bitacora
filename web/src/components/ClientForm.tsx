@@ -308,7 +308,7 @@ export function ClientForm({
           </FormStep>
 
           <FormStep step="02" title="Ubicación" blurb="Pin del PDV. Se puede actualizar después.">
-            <div className="client-pick-map-wrap">
+            <div className="map-stage">
               <ClientLocationPicker
                 latitude={latitude}
                 longitude={longitude}

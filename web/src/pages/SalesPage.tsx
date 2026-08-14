@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
 import { MetricGrid, MetricTile } from "../components/MetricTile";
 import { Modal } from "../components/Modal";
+import { SearchPickField } from "../components/SearchPickField";
 import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
 import {
   emptyPaymentCapture,
@@ -21,6 +22,7 @@ import {
   type QuoteLine,
 } from "../components/SaleQuoter";
 import { SalesTable } from "../components/SalesTable";
+import { WizardFooter } from "../components/WizardFooter";
 import { WizardSteps } from "../components/WizardSteps";
 import { TextField } from "../components/TextField";
 import { WorkspacePage } from "../layout/WorkspacePage";
@@ -41,7 +43,12 @@ import {
   getCachedClients,
   getCachedProducts,
 } from "../lib/offlineQueue";
-import { sortSalesNewestFirst } from "../lib/saleLabels";
+import { sortSalesNewestFirst, saleOrderCode } from "../lib/saleLabels";
+import {
+  clearStandaloneSaleDraft,
+  loadStandaloneSaleDraft,
+  saveStandaloneSaleDraft,
+} from "../lib/saleWizardDraft";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
 import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
 import { draftQuoteCode, buildQuoteLines, QuoteDocument } from "../components/QuoteDocument";
@@ -72,7 +79,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(() => loadStandaloneSaleDraft() != null);
   const [detailSale, setDetailSale] = useState<Sale | null>(null);
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -90,8 +97,11 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
-  const submitIntent = useRef<"quote" | "sale">("sale");
+  const [draftCode, setDraftCode] = useState(() => draftQuoteCode());
+  const [quoteCopied, setQuoteCopied] = useState(false);
+  const [issuedAt, setIssuedAt] = useState(() => new Date());
   const wasComposing = useRef(false);
+  const skipStandaloneSave = useRef(true);
 
   useEffect(() => {
     if (teamView || searchParams.get("nueva") !== "1") return;
@@ -149,13 +159,14 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       const name = sale.client?.name ?? "";
       const id = sale.client?.rif ?? sale.client?.ci ?? "";
       const seller = sellerNameById.get(sale.seller_id) ?? "";
-      return `${name} ${id} ${seller} OV-${sale.id}`.toLowerCase().includes(q);
+      return `${name} ${id} ${seller} ${saleOrderCode(sale)} OV-${sale.id}`.toLowerCase().includes(q);
     });
   }, [sales, query, sellerNameById]);
 
   useEffect(() => {
     if (!composing) {
       wasComposing.current = false;
+      skipStandaloneSave.current = true;
       return;
     }
     const justOpened = !wasComposing.current;
@@ -163,11 +174,31 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     let cancelled = false;
     setLoadingCatalog(true);
     if (justOpened) {
-      setLines([newQuoteLine()]);
-      setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
-      setIsCredit(false);
-      setWizardStep(0);
-      setFormError(null);
+      const draft = loadStandaloneSaleDraft();
+      if (draft) {
+        setClientId(draft.clientId);
+        setOrigin(draft.origin);
+        setLines(draft.lines.length ? draft.lines : [newQuoteLine()]);
+        setPayment(draft.payment);
+        setIsCredit(draft.isCredit);
+        setApplyIva(draft.applyIva);
+        setCurrency(draft.currency);
+        setNotes(draft.notes);
+        setWizardStep(draft.wizardStep);
+        setDraftCode(draft.draftCode);
+        setIssuedAt(new Date(draft.issuedAt));
+        setFormError(null);
+        setQuoteCopied(false);
+      } else {
+        setLines([newQuoteLine()]);
+        setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
+        setIsCredit(false);
+        setApplyIva(false);
+        setWizardStep(0);
+        setFormError(null);
+        setDraftCode(draftQuoteCode());
+        setIssuedAt(new Date());
+      }
     }
     (async () => {
       try {
@@ -186,7 +217,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           setClients(c);
           setProducts(p);
           setAccounts(banks);
-          if (c.length && clientId === "") setClientId(c[0].id);
+          setClientId((id) => (id === "" && c.length ? c[0].id : id));
           if (!c.length || !p.length) {
             setFormError("Catálogo incompleto en cache. Conéctate para sincronizar.");
           }
@@ -222,6 +253,40 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composing]);
 
+  useEffect(() => {
+    if (!composing) return;
+    if (skipStandaloneSave.current) {
+      skipStandaloneSave.current = false;
+      return;
+    }
+    saveStandaloneSaleDraft({
+      clientId,
+      origin,
+      wizardStep,
+      lines,
+      currency,
+      isCredit,
+      applyIva,
+      payment,
+      notes,
+      issuedAt: issuedAt.toISOString(),
+      draftCode,
+    });
+  }, [
+    composing,
+    clientId,
+    origin,
+    wizardStep,
+    lines,
+    currency,
+    isCredit,
+    applyIva,
+    payment,
+    notes,
+    issuedAt,
+    draftCode,
+  ]);
+
   const subtotal = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
   const money = useMemo(() => quoteMoney(subtotal, applyIva), [subtotal, applyIva]);
   const selectedClient = useMemo(
@@ -230,8 +295,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   );
   const quoteData = useMemo(
     () => ({
-      code: draftQuoteCode(0),
-      issuedAt: new Date(),
+      code: draftCode,
+      issuedAt,
       sellerName: user?.full_name ?? "Vendedor",
       client: selectedClient,
       clientFallback: selectedClient?.name ?? (clientId === "" ? "Cliente" : `Cliente #${clientId}`),
@@ -243,6 +308,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       applyIva,
     }),
     [
+      draftCode,
+      issuedAt,
       selectedClient,
       clientId,
       user?.full_name,
@@ -300,6 +367,44 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     setCurrency("USD");
     setPayment(emptyPaymentCapture());
     setWizardStep(0);
+    setQuoteCopied(false);
+    clearStandaloneSaleDraft();
+  }
+
+  async function copyQuote() {
+    setFormError(null);
+    setQuoteCopied(false);
+    if (clientId === "") {
+      setFormError("Selecciona un cliente");
+      return;
+    }
+    const items = quoteLinesToItems(lines);
+    if (!items.length) {
+      setFormError("Agrega al menos un producto");
+      return;
+    }
+    const client = clients.find((c) => c.id === clientId);
+    const draft = [
+      `COTIZACIÓN · ${client?.name ?? `Cliente #${clientId}`}`,
+      ...items.map((it) => {
+        const p = products.find((x) => x.id === it.product_id);
+        return `· ${p?.name ?? it.product_id} x${it.quantity} = $${(
+          (p ? Number(p.price_usd) : 0) * it.quantity
+        ).toFixed(2)}`;
+      }),
+      `Subtotal: ${formatQuoteAmount(money.subtotal, currency, fxRate)}`,
+      applyIva ? `IVA 16%: ${formatQuoteAmount(money.iva, currency, fxRate)}` : "Sin IVA",
+      `Total: ${formatQuoteAmount(money.total, currency, fxRate)}`,
+      notes.trim() ? `Nota: ${notes.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(draft);
+      setQuoteCopied(true);
+    } catch {
+      setFormError("No se pudo copiar la cotización. Revisa permisos del navegador.");
+    }
   }
 
   async function onSubmit(event: FormEvent) {
@@ -315,35 +420,6 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       return;
     }
 
-    if (submitIntent.current === "quote") {
-      const client = clients.find((c) => c.id === clientId);
-      const draft = [
-        `COTIZACIÓN · ${client?.name ?? `Cliente #${clientId}`}`,
-        ...items.map((it) => {
-          const p = products.find((x) => x.id === it.product_id);
-          return `· ${p?.name ?? it.product_id} x${it.quantity} = $${(
-            (p ? Number(p.price_usd) : 0) * it.quantity
-          ).toFixed(2)}`;
-        }),
-        `Subtotal: ${formatQuoteAmount(money.subtotal, currency, fxRate)}`,
-        applyIva ? `IVA 16%: ${formatQuoteAmount(money.iva, currency, fxRate)}` : "Sin IVA",
-        `Total: ${formatQuoteAmount(money.total, currency, fxRate)}`,
-        notes.trim() ? `Nota: ${notes.trim()}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
-      try {
-        await navigator.clipboard.writeText(draft);
-        setFormError(null);
-        setComposing(false);
-        setError(null);
-        window.alert("Cotización copiada al portapapeles. Confirma la venta cuando el cliente acepte.");
-      } catch {
-        setFormError("No se pudo copiar la cotización. Revisa permisos del navegador.");
-      }
-      return;
-    }
-
     if (!isCredit && !payment.payment_method) {
       setFormError("Selecciona forma de pago");
       return;
@@ -351,7 +427,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
     const quote_snapshot = serializeQuoteSnapshot({
       ...quoteData,
-      issuedAt: new Date(),
+      issuedAt,
     });
 
     const payload: SaleCreateInput = {
@@ -507,62 +583,29 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           open={composing}
           onClose={() => {
             if (shouldIgnoreOverlayClose()) return;
+            clearStandaloneSaleDraft();
             setComposing(false);
           }}
           size="wide"
           eyebrow="Nueva orden"
           title="Venta sin visita"
-          blurb="Cotiza o confirma · descuenta stock al confirmar"
           footer={
-            <div className="side-sheet-actions">
-              {wizardStep === 0 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={submitting}
-                  onClick={() => {
-                    if (shouldIgnoreOverlayClose()) return;
-                    setComposing(false);
-                  }}
-                >
-                  Cancelar
-                </Button>
-              ) : (
-                <Button type="button" variant="ghost" disabled={submitting} onClick={goBack}>
-                  Atrás
-                </Button>
-              )}
-              {wizardStep < 2 ? (
-                <Button type="button" variant="accent" disabled={submitting || loadingCatalog} onClick={goNext}>
-                  Siguiente
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    type="submit"
-                    form="sale-create-form"
-                    variant="secondary"
-                    disabled={submitting || loadingCatalog}
-                    onClick={() => {
-                      submitIntent.current = "quote";
-                    }}
-                  >
-                    Copiar cotización
-                  </Button>
-                  <Button
-                    type="submit"
-                    form="sale-create-form"
-                    variant="accent"
-                    disabled={submitting || loadingCatalog}
-                    onClick={() => {
-                      submitIntent.current = "sale";
-                    }}
-                  >
-                    {submitting ? "Guardando…" : "Confirmar venta"}
-                  </Button>
-                </>
-              )}
-            </div>
+            <WizardFooter
+              step={wizardStep}
+              submitting={submitting}
+              nextDisabled={loadingCatalog}
+              onBack={goBack}
+              primaryLabel={
+                wizardStep < 2
+                  ? "Siguiente"
+                  : submitting
+                    ? "Guardando…"
+                    : "Confirmar OV"
+              }
+              primaryType={wizardStep < 2 ? "button" : "submit"}
+              form={wizardStep < 2 ? undefined : "sale-create-form"}
+              onPrimary={wizardStep < 2 ? goNext : undefined}
+            />
           }
         >
           <form id="sale-create-form" className="sheet-form-stack" onSubmit={onSubmit}>
@@ -571,23 +614,23 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
             {wizardStep === 0 ? (
               <>
                 <div className="field">
-                  <label htmlFor="sale-client">Cliente</label>
-                  <select
+                  <span className="field-label" id="sale-client-label">
+                    Cliente
+                  </span>
+                  <SearchPickField
                     id="sale-client"
-                    className="input"
-                    value={clientId === "" ? "" : String(clientId)}
-                    onChange={(e) => setClientId(e.target.value ? Number(e.target.value) : "")}
-                    required
+                    labelledBy="sale-client-label"
+                    placeholder="Buscar cliente…"
+                    valueId={clientId === "" ? null : clientId}
                     disabled={loadingCatalog}
-                  >
-                    <option value="">Selecciona…</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.rif ? ` · ${c.rif}` : c.ci ? ` · CI ${c.ci}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    emptyLabel="Sin clientes que coincidan"
+                    options={clients.map((c) => ({
+                      id: c.id,
+                      title: c.name,
+                      subtitle: c.rif ? c.rif : c.ci ? `CI ${c.ci}` : undefined,
+                    }))}
+                    onChange={(id) => setClientId(id ?? "")}
+                  />
                 </div>
 
                 <div className="field">
@@ -707,6 +750,21 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
+                <div className="quote-copy-row">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={submitting}
+                    onClick={() => void copyQuote()}
+                  >
+                    Copiar cotización
+                  </Button>
+                  {quoteCopied ? (
+                    <p className="muted small" role="status">
+                      Copiada. Puedes confirmar la OV cuando el cliente acepte.
+                    </p>
+                  ) : null}
+                </div>
                 <QuoteDocument data={quoteData} asImage />
               </>
             ) : null}

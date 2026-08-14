@@ -1,6 +1,6 @@
 # Fase 4 — Homogeneizar UI móvil
 
-**Estado:** SF-4.0–4.3 hechas. Siguiente: SF-4.4 Inicio vendedor.  
+**Estado:** SF-4.0–4.6 hechas. Siguiente: SF-4.7 inventario/clientes.  
 **Fecha de arranque:** 2026-08-13  
 **No toca:** `startVisit`, `createVisitSale`, paleta EnRutas, Overlay Modal vs SideSheet.
 
@@ -207,70 +207,90 @@ La misma fila en vendedor y, luego, supervisor.
 
 ## SF-4.4 — Inicio vendedor
 
-**Estado:** pendiente  
-**Modelo:** GPT-5.6 Terra  
+**Estado:** hecho (2026-08-13)  
+**Modelo:** Grok 4.6  
 **Video:** 12-38 (Inicio)
 
 ### Objetivo
 Una historia del día, no el mismo 8/12 y 67% tres veces.
 
-### Qué hacer
-- Hero de ruta **o** KPIs, no hero + 4 tiles que repiten visitas/cobertura.
-- Agenda: mismas filas que SF-4.3, orden horario, más que `slice(0,3)` o “ver todas” claro a Visitas.
-- CTA al mapa grande (hoy el icono del hero es minúsculo). Ruta sigue **fuera** del tabbar.
-- Copy: “Lista para mover la ruta” → neutro (“Listo para la ruta” / “Tu ruta de hoy”).
-- Sin flash `0 de —` → `8/12`.
-- Cartera en Inicio: no duplicar Clientes; recortar o enlazar.
+### Qué se hizo
+- Un hero de ruta (próxima parada + barra + N de M). Sin 4 tiles que repetían visitas/cobertura.
+- Sin flash `0 de —`: “Cargando…” hasta tener datos; si no hay agenda, “Sin paradas hoy”.
+- Copy: **Listo para la ruta**. CTA **Ver mapa** a ancho completo (recorrido sigue fuera del tabbar).
+- Agenda: mismas `VisitRow`, todas las abiertas de hoy (horario). Enlace **Ver visitas**.
+- Cartera: una fila-enlace a Clientes, no el listado duplicado. El FAB `?nuevo=cliente` sigue abriendo el alta.
+
+### Cómo
+| Pieza | Ruta |
+|-------|------|
+| Inicio | `web/src/pages/HomePage.tsx` |
 
 ### Cómo probarlo
-Inicio: progreso una vez, 2–3 paradas con hora, tap al mapa obvio, sin cartera infinita debajo.
+Inicio: progreso una vez, paradas con hora, **Ver mapa** obvio, sin cartera infinita debajo.
 
 ---
 
 ## SF-4.5 — Mapa = lo agendado
 
-**Estado:** pendiente  
-**Modelo:** Grok 4.6 o GPT-5.6 (lógica clara)  
+**Estado:** hecho (2026-08-13)  
+**Modelo:** Grok 4.6  
 **Video:** 12-51 (recorrido)
 
 ### Objetivo
 El trazo y “Orden del día” son la ruta que el supervisor agendó.
 
-### Qué hacer
-- Ordenar con `scheduled_time` ASC (desempate: id / orden de asignación). **No** `orderDayRoute` greedy como trazo oficial.
-- Filtro del día: visitas **programadas hoy** (más en curso/cerradas de esa agenda). No meter historial ni PDVs de otro estado porque `visited_at` cae hoy.
-- Paradas sin pin: salen en la lista (“Sin pin”), no desaparecen. El polyline salta huecos.
-- `fitBounds` + clustering o pines al zoom; no etiquetas permanentes que se pisan.
-- Mapa más alto / edge-to-edge; leyenda corta; chrome de SF-4.2.
-- Un `en_curso` a la vez en producto (si hay dos, el mapa no los une como “siguiente tramo” geográfico inventado).
-- Seed demo: ruta Lara coherente (sin Kiosco Doña Carmen / duplicados de Bodega 24h en el mismo día).
+### Qué se hizo
+- Orden oficial: `scheduled_time` ASC (desempate `id`). `orderDayRoute` greedy ya no dibuja el trazo.
+- Filtro: `scheduled_date` = hoy. No entra historial cerrado hoy de otra fecha (`visited_at`).
+- Sin pin: la parada sigue en la lista («Sin pin»); el polyline salta el hueco.
+- Números del mapa = números de la lista. Hecho = línea teal continua; pendiente = coral punteada.
+- Mapa más alto / edge-to-edge en móvil. Leyenda corta. Sin 0% ni icono Leaflet por defecto al cargar.
+- Inicio y Ruta supervisor / mapa equipo usan el mismo slice de agenda. Seed Marina: 6 paradas Lara en hora.
 
-### Archivos probables
-`SellerRouteMapPage.tsx`, `web/src/lib/routeOrder.ts`, `HomePage.tsx` (conteos), `mvp/seed.py` (datos del día), quizá `TeamMapPage.tsx` alineado.
+### Cómo
+| Pieza | Ruta |
+|-------|------|
+| Orden | `web/src/lib/visitOrder.ts` (`sortVisitsRoute`, `isOnDayAgenda`) |
+| Mapa vendedor | `web/src/pages/SellerRouteMapPage.tsx` |
+| Conteo Inicio | `HomePage.tsx` (`scheduled_date`) |
+| Supervisor | `RouteDayPage.tsx`, `TeamMapPage.tsx` (trazo si hay un vendedor) |
+| Iconos | `web/src/lib/mapMarkers.ts` (sin marker-icon.png) |
 
 ### Cómo probarlo
-1. Orden del día = horas de Visitas/Agenda = números del mapa.
+1. Orden del día = horas de Visitas/Programadas = números del mapa.
 2. El trazo no vuela a Chivacoa/Acarigua si eso no está agendado hoy.
 3. 1. El Río → 2. Bodega 24h → 3. Mini Market… (hora), no Mini Market antes que Bodega por vecino cercano.
-4. Recarga: no flash 0% + triángulos naranjas de Leaflet (iconos custom desde el primer paint).
+4. Recarga: no flash 0% + triángulos naranjas de Leaflet.
 
 ---
 
 ## SF-4.6 — Wizard 1-2-3 pulido
 
-**Estado:** pendiente  
-**Modelo:** GPT-5.6 Terra  
+**Estado:** hecho (2026-08-13)  
+**Modelo:** Grok 4.6  
 **Video:** 12-56
 
 ### Objetivo
 Misma cotización, legible y estable en el teléfono.
 
-### Qué hacer
-- Nombres de producto completos (no `JABON · Jabón en p…`).
-- Un indicador de pasos: o `WizardSteps` o el blurb, no los dos compitiendo.
-- Footer: en móvil **Anterior** secundario; primario **Siguiente / Confirmar OV** siempre visible (teclado no lo tapa: `visualViewport` o scroll al foco).
-- Cuenta destino una vez (select; el hint no repite el mismo texto).
-- Wizard standalone (venta sin visita): mismo trato + cliente con búsqueda, no `<select>` nativo kilométrico.
+### Qué se hizo
+- Producto: buscador con **nombre completo** (SKU y stock como secundario). Ya no `JABON · Jabón en p…` en un `<select>`.
+- Un solo indicador: `WizardSteps`. Sin blurb “1 · 2 · 3”.
+- Footer: **Anterior** a la izquierda; **Siguiente / Confirmar OV** siempre visible. Cerrar con la X.
+- Teclado: el modal sigue `visualViewport`; el campo con foco hace scroll; el footer no queda detrás.
+- Cuenta destino: el select muestra el nombre; el hint (`pay_hint`) solo si no repite ese texto.
+- Venta sin visita: mismo footer + cliente con búsqueda. **Copiar cotización** vive en el paso 3, no en el footer.
+
+### Cómo
+| Pieza | Ruta |
+|-------|------|
+| Wizard visita | `web/src/components/VisitSaleWizard.tsx` |
+| Wizard mostrador | `web/src/pages/SalesPage.tsx` |
+| Cotizador | `web/src/components/SaleQuoter.tsx` |
+| Pago | `web/src/components/PaymentCapture.tsx` |
+| Modal / teclado | `web/src/components/Modal.tsx` |
+| Picker | `web/src/components/SearchPickField.tsx` |
 
 ### Cómo probarlo
 Repetir el video 12-56: 2 líneas + IVA + Zelle + resumen + Confirmar OV. Producto se lee entero. Teclado no esconde Confirmar.

@@ -10,7 +10,6 @@ import {
 import { newLocalUuid } from "../lib/offlineDb";
 import { getCachedProducts } from "../lib/offlineQueue";
 import type { BankAccount, CurrencyCode, Product, Sale, Visit } from "../lib/types";
-import { Button } from "./Button";
 import { Modal } from "./Modal";
 import {
   emptyPaymentCapture,
@@ -31,10 +30,16 @@ import {
   type QuoteLine,
 } from "./SaleQuoter";
 import { TextField } from "./TextField";
+import { WizardFooter } from "./WizardFooter";
 import { WizardSteps } from "./WizardSteps";
 import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
 import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
+import {
+  clearVisitSaleDraft,
+  loadVisitSaleDraft,
+  saveVisitSaleDraft,
+} from "../lib/saleWizardDraft";
 
 type Props = {
   visit: Visit;
@@ -65,29 +70,45 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
   const [payment, setPayment] = useState<PaymentCaptureValue>(() => emptyPaymentCapture());
   const [notes, setNotes] = useState("");
   const [fxRate, setFxRate] = useState<number | null>(null);
-  const [issuedAt] = useState(() => new Date());
+  const [issuedAt, setIssuedAt] = useState(() => new Date());
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wasOpen = useRef(false);
+  const skipDraftSave = useRef(true);
 
   useEffect(() => {
     if (!open) {
       wasOpen.current = false;
+      skipDraftSave.current = true;
       return;
     }
     const justOpened = !wasOpen.current;
     wasOpen.current = true;
     let cancelled = false;
     if (justOpened) {
-      setStep(0);
-      setLines([newQuoteLine()]);
-      setCurrency("USD");
-      setIsCredit(false);
-      setApplyIva(false);
-      setPayment(emptyPaymentCapture());
-      setNotes("");
-      setError(null);
+      const draft = loadVisitSaleDraft(visit.id);
+      if (draft) {
+        setStep(draft.step);
+        setLines(draft.lines.length ? draft.lines : [newQuoteLine()]);
+        setCurrency(draft.currency);
+        setIsCredit(draft.isCredit);
+        setApplyIva(draft.applyIva);
+        setPayment(draft.payment);
+        setNotes(draft.notes);
+        setIssuedAt(new Date(draft.issuedAt));
+        setError(null);
+      } else {
+        setStep(0);
+        setLines([newQuoteLine()]);
+        setCurrency("USD");
+        setIsCredit(false);
+        setApplyIva(false);
+        setPayment(emptyPaymentCapture());
+        setNotes("");
+        setIssuedAt(new Date());
+        setError(null);
+      }
     }
     setLoading(true);
     (async () => {
@@ -126,11 +147,30 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    if (skipDraftSave.current) {
+      skipDraftSave.current = false;
+      return;
+    }
+    saveVisitSaleDraft({
+      visitId: visit.id,
+      step,
+      lines,
+      currency,
+      isCredit,
+      applyIva,
+      payment,
+      notes,
+      issuedAt: issuedAt.toISOString(),
+    });
+  }, [open, visit.id, step, lines, currency, isCredit, applyIva, payment, notes, issuedAt]);
+
   const items = useMemo(() => quoteLinesToItems(lines), [lines]);
   const subtotal = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
   const money = useMemo(() => quoteMoney(subtotal, applyIva), [subtotal, applyIva]);
   const clientName = visit.client?.name ?? `Cliente #${visit.client_id}`;
-  const quoteCode = draftQuoteCode(Math.max(visit.id, 0), issuedAt);
+  const quoteCode = useMemo(() => draftQuoteCode(issuedAt), [issuedAt]);
 
   const quoteData: QuoteDocumentData = useMemo(
     () => ({
@@ -208,6 +248,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
         created_offline: false,
       });
       onSold(sale);
+      clearVisitSaleDraft();
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar la venta");
@@ -218,6 +259,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
 
   function requestClose() {
     if (shouldIgnoreOverlayClose()) return;
+    clearVisitSaleDraft();
     onClose();
   }
 
@@ -228,32 +270,17 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
       size="wide"
       eyebrow="Orden de venta"
       title={clientName}
-      blurb="1 Productos · 2 Pago · 3 Resumen. La visita sigue abierta."
       footer={
-        <div className="side-sheet-actions">
-          <Button type="button" variant="ghost" disabled={submitting} onClick={requestClose}>
-            Cancelar
-          </Button>
-          {step > 0 ? (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={submitting}
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
-            >
-              Anterior
-            </Button>
-          ) : null}
-          {step < 2 ? (
-            <Button type="button" variant="accent" disabled={loading || submitting} onClick={goNext}>
-              Siguiente
-            </Button>
-          ) : (
-            <Button type="button" variant="accent" disabled={submitting} onClick={() => void confirmSale()}>
-              {submitting ? "Registrando…" : "Confirmar OV"}
-            </Button>
-          )}
-        </div>
+        <WizardFooter
+          step={step}
+          submitting={submitting}
+          nextDisabled={loading}
+          onBack={() => setStep((s) => Math.max(0, s - 1))}
+          primaryLabel={
+            step < 2 ? "Siguiente" : submitting ? "Registrando…" : "Confirmar OV"
+          }
+          onPrimary={step < 2 ? goNext : () => void confirmSale()}
+        />
       }
     >
       <div className="sheet-form-stack">

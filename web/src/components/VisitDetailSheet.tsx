@@ -9,6 +9,8 @@ import { SaleDetailSheet } from "./SaleDetailSheet";
 import { VisitMapSheet } from "./VisitMapSheet";
 import { VisitSaleWizard } from "./VisitSaleWizard";
 import { formatDateTime, todayISO } from "../lib/caracasTime";
+import { saleOrderCode } from "../lib/saleLabels";
+import { hasVisitSaleDraft } from "../lib/saleWizardDraft";
 import { isVisitOverdue } from "../lib/visitOrder";
 import { ApiError, cancelVisit, pinVisitGps, startVisit } from "../lib/api";
 import { coordsFromClient, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
@@ -61,7 +63,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
     setError(null);
     setGpsOk(null);
     setClosing(false);
-    setSelling(false);
+    setSelling((prev) => prev || hasVisitSaleDraft(visit.id));
     setShowMap(false);
     setViewSaleDoc(false);
     setConfirmCancel(false);
@@ -268,7 +270,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
             >
               <div className="visit-sale-confirmed-copy">
                 <p className="eyebrow">Orden de venta</p>
-                <strong>OV-{sale.id}</strong>
+                <strong>{saleOrderCode(sale)}</strong>
                 <div className="visit-sale-metrics">
                   <div>
                     <span className="muted small">Total</span>

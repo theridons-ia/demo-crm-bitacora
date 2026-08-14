@@ -12,6 +12,17 @@ Necesitas **3 piezas** corriendo a la vez:
 
 Usa **3 terminales** (o deja 2 en background). No mezcles los comandos en el mismo directorio sin cambiar de carpeta.
 
+Tras un **apagón** ya no hace falta pegar esos comandos a mano: Docker arranca solo, Postgres tiene `restart: unless-stopped`, y crontab `@reboot` corre `scripts/enrutas-boot.sh` (API + Vite HTTPS).
+
+```bash
+~/demo-crm-bitacora/scripts/enrutas-status.sh   # ¿está todo arriba?
+~/demo-crm-bitacora/scripts/enrutas-boot.sh     # levantar ahora (idempotente)
+~/demo-crm-bitacora/scripts/enrutas-down.sh     # bajar API y web
+~/demo-crm-bitacora/scripts/enrutas-down.sh --db  # también Postgres
+```
+
+Logs: `~/demo-crm-bitacora/logs/{boot,api,web}.log`.
+
 ---
 
 ## 0. Una sola vez (solo si es máquina nueva)
@@ -189,7 +200,22 @@ Para detener Vite: `Ctrl+C` en esa terminal.
 
 ## Checklist rápido (después de un apagón)
 
-Copia y pega en orden:
+En esta máquina el arranque es **automático** (crontab `@reboot` → `scripts/enrutas-boot.sh`). Espera ~30–60 s a que Docker y Postgres suban, luego:
+
+```bash
+~/demo-crm-bitacora/scripts/enrutas-status.sh
+```
+
+Debes ver `5432`, `8090`, `5173` y `{"ok":true,...}` en health.
+
+Si algo no levantó:
+
+```bash
+~/demo-crm-bitacora/scripts/enrutas-boot.sh
+tail -50 ~/demo-crm-bitacora/logs/boot.log
+```
+
+Arranque manual (sin crontab), en orden:
 
 ```bash
 # 1) DB

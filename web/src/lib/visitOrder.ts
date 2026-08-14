@@ -38,6 +38,20 @@ export function sortVisitsAgenda(list: Visit[], today?: string): Visit[] {
   });
 }
 
+/** Visita del plan de ese día Caracas (no historial cerrado hoy de otra fecha). */
+export function isOnDayAgenda(visit: Visit, day: string): boolean {
+  return visit.status !== "cancelada" && visit.scheduled_date === day;
+}
+
+/** Trazo oficial del día: `scheduled_time` ASC, desempate id. Incluye culminadas. */
+export function sortVisitsRoute(list: Visit[]): Visit[] {
+  return [...list].sort((a, b) => {
+    const d = scheduledStamp(a) - scheduledStamp(b);
+    if (d !== 0) return d;
+    return a.id - b.id;
+  });
+}
+
 /** Hechas / canceladas: más reciente primero. */
 export function sortVisitsHistory(list: Visit[]): Visit[] {
   return [...list].sort((a, b) => historyStamp(b) - historyStamp(a));

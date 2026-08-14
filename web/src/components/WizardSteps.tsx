@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 type Props = {
   steps: { id: string; label: string }[];
   current: number;
@@ -6,8 +8,15 @@ type Props = {
 
 /** Rail visual 1 ——— 2 ——— 3 para wizards (venta, alta visita…). */
 export function WizardSteps({ steps, current, className = "" }: Props) {
+  const ref = useRef<HTMLOListElement>(null);
+
+  useEffect(() => {
+    const body = ref.current?.closest(".app-modal-body");
+    if (body instanceof HTMLElement) body.scrollTop = 0;
+  }, [current]);
+
   return (
-    <ol className={`wizard-steps ${className}`.trim()} aria-label="Pasos">
+    <ol ref={ref} className={`wizard-steps ${className}`.trim()} aria-label="Pasos">
       {steps.map((step, index) => {
         const n = index + 1;
         const state = index < current ? "done" : index === current ? "active" : "todo";

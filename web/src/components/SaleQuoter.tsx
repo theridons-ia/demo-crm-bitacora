@@ -2,6 +2,7 @@ import { Package, Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { formatQuoteAmount, IVA_RATE, quoteMoney, roundMoney } from "../lib/quoteMoney";
 import type { CurrencyCode, Product } from "../lib/types";
+import { SearchPickField } from "./SearchPickField";
 
 export type QuoteLine = {
   key: string;
@@ -116,13 +117,22 @@ export function SaleQuoter({
                   <span className="stock-product-icon" aria-hidden>
                     <Package size={16} />
                   </span>
-                  <select
-                    className="input sale-quoter-select"
-                    value={line.productId ?? ""}
-                    disabled={disabled}
+                  <SearchPickField
+                    id={`ql-prod-${line.key}`}
                     aria-label="Producto"
-                    onChange={(e) => {
-                      const id = e.target.value ? Number(e.target.value) : null;
+                    placeholder="Elegir producto…"
+                    valueId={line.productId}
+                    disabled={disabled}
+                    emptyLabel="Sin producto con stock"
+                    options={(product && !opts.some((p) => p.id === product.id)
+                      ? [product, ...opts]
+                      : opts
+                    ).map((p) => ({
+                      id: p.id,
+                      title: p.name,
+                      subtitle: `${p.sku} · stock ${p.stock}`,
+                    }))}
+                    onChange={(id) => {
                       const next = id != null ? byId.get(id) : undefined;
                       updateLine(line.key, {
                         productId: id,
@@ -131,19 +141,7 @@ export function SaleQuoter({
                           : 1,
                       });
                     }}
-                  >
-                    <option value="">Elegir producto…</option>
-                    {opts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.sku} · {p.name} (stock {p.stock})
-                      </option>
-                    ))}
-                    {product && !opts.some((p) => p.id === product.id) ? (
-                      <option value={product.id}>
-                        {product.sku} · {product.name}
-                      </option>
-                    ) : null}
-                  </select>
+                  />
                   <button
                     type="button"
                     className="sale-quoter-remove"

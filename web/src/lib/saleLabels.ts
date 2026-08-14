@@ -36,3 +36,15 @@ export function sortSalesNewestFirst(sales: Sale[]): Sale[] {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 }
+
+/** Código de OV confirmada (snapshot) o fallback OV-{id} en ventas viejas. */
+export function saleOrderCode(sale: Sale): string {
+  if (!sale.quote_snapshot?.trim()) return `OV-${sale.id}`;
+  try {
+    const data = JSON.parse(sale.quote_snapshot) as { code?: unknown };
+    if (typeof data?.code === "string" && data.code.trim()) return data.code.trim();
+  } catch {
+    /* snapshot viejo o corrupto */
+  }
+  return `OV-${sale.id}`;
+}

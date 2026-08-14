@@ -1,6 +1,7 @@
 # Root gitignore — Bitácora Campo
 .DS_Store
 *.log
+logs/
 
 # Python / MVP
 mvp/.venv/

@@ -107,9 +107,9 @@ Detalle y videos: [`implementacion/FASE-4-UI-MOVIL.md`](implementacion/FASE-4-UI
 | **SF-4.1** | Quemaduras | Galería (no solo cámara); Cancelar picker no cierra wizard; `Total $` simple | hecho |
 | **SF-4.2** | Chrome + FAB | Fold usable; un solo `+`; FAB no tapa CTAs | hecho |
 | **SF-4.3** | Una fila de visita | `VisitRow` en agenda / Visitas / mapa | hecho |
-| **SF-4.4** | Inicio vendedor | Un progreso; agenda horaria; CTA mapa | pendiente |
-| **SF-4.5** | Mapa = agendado | Trazo y números = `scheduled_time`; seed del día limpio | pendiente |
-| **SF-4.6** | Wizard 1-2-3 | Nombres, footer, teclado, cuenta una vez | pendiente |
+| **SF-4.4** | Inicio vendedor | Un progreso; agenda horaria; CTA mapa | hecho |
+| **SF-4.5** | Mapa = agendado | Trazo y números = `scheduled_time`; seed del día limpio | hecho |
+| **SF-4.6** | Wizard 1-2-3 | Nombres, footer, teclado, cuenta una vez | hecho |
 | **SF-4.7** | Densidad catálogo | Inventario compacto; cliente una acción | pendiente |
 | **SF-4.8** | Supervisor móvil | Mismas piezas 4.3–4.5; Ruta/Visitas/Mapa = lentes | pendiente |
 
@@ -131,9 +131,28 @@ Siguientes SF se abren al cerrar Fase 4: modelo `Route`, UI supervisor (tarjeta 
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-4.3** (`VisitRow`). Incluye 4.2 + hora Caracas + docs ruta semanal si aún no estaban en remoto.
+**Listo para commit / tu push:** **SF-4.6** wizard 1-2-3 (y lo anterior de 4.4/4.5/logo/boot si aún no estaba).
 
-**Siguiente:** **SF-4.4** Inicio vendedor. Luego 4.5 mapa = agendado.
+**Siguiente:** **SF-4.7** densidad inventario/clientes. Luego 4.8 supervisor.
+
+### Cómo verificar SF-4.4
+
+1. Inicio: un hero (N de M + %). No 4 tarjetas que repiten lo mismo.
+2. **Ver mapa** grande. Agenda con filas de visita (todas las abiertas de hoy).
+3. Sin listado largo de clientes; una fila a Cartera. No aparece `0 de —` al cargar.
+
+### Cómo verificar SF-4.6
+
+1. Visita en curso → Registrar venta: nombres de producto enteros; un solo rail 1-2-3.
+2. Footer: **Siguiente** / **Confirmar OV** visible; al abrir teclado en Referencia no tapa Confirmar.
+3. Zelle: cuenta una vez; el hint no copia el mismo nombre.
+4. Ventas → nueva OV sin visita: buscar cliente (no combo nativo kilométrico).
+
+### Cómo verificar SF-4.5
+
+1. Recorrido: Orden del día 1 El Río 08:00 → 2 Bodega 09:15 → … igual que los números del mapa.
+2. El trazo no salta a Yaracuy si no está agendado hoy.
+3. Recarga: sin 0% ni triángulos naranjas de Leaflet.
 
 ### Cómo verificar SF-4.3
 

@@ -1,48 +1,19 @@
-import {
-  ArrowUpRight,
-  Calendar,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardList,
-  DollarSign,
-  MapPin,
-  Plus,
-  Route,
-  Search,
-} from "lucide-react";
+import { ChevronRight, MapPin } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Button } from "../components/Button";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
-import { MetricGrid, MetricTile } from "../components/MetricTile";
-import { TextField } from "../components/TextField";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
 import { PageWorkspace } from "../layout/PageWorkspace";
 import { ApiError, fetchClients, fetchSales, fetchVisits } from "../lib/api";
 import { formatLongDate, isSameCaracasDay, todayISO } from "../lib/caracasTime";
 import { getCachedClients } from "../lib/offlineQueue";
-import { sortVisitsAgenda } from "../lib/visitOrder";
-import type { Client, Sale, Visit, VisitStatus } from "../lib/types";
+import { isOnDayAgenda, sortVisitsAgenda } from "../lib/visitOrder";
+import type { Client, Sale, Visit } from "../lib/types";
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function visitBadge(status: VisitStatus | null): { label: string; className: string } | null {
-  if (!status) return { label: "Pendiente", className: "badge badge-accent" };
-  if (status === "completada") return { label: "Visitado", className: "badge badge-success" };
-  if (status === "en_curso") return { label: "Próxima", className: "badge badge-progress" };
-  if (status === "programada") return { label: "Próxima", className: "badge badge-progress" };
-  return null;
-}
-
-/** Inicio vendedor — workspace con panel derecho al ras. */
+/** Inicio vendedor — una historia del día (SF-4.4). */
 export function HomePage() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
@@ -50,10 +21,8 @@ export function HomePage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
   const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -76,7 +45,7 @@ export function HomePage() {
       try {
         const [clientData, visitData, saleData] = await Promise.all([
           navigator.onLine ? fetchClients() : getCachedClients(),
-          navigator.onLine ? fetchVisits({ day }).catch(() => []) : Promise.resolve([]),
+          navigator.onLine ? fetchVisits({ scheduled_date: day }).catch(() => []) : Promise.resolve([]),
           navigator.onLine ? fetchSales().catch(() => []) : Promise.resolve([]),
         ]);
         if (cancelled) return;
@@ -99,22 +68,11 @@ export function HomePage() {
     };
   }, [day]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter((c) =>
-      `${c.name} ${c.rif ?? ""} ${c.ci ?? ""} ${c.state ?? ""} ${c.address ?? ""}`
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [clients, query]);
-
   const dayVisits = useMemo(
-    () => visits.filter((v) => v.status !== "cancelada"),
-    [visits],
+    () => visits.filter((v) => isOnDayAgenda(v, day)),
+    [visits, day],
   );
   const completed = dayVisits.filter((v) => v.status === "completada").length;
-  const inProgress = dayVisits.filter((v) => v.status === "en_curso").length;
   const totalDay = dayVisits.length;
   const coverage = totalDay ? Math.round((completed / totalDay) * 100) : 0;
 
@@ -132,31 +90,22 @@ export function HomePage() {
 
   const upcoming = useMemo(
     () => sortVisitsAgenda(dayVisits.filter((v) => v.status === "programada" || v.status === "en_curso"), day),
-    [dayVisits],
+    [dayVisits, day],
   );
-  const agendaPreview = upcoming.slice(0, 3);
 
-  const visitStatusByClient = useMemo(() => {
-    const map = new Map<number, VisitStatus>();
-    for (const v of dayVisits) {
-      const prev = map.get(v.client_id);
-      if (!prev) {
-        map.set(v.client_id, v.status);
-        continue;
-      }
-      // Prefer en_curso > programada > completada for badge
-      const rank = (s: VisitStatus) =>
-        s === "en_curso" ? 3 : s === "programada" ? 2 : s === "completada" ? 1 : 0;
-      if (rank(v.status) > rank(prev)) map.set(v.client_id, v.status);
-    }
-    return map;
-  }, [dayVisits]);
+  const routeTitle = loading
+    ? "Tu ruta de hoy"
+    : nextVisit
+      ? (nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`)
+      : totalDay
+        ? "Ruta del día lista"
+        : "Nada agendado hoy";
 
-  const routeTitle = nextVisit
-    ? (nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`)
+  const progressLabel = loading
+    ? "Cargando…"
     : totalDay
-      ? "Ruta del día en marcha"
-      : "Tu ruta comienza aquí";
+      ? `${completed} de ${totalDay} paradas`
+      : "Sin paradas hoy";
 
   return (
     <>
@@ -165,158 +114,66 @@ export function HomePage() {
           <div>
             <p className="eyebrow">{formatLongDate()}</p>
             <h1>Hola{firstName ? `, ${firstName}` : ""}</h1>
-            <p className="greeting-sub">Lista para mover la ruta.</p>
+            <p className="greeting-sub">Listo para la ruta</p>
           </div>
         </div>
 
         <section className="route-card" aria-label="Tu ruta de hoy">
-          <Link to="/app/ruta" className="route-card-link">
-            <div className="route-card-top">
-              <p className="label">Tu ruta de hoy</p>
-              <span className="route-arrow" aria-hidden>
-                <ArrowUpRight size={18} strokeWidth={2.4} />
-              </span>
-            </div>
-            <h2>{routeTitle}</h2>
+          <p className="label">Tu ruta de hoy</p>
+          <h2>{routeTitle}</h2>
+          {loading ? null : (
             <div className="progress-track" aria-hidden>
               <div className="progress-fill" style={{ width: `${Math.min(100, coverage)}%` }} />
             </div>
-            <div className="route-meta">
-              <span>
-                {completed} de {totalDay || "—"} visitas registradas
-              </span>
-              <strong>{coverage}%</strong>
-            </div>
+          )}
+          <div className="route-meta">
+            <span>{progressLabel}</span>
+            {!loading && totalDay ? <strong>{coverage}%</strong> : null}
+          </div>
+          {!loading && salesToday > 0 ? (
+            <p className="route-sales">Ventas hoy ${salesToday.toFixed(0)}</p>
+          ) : null}
+          <Link to="/app/ruta" className="btn btn-accent route-map-cta">
+            <MapPin size={18} />
+            Ver mapa
           </Link>
         </section>
-
-        <MetricGrid aria-label="Resumen del día" className="home-kpis">
-          <MetricTile
-            label="Ventas hoy"
-            value={`$${salesToday.toFixed(0)}`}
-            icon={DollarSign}
-            tone="solid"
-          />
-          <MetricTile
-            label="Visitas"
-            value={`${completed}/${totalDay || "—"}`}
-            icon={Route}
-            hint="completadas hoy"
-          />
-          <MetricTile
-            label="Cobertura"
-            value={`${coverage}%`}
-            icon={CheckCircle2}
-            tone="success"
-          />
-          <MetricTile
-            label="En curso"
-            value={inProgress}
-            icon={ClipboardList}
-            tone="accent"
-          />
-        </MetricGrid>
 
         <section className="card seller-panel home-agenda">
           <div className="seller-panel-head">
             <div>
               <h2 className="section-heading">Agenda de hoy</h2>
-              <p className="muted small">{upcoming.length} paradas abiertas</p>
+              <p className="muted small">
+                {loading ? "…" : `${upcoming.length} abierta${upcoming.length === 1 ? "" : "s"}`}
+              </p>
             </div>
-            <Calendar size={18} aria-hidden color="var(--muted-foreground)" />
+            <Link to="/app/visitas" className="link-accent">
+              Ver visitas
+            </Link>
           </div>
 
-          {agendaPreview.length === 0 ? (
+          {error ? <p className="form-error">{error}</p> : null}
+          {loading ? <p className="muted list-loading">Cargando…</p> : null}
+          {!loading && upcoming.length === 0 ? (
             <p className="muted">No hay visitas abiertas para hoy.</p>
           ) : (
             <ul className="visit-row-list">
-              {agendaPreview.map((v) => (
+              {upcoming.map((v) => (
                 <VisitRow key={v.id} visit={v} onClick={() => setDetailVisit(v)} />
               ))}
             </ul>
           )}
-
-          <Link to="/app/ruta" className="btn btn-secondary">
-            <MapPin size={18} />
-            Ver recorrido completo
-          </Link>
         </section>
 
-        <section className="card seller-panel">
-          <div className="seller-panel-head">
-            <div>
-              <h2 className="section-heading">Mi cartera</h2>
-              <p className="muted small">
-                {clients.length} cliente{clients.length === 1 ? "" : "s"} · los más recientes primero
-              </p>
-            </div>
-            <Button
-              variant="accent"
-              className="seller-new-client"
-              onClick={() => {
-                setEditingClient(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus size={18} />
-              Nuevo cliente
-            </Button>
-          </div>
-
-          <div className="search-row">
-            <Search size={18} className="search-icon" aria-hidden />
-            <TextField
-              id="clients-search"
-              label="Buscar cliente"
-              placeholder="Buscar cliente o dirección…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-
-          {loading ? <p className="muted">Cargando…</p> : null}
-          {error ? <p className="form-error">{error}</p> : null}
-
-          {!loading && !error && filtered.length === 0 ? (
-            <p className="muted">No hay coincidencias. Prueba otra búsqueda o crea un cliente.</p>
-          ) : null}
-
-          <ul className="client-card-list">
-            {filtered.map((client) => {
-              const highlight = justCreatedId === client.id;
-              const badge = visitBadge(visitStatusByClient.get(client.id) ?? null);
-              return (
-                <li key={client.id}>
-                  <button
-                    type="button"
-                    className={`client-card${highlight ? " is-new" : ""}`}
-                    onClick={() => setSelected(client)}
-                  >
-                    <span className="client-avatar" aria-hidden>
-                      {initials(client.name)}
-                    </span>
-                    <span className="client-card-body">
-                      <span className="client-card-top">
-                        <strong>{client.name}</strong>
-                        {badge ? <span className={badge.className}>{badge.label}</span> : null}
-                      </span>
-                      <span className="muted small">
-                        {client.state ?? "—"}
-                        {client.address ? ` · ${client.address}` : ""}
-                      </span>
-                    </span>
-                    <ChevronRight className="client-card-chevron" size={18} aria-hidden />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-
-          <Link to="/app/clientes" className="link-accent" style={{ marginTop: "0.35rem" }}>
-            <ClipboardList size={16} style={{ verticalAlign: "-3px", marginRight: 4 }} />
-            Ver cartera completa
-          </Link>
-        </section>
+        <Link to="/app/clientes" className="home-cartera-link">
+          <span>
+            Mi cartera
+            <em>
+              {clients.length} PDV{clients.length === 1 ? "" : "s"}
+            </em>
+          </span>
+          <ChevronRight size={18} aria-hidden />
+        </Link>
       </PageWorkspace>
 
       <ClientForm
@@ -327,8 +184,6 @@ export function HomePage() {
           setEditingClient(null);
         }}
         onSaved={(client) => {
-          setQuery("");
-          setJustCreatedId(client.id);
           setClients((prev) => {
             const without = prev.filter((c) => c.id !== client.id);
             return [client, ...without];

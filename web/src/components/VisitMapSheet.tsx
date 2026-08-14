@@ -213,8 +213,8 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
         </span>
       </div>
 
-      <div className="card visit-map-card">
-        <div ref={mapEl} className="visit-map" />
+      <div className="map-stage">
+        <div ref={mapEl} className="map-stage-canvas is-sheet" />
       </div>
     </Modal>
   );

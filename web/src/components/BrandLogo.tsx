@@ -11,10 +11,10 @@ export function BrandLogo({ size = 40, className = "", withWordmark = false }: P
   return (
     <span className={`brand-logo ${withWordmark ? "brand-logo-row" : ""} ${className}`.trim()}>
       <img
-        src="/brand/enrutas-logo.svg"
+        src="/brand/enrutas-logo.png"
         alt=""
         width={size}
-        height={Math.round(size * (140 / 120))}
+        height={Math.round(size * (512 / 430))}
         className="brand-logo-img"
         decoding="async"
       />

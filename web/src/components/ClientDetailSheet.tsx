@@ -124,7 +124,7 @@ export function ClientDetailSheet({ client, open, onClose, onEdit }: Props) {
                 <MapPin size={14} style={{ verticalAlign: "middle" }} />{" "}
                 {Number(client.latitude).toFixed(5)}, {Number(client.longitude).toFixed(5)}
               </p>
-              <div className="client-pick-map-wrap">
+              <div className="map-stage">
                 <div ref={mapEl} className="client-detail-map" />
               </div>
             </>

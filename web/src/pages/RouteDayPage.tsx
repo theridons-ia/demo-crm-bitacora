@@ -25,6 +25,7 @@ import {
   unassignVisit,
 } from "../lib/api";
 import { todayISO } from "../lib/caracasTime";
+import { sortVisitsRoute } from "../lib/visitOrder";
 import type { Client, User, Visit, VisitStatus } from "../lib/types";
 
 function clientLabel(client: Client): string {
@@ -86,7 +87,7 @@ export function RouteDayPage() {
   }, []);
 
   const loadDay = useCallback(async (day: string) => {
-    const list = await fetchVisits({ day });
+    const list = await fetchVisits({ scheduled_date: day });
     setVisits(list.filter((v) => v.status !== "cancelada"));
   }, []);
 
@@ -115,7 +116,7 @@ export function RouteDayPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return visits.filter((v) => {
+    const next = visits.filter((v) => {
       if (sellerFilter !== "all" && v.seller_id !== sellerFilter) return false;
       if (statusFilter !== "all" && v.status !== statusFilter) return false;
       if (!q) return true;
@@ -123,6 +124,7 @@ export function RouteDayPage() {
       const client = v.client?.name ?? "";
       return `${client} ${seller} ${v.description ?? ""}`.toLowerCase().includes(q);
     });
+    return sortVisitsRoute(next);
   }, [visits, sellerFilter, statusFilter, query, sellerNameById]);
 
   const metrics = useMemo(() => {

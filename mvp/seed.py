@@ -606,7 +606,7 @@ MARINA_OVERDUE_MARKER = "Sin asistir ·"
 
 
 def sync_marina_today_route(db, users: dict[str, User], products: list[Product]) -> None:
-    """Marina: exactamente 6 visitas hoy — 3 cerradas + 3 pendientes (mapa sólido/punteado).
+    """Marina: exactamente 6 visitas hoy en Lara, orden horario (mapa = agenda).
 
     Se puede re-ejecutar: regenera la ruta del día de Marina.
     """

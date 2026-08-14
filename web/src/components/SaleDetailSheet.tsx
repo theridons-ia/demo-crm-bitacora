@@ -8,6 +8,7 @@ import {
   PAYMENT_METHOD_LABEL,
   SALE_ORIGIN_LABEL,
   saleItemCount,
+  saleOrderCode,
   saleUnitCount,
 } from "../lib/saleLabels";
 import {
@@ -71,7 +72,7 @@ export function SaleDetailSheet({
     const snap = parseQuoteSnapshot(sale.quote_snapshot);
     if (snap) {
       const data = snapshotToQuoteDocumentData(snap);
-      data.code = `OV-${sale.id}`;
+      data.code = saleOrderCode(sale);
       return data;
     }
     return buildQuoteDataFromSale(sale, products, sellerName ?? "Vendedor");
@@ -91,7 +92,7 @@ export function SaleDetailSheet({
       onClose={onClose}
       size="wide"
       eyebrow="Orden de venta"
-      title={`OV-${sale.id}`}
+      title={saleOrderCode(sale)}
       blurb={`${formatSaleWhen(sale.created_at)} · ${SALE_ORIGIN_LABEL[sale.origin]}`}
       footer={
         <div className="side-sheet-actions">

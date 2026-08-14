@@ -1,15 +1,24 @@
-import { Download, Image as ImageIcon } from "lucide-react";
+import { Download, Image as ImageIcon, Printer } from "lucide-react";
 import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
+  type Ref,
 } from "react";
 import { formatDateTime } from "../lib/caracasTime";
 import { formatQuoteAmount, IVA_RATE, quoteMoney } from "../lib/quoteMoney";
+import {
+  armFilePickerGuard,
+  settleFilePickerGuard,
+} from "../lib/overlayGuard";
 import type { Client, CurrencyCode, Product } from "../lib/types";
+import { createPortal } from "react-dom";
+import { QUOTE_CAPTURE_CSS } from "../lib/quoteCaptureCss";
 import { Button } from "./Button";
+import { QuoteDocViewer } from "./QuoteDocViewer";
 import type { QuoteLine } from "./SaleQuoter";
 
 export type QuoteDocLine = {
@@ -55,6 +64,7 @@ export type QuoteDocumentData = {
 export type QuoteDocumentHandle = {
   downloadPng: () => Promise<void>;
   downloadPdf: () => Promise<void>;
+  printDoc: () => Promise<void>;
 };
 
 type Props = {
@@ -65,17 +75,7 @@ type Props = {
   className?: string;
 };
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/** Código de cotización provisional COT-AAMMDD-#### */
-export function draftQuoteCode(visitId: number, when = new Date()): string {
-  const yy = String(when.getFullYear()).slice(-2);
-  const mm = pad2(when.getMonth() + 1);
-  const dd = pad2(when.getDate());
-  return `COT-${yy}${mm}${dd}-${String(visitId).padStart(4, "0")}`;
-}
+export { draftQuoteCode } from "../lib/saleCode";
 
 export function buildQuoteLines(
   lines: QuoteLine[],
@@ -99,25 +99,117 @@ export function buildQuoteLines(
   return out;
 }
 
-async function canvasFromNode(node: HTMLElement) {
-  const imgs = Array.from(node.querySelectorAll("img"));
-  await Promise.all(
+const LETTER_W = 794;
+
+async function waitPaint() {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function waitImages(root: ParentNode) {
+  const imgs = Array.from(root.querySelectorAll("img"));
+  if (!imgs.length) return Promise.resolve();
+  return Promise.all(
     imgs.map((img) =>
-      img.complete
+      img.complete && img.naturalWidth
         ? Promise.resolve()
         : new Promise<void>((resolve) => {
             img.addEventListener("load", () => resolve(), { once: true });
             img.addEventListener("error", () => resolve(), { once: true });
           }),
     ),
+  ).then(() => undefined);
+}
+
+function absolutizeImages(root: HTMLElement) {
+  const base = window.location.href;
+  root.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (!src || src.startsWith("data:") || src.startsWith("blob:")) return;
+    img.src = new URL(src, base).href;
+  });
+}
+
+async function canvasFromNode(node: HTMLElement) {
+  await waitImages(node);
+  await waitPaint();
+
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText =
+    "position:fixed;left:-14000px;top:0;width:794px;height:1123px;border:0;opacity:1;pointer-events:none;z-index:-1";
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument;
+  if (!idoc) {
+    iframe.remove();
+    throw new Error("No se pudo preparar el documento");
+  }
+  idoc.open();
+  idoc.write(
+    `<!doctype html><html><head><meta charset="utf-8"><base href="${window.location.origin}/"><style>${QUOTE_CAPTURE_CSS}</style></head><body></body></html>`,
   );
+  idoc.close();
+
+  const clone = node.cloneNode(true) as HTMLElement;
+  clone.classList.add("quote-doc");
+  absolutizeImages(clone);
+  idoc.body.appendChild(clone);
+  await waitImages(clone);
+  await waitPaint();
+
   const { default: html2canvas } = await import("html2canvas");
-  return html2canvas(node, {
+  const opts = {
     scale: 2,
     backgroundColor: "#ffffff",
-    useCORS: true,
     logging: false,
-  });
+    imageTimeout: 4000,
+    useCORS: true,
+    allowTaint: false,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: LETTER_W,
+    windowHeight: Math.max(1123, clone.scrollHeight || 1123),
+  };
+  try {
+    try {
+      return await html2canvas(clone, opts);
+    } catch {
+      return await html2canvas(clone, {
+        ...opts,
+        allowTaint: true,
+        ignoreElements: (el) => el.tagName === "IMG",
+      });
+    }
+  } finally {
+    iframe.remove();
+  }
+}
+
+function canvasToPng(canvas: HTMLCanvasElement): string {
+  try {
+    return canvas.toDataURL("image/png");
+  } catch {
+    return canvas.toDataURL("image/jpeg", 0.92);
+  }
+}
+
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 8_000);
+}
+
+async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
+  const res = await fetch(dataUrl);
+  return res.blob();
 }
 
 /**
@@ -130,8 +222,10 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
     ref,
   ) {
     const sheetRef = useRef<HTMLDivElement>(null);
-    const [busy, setBusy] = useState<"png" | "pdf" | null>(null);
+    const [busy, setBusy] = useState<"png" | "pdf" | "print" | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [previewError, setPreviewError] = useState<string | null>(null);
 
     const applyIva = Boolean(data.applyIva);
     const money = quoteMoney(
@@ -163,99 +257,200 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
       address: data.issuer?.address?.trim() || DEFAULT_QUOTE_ISSUER.address,
     };
 
-    async function downloadPng() {
-      setBusy("png");
+    const captureKey = useMemo(
+      () =>
+        [
+          data.code,
+          data.currency,
+          data.applyIva ? "1" : "0",
+          data.isCredit ? "1" : "0",
+          data.notes ?? "",
+          String(data.fxRate ?? ""),
+          data.sellerName,
+          data.lines.map((l) => `${l.sku}:${l.quantity}:${l.lineUsd}`).join("|"),
+        ].join("~"),
+      [data],
+    );
+
+    async function blobFromPreview(): Promise<Blob> {
+      if (previewUrl) return blobFromDataUrl(previewUrl);
+      if (!sheetRef.current) throw new Error("Sin documento");
+      const canvas = await canvasFromNode(sheetRef.current);
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, "image/png");
+      });
+      if (!blob) throw new Error("No se pudo generar la imagen");
       try {
-        let href = previewUrl;
-        if (!href) {
-          if (!sheetRef.current) return;
-          const canvas = await canvasFromNode(sheetRef.current);
-          href = canvas.toDataURL("image/png");
-        }
-        const a = document.createElement("a");
-        a.href = href;
-        a.download = `${data.code}.png`;
-        a.click();
+        setPreviewUrl(canvasToPng(canvas));
+      } catch {
+        /* preview opcional si ya hay blob */
+      }
+      return blob;
+    }
+
+    async function runExport(kind: "png" | "pdf" | "print", fn: () => Promise<void>) {
+      setBusy(kind);
+      setPreviewError(null);
+      try {
+        await fn();
+      } catch (err) {
+        setPreviewError(
+          err instanceof Error ? err.message : "No se pudo generar el documento",
+        );
       } finally {
         setBusy(null);
       }
     }
 
+    async function downloadPng() {
+      await runExport("png", async () => {
+        armFilePickerGuard();
+        try {
+          const blob = await blobFromPreview();
+          const file = new File([blob], `${data.code}.png`, { type: "image/png" });
+          if (navigator.canShare?.({ files: [file] })) {
+            try {
+              await navigator.share({
+                files: [file],
+                title: data.code,
+                text: data.code,
+              });
+              return;
+            } catch (err) {
+              if (err instanceof Error && err.name === "AbortError") return;
+            }
+          }
+          triggerBlobDownload(blob, `${data.code}.png`);
+        } finally {
+          settleFilePickerGuard(true);
+        }
+      });
+    }
+
     async function downloadPdf() {
-      setBusy("pdf");
-      try {
-        let img = previewUrl;
-        let width = 0;
-        let height = 0;
-        if (img) {
+      await runExport("pdf", async () => {
+        armFilePickerGuard();
+        try {
+          const blob = await blobFromPreview();
+          const img = URL.createObjectURL(blob);
           const probe = new Image();
           await new Promise<void>((resolve, reject) => {
             probe.onload = () => resolve();
             probe.onerror = () => reject(new Error("preview"));
-            probe.src = img!;
+            probe.src = img;
           });
-          width = probe.naturalWidth;
-          height = probe.naturalHeight;
-        } else {
-          if (!sheetRef.current) return;
-          const canvas = await canvasFromNode(sheetRef.current);
-          img = canvas.toDataURL("image/jpeg", 0.92);
-          width = canvas.width;
-          height = canvas.height;
+          const { jsPDF } = await import("jspdf");
+          const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+          const pageW = pdf.internal.pageSize.getWidth();
+          const pageH = pdf.internal.pageSize.getHeight();
+          const margin = 8;
+          const usableW = pageW - margin * 2;
+          const ratio = probe.naturalHeight / probe.naturalWidth;
+          let drawW = usableW;
+          let drawH = drawW * ratio;
+          if (drawH > pageH - margin * 2) {
+            drawH = pageH - margin * 2;
+            drawW = drawH / ratio;
+          }
+          const x = (pageW - drawW) / 2;
+          pdf.addImage(probe, "PNG", x, margin, drawW, drawH);
+          const pdfBlob = pdf.output("blob");
+          URL.revokeObjectURL(img);
+          const file = new File([pdfBlob], `${data.code}.pdf`, { type: "application/pdf" });
+          if (navigator.canShare?.({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], title: data.code });
+              return;
+            } catch (err) {
+              if (err instanceof Error && err.name === "AbortError") return;
+            }
+          }
+          triggerBlobDownload(pdfBlob, `${data.code}.pdf`);
+        } finally {
+          settleFilePickerGuard(true);
         }
-        const { jsPDF } = await import("jspdf");
-        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        const margin = 8;
-        const usableW = pageW - margin * 2;
-        const ratio = height / width;
-        let drawW = usableW;
-        let drawH = drawW * ratio;
-        if (drawH > pageH - margin * 2) {
-          drawH = pageH - margin * 2;
-          drawW = drawH / ratio;
-        }
-        const x = (pageW - drawW) / 2;
-        pdf.addImage(img, img.startsWith("data:image/png") ? "PNG" : "JPEG", x, margin, drawW, drawH);
-        pdf.save(`${data.code}.pdf`);
-      } finally {
-        setBusy(null);
-      }
+      });
     }
 
-    useImperativeHandle(ref, () => ({ downloadPng, downloadPdf }));
+    async function printDoc() {
+      await runExport("print", async () => {
+        const blob = await blobFromPreview();
+        const url = URL.createObjectURL(blob);
+        const frame = document.createElement("iframe");
+        frame.setAttribute("aria-hidden", "true");
+        frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+        document.body.appendChild(frame);
+        const win = frame.contentWindow;
+        if (!win) {
+          URL.revokeObjectURL(url);
+          frame.remove();
+          throw new Error("No se pudo abrir la impresión");
+        }
+        win.document.open();
+        win.document.write(
+          `<!doctype html><html><head><title>${data.code}</title>
+<style>@page{size:A4;margin:10mm}html,body{margin:0}img{width:100%;height:auto;display:block}</style>
+</head><body><img src="${url}" alt="${data.code}"></body></html>`,
+        );
+        win.document.close();
+        await new Promise<void>((resolve) => {
+          const img = win.document.querySelector("img");
+          if (!img || img.complete) {
+            resolve();
+            return;
+          }
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+        win.focus();
+        win.print();
+        window.setTimeout(() => {
+          URL.revokeObjectURL(url);
+          frame.remove();
+        }, 60_000);
+      });
+    }
+
+    useImperativeHandle(ref, () => ({ downloadPng, downloadPdf, printDoc }));
 
     useEffect(() => {
       if (!asImage) {
         setPreviewUrl(null);
+        setPreviewError(null);
         return;
       }
       let cancelled = false;
-      setPreviewUrl(null);
+      setPreviewError(null);
       const t = window.setTimeout(() => {
         void (async () => {
-          if (!sheetRef.current) return;
           try {
+            if (!sheetRef.current) {
+              if (!cancelled) setPreviewError("No se pudo preparar el documento");
+              return;
+            }
             const canvas = await canvasFromNode(sheetRef.current);
-            if (!cancelled) setPreviewUrl(canvas.toDataURL("image/png"));
-          } catch {
-            /* se deja el HTML visible */
+            if (!cancelled) setPreviewUrl(canvasToPng(canvas));
+          } catch (err) {
+            if (!cancelled) {
+              setPreviewError(
+                err instanceof Error ? err.message : "No se pudo preparar el documento",
+              );
+            }
           }
         })();
-      }, 80);
+      }, 120);
       return () => {
         cancelled = true;
         window.clearTimeout(t);
       };
-    }, [asImage, data]);
+    }, [asImage, captureKey]);
 
-    const sheet = (
-      <div ref={sheetRef} className="quote-doc">
+    const renderSheet = (targetRef?: Ref<HTMLDivElement>, letter = false) => (
+      <div ref={targetRef} className={letter ? "quote-doc is-letter-page" : "quote-doc"}>
         <header className="quote-doc-head">
           <div className="quote-doc-brand">
             <div className="quote-doc-logo">
-              <img src="/brand/enrutas-logo.svg" alt="" width={64} height={64} />
+              <img src="/brand/enrutas-logo.png" alt="" width={64} height={64} />
             </div>
             <div className="quote-doc-company">
               <h2>{issuer.companyName}</h2>
@@ -269,43 +464,56 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
             <p>
               <strong>{data.code}</strong>
             </p>
-            <p>Emisión: {issued}</p>
-            <p>Atendido por: {data.sellerName}</p>
+            <p>Emisión:{"\u00A0"}{issued}</p>
+            <p>Atendido por:{"\u00A0"}{data.sellerName}</p>
           </div>
         </header>
 
         <section className="quote-doc-parties">
           <div className="quote-doc-party-row">
             <p>
-              <span>Cliente:</span> {data.client?.name ?? data.clientFallback}
+              <span>Cliente:</span>
+              {"\u00A0"}
+              {data.client?.name ?? data.clientFallback}
             </p>
             <p className="is-end">
-              <span>Válido hasta:</span> {validLabel}
+              <span>Válido hasta:</span>
+              {"\u00A0"}
+              {validLabel}
             </p>
           </div>
           <div className="quote-doc-party-row">
             <p>
-              <span>RIF / CI:</span> {clientId}
+              <span>RIF / CI:</span>
+              {"\u00A0"}
+              {clientId}
             </p>
             <p className="is-end">
               {isVes ? (
                 <>
-                  <span>Tasa USD BCV:</span>{" "}
+                  <span>Tasa USD BCV:</span>
+                  {"\u00A0"}
                   {fx != null ? fx.toLocaleString("es-VE", { maximumFractionDigits: 4 }) : "—"}
                 </>
               ) : (
                 <>
-                  <span>Moneda:</span> USD
+                  <span>Moneda:</span>
+                  {"\u00A0"}
+                  USD
                 </>
               )}
             </p>
           </div>
           <div className="quote-doc-party-row">
             <p>
-              <span>Dirección:</span> {address}
+              <span>Dirección:</span>
+              {"\u00A0"}
+              {address}
             </p>
             <p className="is-end">
-              <span>Condición:</span> {data.isCredit ? "Crédito" : "Contado"}
+              <span>Condición:</span>
+              {"\u00A0"}
+              {data.isCredit ? "Crédito" : "Contado"}
             </p>
           </div>
         </section>
@@ -313,7 +521,7 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
         <div className="quote-doc-table-wrap">
           <img
             className="quote-doc-watermark"
-            src="/brand/enrutas-logo.svg"
+            src="/brand/enrutas-logo.png"
             alt=""
             aria-hidden
           />
@@ -370,7 +578,9 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
 
         {data.notes ? (
           <p className="quote-doc-notes">
-            <span>Notas:</span> {data.notes}
+            <span>Notas:</span>
+            {"\u00A0"}
+            {data.notes}
           </p>
         ) : null}
 
@@ -401,7 +611,7 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
     );
 
     return (
-      <div className={`quote-doc-wrap ${className}`.trim()}>
+      <div className={`quote-doc-wrap${asImage ? " is-letter" : ""} ${className}`.trim()}>
         {showActions ? (
           <div className="quote-doc-actions">
             <Button
@@ -411,7 +621,7 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
               onClick={() => void downloadPng()}
             >
               <ImageIcon size={16} />
-              {busy === "png" ? "Generando…" : "Descargar imagen"}
+              {busy === "png" ? "Guardando…" : "Guardar imagen"}
             </Button>
             <Button
               type="button"
@@ -420,17 +630,58 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
               onClick={() => void downloadPdf()}
             >
               <Download size={16} />
-              {busy === "pdf" ? "Generando…" : "Descargar PDF"}
+              {busy === "pdf" ? "Generando…" : "PDF"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy != null}
+              onClick={() => void printDoc()}
+            >
+              <Printer size={16} />
+              {busy === "print" ? "Abriendo…" : "Imprimir"}
             </Button>
           </div>
         ) : null}
 
-        {asImage && previewUrl ? (
-          <img className="quote-doc-image" src={previewUrl} alt={data.code} />
+        {asImage ? (
+          <button
+            type="button"
+            className="quote-doc-thumb"
+            onClick={() => setViewerOpen(true)}
+          >
+            <span className="quote-doc-thumb-frame">
+              <span className="quote-doc-thumb-scale">{renderSheet(undefined, true)}</span>
+            </span>
+            <span>Toca para ampliar · pellizca en la vista previa</span>
+          </button>
         ) : null}
-        <div className={asImage && previewUrl ? "quote-doc-capture" : undefined}>
-          {sheet}
-        </div>
+        {previewError ? (
+          <p className="form-error" role="alert">
+            {previewError}
+          </p>
+        ) : null}
+
+        {asImage && typeof document !== "undefined"
+          ? createPortal(
+              <div className="quote-doc-capture" aria-hidden style={{ width: LETTER_W }}>
+                {renderSheet(sheetRef, true)}
+              </div>,
+              document.body,
+            )
+          : asImage
+            ? null
+            : renderSheet(sheetRef)}
+
+        {asImage ? (
+          <QuoteDocViewer
+            open={viewerOpen}
+            src={previewUrl}
+            alt={data.code}
+            onClose={() => setViewerOpen(false)}
+            fallback={renderSheet(undefined, true)}
+          />
+        ) : null}
       </div>
     );
   },

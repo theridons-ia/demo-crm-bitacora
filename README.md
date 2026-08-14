@@ -32,7 +32,12 @@ CRM de campo **Bitácora**: visitas con evidencia GPS, ventas/órdenes e inventa
 
 **Guía detallada (apagón / checklist / verificación):** [docs/ARRANQUE_LOCAL.md](docs/ARRANQUE_LOCAL.md)
 
+En el servidor de demo el stack se levanta **solo** al encender (`scripts/enrutas-boot.sh` + Docker `restart: unless-stopped`). A mano:
+
 ```bash
+~/demo-crm-bitacora/scripts/enrutas-boot.sh
+
+# o las 3 terminales de siempre:
 # Terminal 0 — Postgres (si no está)
 cd mvp && docker compose up -d
 

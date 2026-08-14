@@ -105,6 +105,7 @@ export function PaymentCapture({
   }, [needsAccount, value.payment_method, currency, filteredAccounts.length, value.bank_account_id]);
 
   const selected = filteredAccounts.find((a) => a.id === value.bank_account_id);
+  const accountHint = distinctPayHint(selected);
   const emptyAccountHint =
     needsAccount && !filteredAccounts.length
       ? "No hay cuenta activa para este método. El supervisor la carga en Bancos, o elige otro medio."
@@ -146,7 +147,7 @@ export function PaymentCapture({
               bank_account_id: e.target.value ? Number(e.target.value) : null,
             })
           }
-          hint={selected?.pay_hint || undefined}
+          hint={accountHint}
         >
           {filteredAccounts.map((a) => (
             <option key={a.id} value={a.id}>
@@ -184,6 +185,22 @@ export function PaymentCapture({
       />
     </div>
   );
+}
+
+function distinctPayHint(account: BankAccount | undefined): string | undefined {
+  const hint = account?.pay_hint?.trim();
+  if (!hint) return undefined;
+  const name = account?.name.trim() ?? "";
+  if (foldText(hint) === foldText(name)) return undefined;
+  if (foldText(name).includes(foldText(hint))) return undefined;
+  return hint;
+}
+
+function foldText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
 }
 
 export function emptyPaymentCapture(

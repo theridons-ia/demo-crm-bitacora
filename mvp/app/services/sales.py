@@ -1,8 +1,10 @@
 """Ventas de primer nivel (SF-1.8) y venta en visita abierta."""
 
 import json
+from datetime import datetime, time, timedelta, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from ..models import (
@@ -17,21 +19,36 @@ from ..models import (
     VisitStatus,
 )
 from ..schemas import SaleCreate, SaleIn
+from ..timeutil import CARACAS, now_caracas
 from .banks import record_sale_collection
 from .catalog_visibility import assert_seller_can_use_products
 from .fx import resolve_usd_to_ves
 from .visits import apply_sale_to_inventory
 
 
-def _stamp_quote_snapshot(raw: str | None, *, sale_id: int) -> str | None:
-    """Guarda el snapshot y fija el código definitivo OV-{id}."""
+def _allocate_sale_code(db: Session, *, sale_id: int) -> str:
+    """OV-AAMMDD-HHMM-0001 — correlativo del día en hora Caracas."""
+    now = now_caracas()
+    start = datetime.combine(now.date(), time.min, tzinfo=CARACAS).astimezone(timezone.utc)
+    end = start + timedelta(days=1)
+    prior = (
+        db.query(func.count(Sale.id))
+        .filter(Sale.created_at >= start, Sale.created_at < end, Sale.id != sale_id)
+        .scalar()
+        or 0
+    )
+    return f"OV-{now.strftime('%y%m%d')}-{now.strftime('%H%M')}-{int(prior) + 1:04d}"
+
+
+def _stamp_quote_snapshot(raw: str | None, *, code: str) -> str | None:
+    """Guarda el snapshot y fija el código definitivo de la OV."""
     if not raw or not raw.strip():
         return None
     try:
         data = json.loads(raw)
         if not isinstance(data, dict):
             return raw
-        data["code"] = f"OV-{sale_id}"
+        data["code"] = code
         data["confirmed"] = True
         return json.dumps(data, ensure_ascii=False)
     except (json.JSONDecodeError, TypeError):
@@ -98,7 +115,9 @@ def _persist_sale(
     )
     db.add(sale)
     db.flush()
-    sale.quote_snapshot = _stamp_quote_snapshot(sale_in.quote_snapshot, sale_id=sale.id)
+    sale.quote_snapshot = _stamp_quote_snapshot(
+        sale_in.quote_snapshot, code=_allocate_sale_code(db, sale_id=sale.id)
+    )
 
     if not sale_in.is_credit:
         record_sale_collection(

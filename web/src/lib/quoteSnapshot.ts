@@ -2,6 +2,7 @@ import type { Client, CurrencyCode, Product, Sale } from "../lib/types";
 import type { QuoteDocLine, QuoteDocumentData } from "../components/QuoteDocument";
 import type { QuoteLine } from "../components/SaleQuoter";
 import { buildQuoteLines, DEFAULT_QUOTE_ISSUER } from "../components/QuoteDocument";
+import { saleOrderCode } from "./saleLabels";
 
 /** Snapshot serializable guardado en Sale.quote_snapshot. */
 export type QuoteSnapshot = {
@@ -106,7 +107,7 @@ export function buildQuoteDataFromSale(
     };
   });
   return {
-    code: `OV-${sale.id}`,
+    code: saleOrderCode(sale),
     issuedAt: new Date(sale.created_at),
     sellerName,
     client: sale.client,
