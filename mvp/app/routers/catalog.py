@@ -9,6 +9,7 @@ from ..schemas import (
     CatalogVisibilityUpdate,
     ProductCreate,
     ProductOut,
+    ProductUpdate,
     SupplierCreate,
     SupplierOut,
 )
@@ -33,6 +34,42 @@ def list_products(db: Session = Depends(get_db), current_user: User = Depends(ge
     return query.order_by(Product.name).all()
 
 
+def _normalize_image_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    url = value.strip()
+    if not url:
+        return None
+    if len(url) > 500_000:
+        raise HTTPException(status_code=400, detail="La imagen es demasiado pesada")
+    return url
+
+
+def _blank_to_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = value.strip()
+    return text or None
+
+
+def _sanitize_product_payload(data: dict) -> dict:
+    for key in ("brand", "category", "presentation", "barcode", "lot", "notes"):
+        if key in data:
+            raw = data[key]
+            data[key] = _blank_to_none(raw) if isinstance(raw, str) or raw is None else raw
+    if "image_url" in data:
+        data["image_url"] = _normalize_image_url(data.get("image_url"))
+    if "unit" in data and data["unit"] is not None:
+        data["unit"] = str(data["unit"]).strip() or "unidad"
+    if "pack_units" in data and data["pack_units"] is not None and data["pack_units"] < 1:
+        raise HTTPException(status_code=400, detail="Unidades por empaque debe ser al menos 1")
+    if "min_stock" in data and data["min_stock"] is not None and data["min_stock"] < 0:
+        raise HTTPException(status_code=400, detail="Stock mínimo inválido")
+    if "cost_usd" in data and data["cost_usd"] is not None and data["cost_usd"] < 0:
+        raise HTTPException(status_code=400, detail="Costo inválido")
+    return data
+
+
 @router.post("/api/products", response_model=ProductOut)
 def create_product(
     payload: ProductCreate,
@@ -41,8 +78,43 @@ def create_product(
 ):
     if current_user.role == UserRole.vendedor:
         raise HTTPException(status_code=403, detail="Solo supervisor/admin puede crear productos")
-    product = Product(**payload.model_dump())
+    sku = payload.sku.strip().upper()
+    if not sku or not payload.name.strip():
+        raise HTTPException(status_code=400, detail="SKU y nombre son obligatorios")
+    if db.query(Product).filter(Product.sku == sku).first():
+        raise HTTPException(status_code=409, detail="Ya existe un producto con ese SKU")
+    data = _sanitize_product_payload(payload.model_dump())
+    data["sku"] = sku
+    data["name"] = payload.name.strip()
+    data["stock"] = max(0, payload.stock)
+    if data.get("min_stock") is None:
+        data["min_stock"] = 40
+    product = Product(**data)
     db.add(product)
+    db.commit()
+    db.refresh(product)
+    return product
+
+
+@router.patch("/api/products/{product_id}", response_model=ProductOut)
+def update_product(
+    product_id: int,
+    payload: ProductUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == UserRole.vendedor:
+        raise HTTPException(status_code=403, detail="Solo supervisor/admin puede editar productos")
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    data = _sanitize_product_payload(payload.model_dump(exclude_unset=True))
+    if "name" in data and data["name"] is not None:
+        data["name"] = data["name"].strip()
+        if not data["name"]:
+            raise HTTPException(status_code=400, detail="El nombre no puede quedar vacío")
+    for key, value in data.items():
+        setattr(product, key, value)
     db.commit()
     db.refresh(product)
     return product

@@ -1,7 +1,8 @@
-import { Check, Package } from "lucide-react";
+import { Check } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
+import { ProductThumb } from "../components/ProductThumb";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
@@ -10,6 +11,7 @@ import {
   fetchSellers,
   updateCatalogVisibility,
 } from "../lib/api";
+import { productSearchHay } from "../lib/productFields";
 import type { Product, User } from "../lib/types";
 
 /** Catálogo por vendedor — lista tipo ficha + búsqueda. */
@@ -83,7 +85,7 @@ export function CatalogVisibilityPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
-    return products.filter((p) => `${p.name} ${p.sku}`.toLowerCase().includes(q));
+    return products.filter((p) => productSearchHay(p).includes(q));
   }, [products, query]);
 
   const visibleCount = unrestricted ? products.length : selected.size;
@@ -239,8 +241,13 @@ export function CatalogVisibilityPage() {
                 disabled={busy}
                 aria-pressed={on}
               >
-                <span className="ficha-check" aria-hidden>
-                  {on ? <Check size={16} /> : <Package size={16} />}
+                <span className={`ficha-product${on ? " is-on" : ""}`} aria-hidden>
+                  <ProductThumb src={p.image_url} alt="" size="md" />
+                  {on ? (
+                    <span className="ficha-product-check">
+                      <Check size={12} />
+                    </span>
+                  ) : null}
                 </span>
                 <span className="ficha-body">
                   <span className="ficha-row">
@@ -248,7 +255,9 @@ export function CatalogVisibilityPage() {
                     <strong className="ficha-amount">${Number(p.price_usd).toFixed(0)}</strong>
                   </span>
                   <p className="ficha-meta">
-                    {p.sku} · stock {p.stock} {p.unit}
+                    {[p.sku, p.presentation, p.brand, `stock ${p.stock} ${p.unit}`]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </span>
               </button>

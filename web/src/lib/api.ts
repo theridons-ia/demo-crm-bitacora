@@ -230,6 +230,7 @@ export type VisitStartInput = {
   longitude?: number | null;
   gps_accuracy_m?: number | null;
   gps_offline?: boolean;
+  replace_start?: boolean;
 };
 
 export function startVisit(visitId: number, payload: VisitStartInput = {}): Promise<Visit> {
@@ -324,6 +325,59 @@ export function fetchProducts(): Promise<Product[]> {
   return request<Product[]>("/api/products");
 }
 
+export type ProductCreateInput = {
+  sku: string;
+  name: string;
+  unit?: string;
+  price_usd?: number;
+  stock?: number;
+  image_url?: string | null;
+  brand?: string | null;
+  category?: string | null;
+  presentation?: string | null;
+  barcode?: string | null;
+  cost_usd?: number | null;
+  pack_units?: number | null;
+  min_stock?: number;
+  lot?: string | null;
+  expires_on?: string | null;
+  notes?: string | null;
+};
+
+export function createProduct(payload: ProductCreateInput): Promise<Product> {
+  return request<Product>("/api/products", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ProductUpdateInput = {
+  name?: string;
+  unit?: string;
+  price_usd?: number;
+  image_url?: string | null;
+  brand?: string | null;
+  category?: string | null;
+  presentation?: string | null;
+  barcode?: string | null;
+  cost_usd?: number | null;
+  pack_units?: number | null;
+  min_stock?: number;
+  lot?: string | null;
+  expires_on?: string | null;
+  notes?: string | null;
+  is_active?: boolean;
+};
+
+export function updateProduct(id: number, payload: ProductUpdateInput): Promise<Product> {
+  return request<Product>(`/api/products/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export type CatalogVisibility = {
   seller_id: number;
   unrestricted: boolean;
@@ -345,8 +399,11 @@ export function updateCatalogVisibility(
   });
 }
 
-export function fetchSales(): Promise<Sale[]> {
-  return request<Sale[]>("/api/sales");
+export function fetchSales(params?: { client_id?: number }): Promise<Sale[]> {
+  const q = new URLSearchParams();
+  if (params?.client_id != null) q.set("client_id", String(params.client_id));
+  const qs = q.toString();
+  return request<Sale[]>(`/api/sales${qs ? `?${qs}` : ""}`);
 }
 
 export type SaleCreateInput = {

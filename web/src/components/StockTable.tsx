@@ -1,24 +1,35 @@
-import { Package } from "lucide-react";
+import { ProductThumb } from "./ProductThumb";
+import { productExpiry } from "../lib/productFields";
 import type { Product } from "../lib/types";
 
 export const LOW_STOCK = 40;
 
 export type StockState = "disponible" | "bajo" | "agotado";
 
-export function stockState(stock: number): StockState {
+export function effectiveMinStock(min?: number | null): number {
+  return min != null && min > 0 ? min : LOW_STOCK;
+}
+
+export function stockState(stock: number, min: number = LOW_STOCK): StockState {
+  const floor = effectiveMinStock(min);
   if (stock <= 0) return "agotado";
-  if (stock < LOW_STOCK) return "bajo";
+  if (stock < floor) return "bajo";
   return "disponible";
 }
 
-export function stockPct(stock: number): number {
-  const max = Math.max(LOW_STOCK * 2, stock);
+export function stockPct(stock: number, min: number = LOW_STOCK): number {
+  const floor = effectiveMinStock(min);
+  const max = Math.max(floor * 2, stock);
   return Math.min(100, Math.round((stock / max) * 100));
 }
 
 export function productCategory(product: Product): string {
+  if (product.category?.trim()) return product.category.trim();
   const key = `${product.sku} ${product.name}`.toLowerCase();
-  if (/agua|jugo|cola|malta|leche|beb|refresco/.test(key)) return "Bebidas";
+  if (/agua|jugo|cola|malta|leche|beb|refresco|glup|minalba|arizona|greenspot|iced tea/.test(key)) {
+    return "Bebidas";
+  }
+  if (/harina|arroz|aceite|pan/.test(key)) return "Abarrotes";
   if (/snack|galleta|chips/.test(key)) return "Snacks";
   if (/dulce|chocolate|caramelo/.test(key)) return "Dulces";
   return "General";
@@ -36,17 +47,23 @@ type RowProps = {
 };
 
 function StockTableRow({ product, onClick }: RowProps) {
-  const st = stockState(product.stock);
+  const min = effectiveMinStock(product.min_stock);
+  const st = stockState(product.stock, min);
   const value = Number(product.price_usd) * product.stock;
+  const expiry = productExpiry(product.expires_on);
   const inner = (
     <>
       <div className="stock-col stock-col-product">
-        <span className="stock-product-icon" aria-hidden>
-          <Package size={16} />
-        </span>
+        <ProductThumb src={product.image_url} alt="" size="md" />
         <span className="stock-product-copy">
           <strong className="stock-product-name">{product.name}</strong>
-          <span className="stock-product-sku">{product.sku}</span>
+          <span className="stock-product-sku">
+            {product.sku}
+            {product.presentation ? ` · ${product.presentation}` : ""}
+          </span>
+          {expiry && expiry.tone !== "ok" ? (
+            <span className={`stock-expiry is-${expiry.tone}`}>{expiry.text}</span>
+          ) : null}
         </span>
       </div>
       <div className="stock-col stock-col-cat muted">{productCategory(product)}</div>
@@ -55,9 +72,9 @@ function StockTableRow({ product, onClick }: RowProps) {
           {product.stock} {product.unit}
         </strong>
         <div className="inv-bar-wrap" aria-hidden>
-          <span className={`inv-bar inv-bar-${st}`} style={{ width: `${stockPct(product.stock)}%` }} />
+          <span className={`inv-bar inv-bar-${st}`} style={{ width: `${stockPct(product.stock, min)}%` }} />
         </div>
-        <span className="stock-min muted small">mínimo {LOW_STOCK}</span>
+        <span className="stock-min muted small">mínimo {min}</span>
       </div>
       <div className="stock-col stock-col-state">
         <span

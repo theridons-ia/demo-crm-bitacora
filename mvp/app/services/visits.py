@@ -28,6 +28,7 @@ from .fx import resolve_usd_to_ves
 # Umbrales evidencia (metros)
 GPS_ACCURACY_WARN_M = Decimal("100")
 GPS_FAR_CLIENT_M = Decimal("250")
+GPS_FAR_START_END_M = Decimal("250")
 
 
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -37,6 +38,42 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dlmb = radians(lon2 - lon1)
     a = sin(dphi / 2) ** 2 + cos(p1) * cos(p2) * sin(dlmb / 2) ** 2
     return 2 * r * asin(sqrt(a))
+
+
+def maybe_alert_gps_vs_pdv(
+    db: Session,
+    visit: Visit,
+    *,
+    seller_id: int,
+    latitude,
+    longitude,
+    gps_accuracy_m,
+    when_label: str,
+) -> None:
+    client = visit.client
+    if client is None:
+        return
+    if client.latitude is None or client.longitude is None:
+        return
+    if gps_accuracy_m is not None and Decimal(gps_accuracy_m) > GPS_ACCURACY_WARN_M:
+        return
+    dist = haversine_m(
+        float(latitude),
+        float(longitude),
+        float(client.latitude),
+        float(client.longitude),
+    )
+    if dist <= float(GPS_FAR_CLIENT_M):
+        return
+    _add_alert(
+        db,
+        visit=visit,
+        seller_id=seller_id,
+        alert_type=AlertType.gps_far,
+        severity=AlertSeverity.warning,
+        message=f"{when_label} a ~{dist:.0f} m del PDV registrado",
+        meta_json=f'{{"distance_m": {dist:.1f}, "when": "{when_label}"}}',
+    )
 
 
 IVA_RATE = Decimal("0.16")
@@ -132,32 +169,34 @@ def close_visit_with_optional_sale(
     visit.result = result
     if description is not None:
         visit.description = description
-    visit.closed_at = gps_captured_at or datetime.now(timezone.utc)
-    # visited_at = inicio (start_visit). No pisarlo con el GPS de cierre.
+    now = datetime.now(timezone.utc)
+    visit.closed_at = now
+    # visited_at = inicio. Nunca pisarlo con el cierre.
     if visit.visited_at is None:
-        visit.visited_at = gps_captured_at
-    if latitude is not None:
-        visit.latitude = latitude
-    if longitude is not None:
-        visit.longitude = longitude
-    if gps_accuracy_m is not None:
-        visit.gps_accuracy_m = gps_accuracy_m
-    visit.gps_offline = gps_offline
+        visit.visited_at = now
     visit.gps_skipped = gps_skipped
     visit.gps_skip_reason = gps_skip_reason
     if photo_evidence:
         visit.photo_evidence = photo_evidence
-    if gps_captured_at is not None:
-        visit.gps_captured_at = gps_captured_at
 
     if has_fix:
+        visit.end_latitude = latitude
+        visit.end_longitude = longitude
+        visit.end_gps_accuracy_m = gps_accuracy_m
+        visit.end_gps_captured_at = gps_captured_at or now
+        visit.gps_offline = gps_offline
+        if visit.latitude is None:
+            visit.latitude = latitude
+            visit.longitude = longitude
+            visit.gps_accuracy_m = gps_accuracy_m
+            visit.gps_captured_at = gps_captured_at or now
         db.add(
             VisitGpsPoint(
                 visit_id=visit.id,
                 latitude=latitude,
                 longitude=longitude,
                 accuracy_m=gps_accuracy_m,
-                captured_at=gps_captured_at or visit.gps_captured_at,
+                captured_at=gps_captured_at or now,
                 source=GpsPointSource.end,
             )
         )
@@ -188,34 +227,37 @@ def close_visit_with_optional_sale(
             seller_id=seller_id,
             alert_type=AlertType.gps_low_accuracy,
             severity=AlertSeverity.warning,
-            message=f"GPS con baja precisión (±{gps_accuracy_m} m)",
+            message=f"GPS de cierre con baja precisión (±{gps_accuracy_m} m)",
             meta_json=f'{{"accuracy_m": {gps_accuracy_m}}}',
         )
 
-    client = visit.client
-    if (
-        has_fix
-        and client is not None
-        and client.latitude is not None
-        and client.longitude is not None
-        and (gps_accuracy_m is None or Decimal(gps_accuracy_m) <= GPS_ACCURACY_WARN_M)
-    ):
-        dist = haversine_m(
-            float(latitude),
-            float(longitude),
-            float(client.latitude),
-            float(client.longitude),
+    if has_fix:
+        maybe_alert_gps_vs_pdv(
+            db,
+            visit,
+            seller_id=seller_id,
+            latitude=latitude,
+            longitude=longitude,
+            gps_accuracy_m=gps_accuracy_m,
+            when_label="Cierre",
         )
-        if dist > float(GPS_FAR_CLIENT_M):
-            _add_alert(
-                db,
-                visit=visit,
-                seller_id=seller_id,
-                alert_type=AlertType.gps_far,
-                severity=AlertSeverity.warning,
-                message=f"Cierre a ~{dist:.0f} m del PDV registrado",
-                meta_json=f'{{"distance_m": {dist:.1f}}}',
+        if visit.latitude is not None and visit.longitude is not None:
+            span = haversine_m(
+                float(visit.latitude),
+                float(visit.longitude),
+                float(latitude),
+                float(longitude),
             )
+            if span > float(GPS_FAR_START_END_M):
+                _add_alert(
+                    db,
+                    visit=visit,
+                    seller_id=seller_id,
+                    alert_type=AlertType.gps_far,
+                    severity=AlertSeverity.warning,
+                    message=f"Inicio y cierre a ~{span:.0f} m entre sí",
+                    meta_json=f'{{"distance_m": {span:.1f}, "when": "start_end"}}',
+                )
 
     existing_sale = (
         visit.sale

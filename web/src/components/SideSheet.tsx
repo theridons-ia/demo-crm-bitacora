@@ -13,13 +13,24 @@ type Props = {
   blurb?: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** `wide` para fichas con muchos campos (producto). */
+  size?: "default" | "wide";
 };
 
 /**
  * Side sheet — acciones cortas (derecha en desktop, hoja en móvil).
  * Portal a body + z-index alto (por encima de Leaflet).
  */
-export function SideSheet({ open, onClose, title, eyebrow, blurb, children, footer }: Props) {
+export function SideSheet({
+  open,
+  onClose,
+  title,
+  eyebrow,
+  blurb,
+  children,
+  footer,
+  size = "default",
+}: Props) {
   const close = useCallback(() => {
     if (shouldIgnoreOverlayClose()) return;
     onClose();
@@ -33,7 +44,7 @@ export function SideSheet({ open, onClose, title, eyebrow, blurb, children, foot
   return createPortal(
     <div className="side-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <button type="button" className="app-overlay-backdrop" aria-label="Cerrar" onClick={close} />
-      <div className="side-sheet-panel">
+      <div className={size === "wide" ? "side-sheet-panel is-wide" : "side-sheet-panel"}>
         <div className="side-sheet-handle" aria-hidden />
         <header className="side-sheet-head">
           <div className="side-sheet-head-copy">

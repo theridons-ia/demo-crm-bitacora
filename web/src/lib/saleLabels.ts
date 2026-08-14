@@ -54,9 +54,19 @@ export function saleOrderCode(sale: Sale): string {
 /** Notas de cierre antiguas «Cierre con OV-41» → código actual. */
 export function rewriteCloseNote(description: string | null | undefined, sale: Sale | null): string | null {
   if (!description?.trim()) return null;
-  if (!sale) return description;
+  if (!sale) return visitNoteForUi(description);
   const code = saleOrderCode(sale);
   const next = description.replace(/\bOV-\d+\b/g, code);
   if (/^Cierre con OV-[\w-]+\s*$/i.test(next.trim())) return null;
-  return next;
+  return visitNoteForUi(next);
+}
+
+const SYSTEM_VISIT_NOTE =
+  /^(Ruta Ali ·|Ruta hoy ·|Sin asistir ·|Cierre con OV-|Cancelada$|Cierre demo)/i;
+
+/** Nota de campo para UI: oculta marcadores de seed/cierre automático. */
+export function visitNoteForUi(description: string | null | undefined): string | null {
+  const text = description?.trim() || "";
+  if (!text || SYSTEM_VISIT_NOTE.test(text)) return null;
+  return text;
 }

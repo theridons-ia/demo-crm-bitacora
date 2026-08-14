@@ -42,7 +42,7 @@ export function FinanceHubPage() {
         setCxcBalance(recv.reduce((a, r) => a + Number(r.balance), 0));
         setBankTotal(banks.reduce((a, b) => a + Number(b.balance || 0), 0));
         setPayableOpen(payables.reduce((a, p) => a + Number(p.amount), 0));
-        setLowStock(products.filter((p) => stockState(p.stock) !== "disponible").length);
+        setLowStock(products.filter((p) => stockState(p.stock, p.min_stock) !== "disponible").length);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "No se pudo cargar finanzas");

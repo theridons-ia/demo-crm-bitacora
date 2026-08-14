@@ -1,12 +1,17 @@
-import { ExternalLink, MapPin, Phone, Store } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ExternalLink, MapPin, Phone, Receipt, Store } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
+import { SaleDetailSheet } from "./SaleDetailSheet";
 import { clientPdvIconFor } from "../lib/mapMarkers";
 import { mapsNavigateUrl } from "../lib/gps";
-import type { Client } from "../lib/types";
+import { fetchSales, fetchSellers } from "../lib/api";
+import { formatDateTime } from "../lib/caracasTime";
+import { saleOrderCode } from "../lib/saleLabels";
+import type { Client, Sale, User } from "../lib/types";
 
 type Props = {
   client: Client;
@@ -52,6 +57,39 @@ export function ClientDetailSheet({
   const lat = pinned ? Number(client.latitude) : null;
   const lng = pinned ? Number(client.longitude) : null;
   const mapsHref = lat != null && lng != null ? mapsNavigateUrl(lat, lng) : null;
+  const { user } = useAuth();
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [sellerById, setSellerById] = useState<Map<number, string>>(new Map());
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [viewSale, setViewSale] = useState<Sale | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setViewSale(null);
+      return;
+    }
+    let cancelled = false;
+    setSalesLoading(true);
+    const sellersP =
+      user?.role === "vendedor" ? Promise.resolve([] as User[]) : fetchSellers().catch(() => [] as User[]);
+    Promise.all([fetchSales({ client_id: client.id }), sellersP])
+      .then(([rows, sellers]) => {
+        if (cancelled) return;
+        setSales(rows.filter((s) => s.client_id === client.id));
+        const map = new Map<number, string>();
+        for (const s of sellers) map.set(s.id, s.full_name);
+        setSellerById(map);
+      })
+      .catch(() => {
+        if (!cancelled) setSales([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSalesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, client.id, user?.role]);
 
   useEffect(() => {
     if (!open || !pinned || !mapEl.current || lat == null || lng == null) return;
@@ -88,8 +126,9 @@ export function ClientDetailSheet({
   }, [open, client, pinned, lat, lng]);
 
   return (
+    <>
     <Modal
-      open={open}
+      open={open && !viewSale}
       onClose={onClose}
       size="wide"
       eyebrow="Ficha de cliente"
@@ -175,6 +214,55 @@ export function ClientDetailSheet({
           ) : null}
         </div>
 
+        <section className="client-sale-history" aria-label="Historial de ventas">
+          <p className="eyebrow">
+            <Receipt size={12} aria-hidden /> Historial de ventas
+          </p>
+          {salesLoading ? (
+            <p className="muted small">Cargando órdenes…</p>
+          ) : sales.length === 0 ? (
+            <p className="muted small">
+              {user?.role === "vendedor"
+                ? "Aún no tienes OV registradas en este PDV."
+                : "Sin órdenes registradas en este PDV."}
+            </p>
+          ) : (
+            <>
+              <p className="muted small" style={{ margin: "0 0 0.45rem" }}>
+                {sales.length} orden{sales.length === 1 ? "" : "es"}
+                {user?.role === "vendedor" ? " tuyas" : ""} · más reciente primero
+              </p>
+              <ul className="client-sale-list">
+                {sales.slice(0, 8).map((sale) => {
+                  const sellerName =
+                    sale.seller?.full_name ??
+                    sellerById.get(sale.seller_id) ??
+                    (user?.id === sale.seller_id ? user.full_name : `Vendedor #${sale.seller_id}`);
+                  return (
+                    <li key={sale.id}>
+                      <button type="button" className="client-sale-row" onClick={() => setViewSale(sale)}>
+                        <span className="client-sale-row-copy">
+                          <strong>{saleOrderCode(sale)}</strong>
+                          <span className="muted small">
+                            {formatDateTime(sale.created_at)} · {sellerName}
+                          </span>
+                        </span>
+                        <span className="client-sale-row-amt">
+                          ${Number(sale.total_amount).toFixed(2)}
+                          <span className="muted small">{sale.currency}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {sales.length > 8 ? (
+                <p className="muted small">+{sales.length - 8} anteriores</p>
+              ) : null}
+            </>
+          )}
+        </section>
+
         <section className={`visit-gps-card ${pinned ? "has-fix" : "needs-fix"}`.trim()}>
           <div className="visit-gps-copy">
             <p className="eyebrow">
@@ -220,5 +308,18 @@ export function ClientDetailSheet({
         </section>
       </div>
     </Modal>
+    {viewSale ? (
+      <SaleDetailSheet
+        sale={viewSale}
+        open
+        sellerName={
+          viewSale.seller?.full_name ??
+          sellerById.get(viewSale.seller_id) ??
+          null
+        }
+        onClose={() => setViewSale(null)}
+      />
+    ) : null}
+    </>
   );
 }

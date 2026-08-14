@@ -2,6 +2,8 @@ import { AlertTriangle, ChevronRight } from "lucide-react";
 import { LiveLed } from "./LiveLed";
 import { formatAgendaDay, formatTime, todayISO } from "../lib/caracasTime";
 import { isVisitOverdue } from "../lib/visitOrder";
+import { visitNoteForUi } from "../lib/saleLabels";
+import { visitGpsProof, visitGpsProofLabel } from "../lib/visitEvidence";
 import type { Visit, VisitStatus } from "../lib/types";
 
 const STATUS_LABEL: Record<VisitStatus, string> = {
@@ -47,6 +49,8 @@ function metaLabel(visit: Visit, pinMissing?: boolean): string {
     if (visit.result === "sin_venta") base = "Sin venta";
     else if (visit.result) base = "Con venta";
     else base = STATUS_LABEL.completada;
+    const proof = visitGpsProofLabel(visitGpsProof(visit));
+    if (proof) base = `${base} · ${proof}`;
   } else if (visit.status === "en_curso") {
     base = "Toca para continuar";
   } else if (visit.status === "programada") {
@@ -64,6 +68,7 @@ export function VisitRow({ visit, onClick, index, clock, pinMissing }: Props) {
   const live = visit.status === "en_curso";
   const overdue = isVisitOverdue(visit, todayISO());
   const title = index != null ? `${index}. ${name}` : name;
+  const note = visitNoteForUi(visit.description);
 
   return (
     <li>
@@ -84,6 +89,7 @@ export function VisitRow({ visit, onClick, index, clock, pinMissing }: Props) {
         <span className="visit-row-copy">
           <span className="visit-row-name">{title}</span>
           <span className="visit-row-meta">{metaLabel(visit, pinMissing)}</span>
+          {note ? <span className="visit-row-note">{note}</span> : null}
         </span>
         <span className="visit-row-when">{whenLabel(visit, clock)}</span>
         <ChevronRight size={18} className="visit-row-chevron" aria-hidden />

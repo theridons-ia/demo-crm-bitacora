@@ -6,7 +6,7 @@ import { ListSearch } from "../components/ListSearch";
 import { MonthCalendar, addDaysISO, calendarTodayISO } from "../components/MonthCalendar";
 import { Modal } from "../components/Modal";
 import { FormStep } from "../components/SideSheet";
-import { SelectField, TextField } from "../components/TextField";
+import { SelectField, TextAreaField, TextField } from "../components/TextField";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
 import { ListSkeleton } from "../components/ListSkeleton";
@@ -629,12 +629,15 @@ function VisitForm({
         ) : null}
       </FormStep>
 
-      <FormStep step="03" title="Nota" blurb="Opcional, visible en la bitácora.">
-        <TextField
+      <FormStep step="03" title="Nota" blurb="Lo que el equipo debe saber de este PDV.">
+        <TextAreaField
           id="visit-notes"
-          label="Nota / motivo"
+          label="Nota de campo"
+          hint="Opcional, pero útil: crédito, horario, quien atiende."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          placeholder="Ej. Preguntar por el encargado · no llegar antes de las 10."
+          className="input-area is-visit-note"
         />
       </FormStep>
 

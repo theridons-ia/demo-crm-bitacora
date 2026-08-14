@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import User, Visit, VisitStatus
-from ..schemas import SyncRequest, SyncResponse, VisitOut
+from ..models import Client, GpsPointSource, User, Visit, VisitGpsPoint, VisitStatus
+from ..schemas import SyncRequest, SyncResponse
 from ..services.visits import close_visit_with_optional_sale
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
@@ -44,22 +44,36 @@ def sync_offline_visits(
         )
         db.add(visit)
         db.flush()
+        visit.client = db.query(Client).filter(Client.id == item.client_id).first()
+
+        if item.latitude is not None and item.longitude is not None:
+            db.add(
+                VisitGpsPoint(
+                    visit_id=visit.id,
+                    latitude=item.latitude,
+                    longitude=item.longitude,
+                    accuracy_m=item.gps_accuracy_m,
+                    captured_at=item.gps_captured_at or now,
+                    source=GpsPointSource.start,
+                )
+            )
 
         if item.sale:
             item.sale.created_offline = True
             if not item.sale.local_uuid:
                 item.sale.local_uuid = f"sale-{item.local_uuid}"
 
+        has_end = item.end_latitude is not None and item.end_longitude is not None
         close_visit_with_optional_sale(
             db,
             visit,
             result=item.result,
             description=item.description,
-            latitude=item.latitude,
-            longitude=item.longitude,
-            gps_accuracy_m=item.gps_accuracy_m,
+            latitude=item.end_latitude if has_end else item.latitude,
+            longitude=item.end_longitude if has_end else item.longitude,
+            gps_accuracy_m=item.end_gps_accuracy_m if has_end else item.gps_accuracy_m,
             gps_offline=True,
-            gps_captured_at=item.gps_captured_at or now,
+            gps_captured_at=(item.end_gps_captured_at if has_end else item.gps_captured_at) or now,
             sale_in=item.sale,
             seller_id=current_user.id,
             gps_skipped=item.gps_skipped,

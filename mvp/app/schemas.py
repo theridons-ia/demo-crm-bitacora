@@ -163,6 +163,35 @@ class ProductCreate(BaseModel):
     unit: str = "unidad"
     price_usd: Decimal = Decimal("0")
     stock: int = 0
+    image_url: str | None = None
+    brand: str | None = None
+    category: str | None = None
+    presentation: str | None = None
+    barcode: str | None = None
+    cost_usd: Decimal | None = None
+    pack_units: int | None = None
+    min_stock: int = 40
+    lot: str | None = None
+    expires_on: date | None = None
+    notes: str | None = None
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = None
+    unit: str | None = None
+    price_usd: Decimal | None = None
+    image_url: str | None = None
+    brand: str | None = None
+    category: str | None = None
+    presentation: str | None = None
+    barcode: str | None = None
+    cost_usd: Decimal | None = None
+    pack_units: int | None = None
+    min_stock: int | None = None
+    lot: str | None = None
+    expires_on: date | None = None
+    notes: str | None = None
+    is_active: bool | None = None
 
 
 class ProductOut(ORMModel):
@@ -172,6 +201,17 @@ class ProductOut(ORMModel):
     unit: str
     price_usd: Decimal
     stock: int
+    image_url: str | None = None
+    brand: str | None = None
+    category: str | None = None
+    presentation: str | None = None
+    barcode: str | None = None
+    cost_usd: Decimal | None = None
+    pack_units: int | None = None
+    min_stock: int = 40
+    lot: str | None = None
+    expires_on: date | None = None
+    notes: str | None = None
     is_active: bool
 
 
@@ -282,6 +322,7 @@ class SaleOut(ORMModel):
     created_at: datetime
     items: list[SaleItemOut] = []
     client: ClientOut | None = None
+    seller: UserOut | None = None
 
 
 class SalePaymentCreate(BaseModel):
@@ -400,6 +441,7 @@ class VisitStart(BaseModel):
     longitude: Decimal | None = None
     gps_accuracy_m: Decimal | None = None
     gps_offline: bool = False
+    replace_start: bool = False
 
 
 class VisitCancel(BaseModel):
@@ -450,6 +492,10 @@ class VisitOut(ORMModel):
     gps_skipped: bool = False
     gps_skip_reason: str | None = None
     photo_evidence: str | None = None
+    end_latitude: Decimal | None = None
+    end_longitude: Decimal | None = None
+    end_gps_accuracy_m: Decimal | None = None
+    end_gps_captured_at: datetime | None = None
     local_uuid: str | None
     created_at: datetime
     client: ClientOut | None = None
@@ -467,6 +513,10 @@ class OfflineVisitSync(BaseModel):
     gps_accuracy_m: Decimal | None = None
     gps_captured_at: datetime | None = None
     visited_at: datetime | None = None
+    end_latitude: Decimal | None = None
+    end_longitude: Decimal | None = None
+    end_gps_accuracy_m: Decimal | None = None
+    end_gps_captured_at: datetime | None = None
     gps_skipped: bool = False
     gps_skip_reason: str | None = None
     photo_evidence: str | None = Field(default=None, max_length=600_000)

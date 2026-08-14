@@ -1,4 +1,4 @@
-import { Calendar, Crosshair, MapPin, Play, ShoppingCart, Square, XCircle } from "lucide-react";
+import { Calendar, Crosshair, MapPin, Play, ShieldCheck, ShoppingCart, Square, StickyNote, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
@@ -13,7 +13,12 @@ import { rewriteCloseNote, saleOrderCode } from "../lib/saleLabels";
 import { hasVisitSaleDraft } from "../lib/saleWizardDraft";
 import { isVisitOverdue } from "../lib/visitOrder";
 import { ApiError, cancelVisit, pinVisitGps, startVisit } from "../lib/api";
-import { coordsFromClient, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
+import { coordsFromClient, distanceMeters, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
+import {
+  GPS_FAR_M,
+  parseCoord,
+  visitGpsProof,
+} from "../lib/visitEvidence";
 import type { Visit, VisitStatus } from "../lib/types";
 
 type Props = {
@@ -47,8 +52,7 @@ function VisitRangePills({ visit }: { visit: Visit }) {
   if (!start && visit.status !== "en_curso" && visit.status !== "completada") {
     return null;
   }
-  const endIso =
-    visit.closed_at ?? (visit.status === "completada" ? visit.gps_captured_at : null);
+  const endIso = visit.closed_at ?? visit.end_gps_captured_at ?? null;
   const end = formatPillParts(endIso);
   const endPending = visit.status === "en_curso";
 
@@ -88,6 +92,170 @@ function VisitRangePills({ visit }: { visit: Visit }) {
   );
 }
 
+function formatCoordPair(lat: number, lng: number): string {
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function gpsConfirmMessage(visit: Visit, failReason: string | null): string | null {
+  if (failReason) {
+    return `${failReason}. Mala señal o sin conexión. Puedes continuar sin GPS (temporal) y actualizar después.`;
+  }
+  const pdv = coordsFromClient(visit.client);
+  const lat = parseCoord(visit.latitude);
+  const lng = parseCoord(visit.longitude);
+  if (lat == null || lng == null || !pdv) return null;
+  const dist = distanceMeters(lat, lng, pdv.latitude, pdv.longitude);
+  if (dist <= GPS_FAR_M) return null;
+  return `La marca está a ~${Math.round(dist)} m del PDV. Si no es el local, actualiza el GPS.`;
+}
+
+function VisitGpsEvidence({
+  visit,
+  hasGps,
+  canPinGps,
+  gpsBusy,
+  gpsOk,
+  onPinGps,
+  onShowMap,
+}: {
+  visit: Visit;
+  hasGps: boolean;
+  canPinGps: boolean;
+  gpsBusy: boolean;
+  gpsOk: string | null;
+  onPinGps: () => void;
+  onShowMap: () => void;
+}) {
+  const startLat = parseCoord(visit.latitude);
+  const startLng = parseCoord(visit.longitude);
+  const endLat = parseCoord(visit.end_latitude);
+  const endLng = parseCoord(visit.end_longitude);
+  const hasEnd = endLat != null && endLng != null;
+  const pdv = coordsFromClient(visit.client);
+  const startEndM =
+    startLat != null && startLng != null && hasEnd
+      ? distanceMeters(startLat, startLng, endLat, endLng)
+      : null;
+  const startPdvM =
+    startLat != null && startLng != null && pdv
+      ? distanceMeters(startLat, startLng, pdv.latitude, pdv.longitude)
+      : null;
+  const endPdvM =
+    hasEnd && pdv ? distanceMeters(endLat, endLng, pdv.latitude, pdv.longitude) : null;
+  const farStartEnd = startEndM != null && startEndM > GPS_FAR_M;
+  const farStartPdv = startPdvM != null && startPdvM > GPS_FAR_M;
+  const farEndPdv = endPdvM != null && endPdvM > GPS_FAR_M;
+  const proof = visitGpsProof(visit);
+
+  return (
+    <section className={`visit-gps-card ${hasGps || hasEnd ? "has-fix" : "needs-fix"}`.trim()}>
+      <div className="visit-gps-copy">
+        <p className="eyebrow">Ubicación GPS</p>
+        {hasGps || hasEnd ? (
+          <div className="visit-gps-pair">
+            <div>
+              <span className="muted small">Inicio</span>
+              {startLat != null && startLng != null ? (
+                <>
+                  <strong>{formatCoordPair(startLat, startLng)}</strong>
+                  <span className="muted small">
+                    {visit.gps_accuracy_m
+                      ? `±${Number(visit.gps_accuracy_m).toFixed(0)} m`
+                      : "Precisión no reportada"}
+                    {visit.gps_offline ? " · prueba / offline" : ""}
+                    {visit.gps_captured_at ? ` · ${formatWhen(visit.gps_captured_at)}` : ""}
+                  </span>
+                </>
+              ) : (
+                <strong>Sin punto de inicio</strong>
+              )}
+            </div>
+            {visit.status === "completada" || hasEnd ? (
+              <div>
+                <span className="muted small">Cierre</span>
+                {hasEnd ? (
+                  <>
+                    <strong>{formatCoordPair(endLat, endLng)}</strong>
+                    <span className="muted small">
+                      {visit.end_gps_accuracy_m
+                        ? `±${Number(visit.end_gps_accuracy_m).toFixed(0)} m`
+                        : "Precisión no reportada"}
+                      {visit.end_gps_captured_at
+                        ? ` · ${formatWhen(visit.end_gps_captured_at)}`
+                        : ""}
+                    </span>
+                  </>
+                ) : (
+                  <strong>Sin punto de cierre</strong>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <strong>Sin coordenada aún</strong>
+            <span className="muted small">
+              {isMockGpsEnabled()
+                ? "GPS de prueba activo en el header. Pulsa guardar para fijar el punto."
+                : "Al iniciar se toma fecha, hora y GPS. También puedes capturar ahora."}
+            </span>
+          </>
+        )}
+        {startEndM != null ? (
+          <p className={`visit-gps-span ${farStartEnd ? "is-warn" : ""}`.trim()}>
+            Inicio y cierre a ~{Math.round(startEndM)} m
+            {farStartEnd ? " (deberían estar en el mismo PDV)" : ""}
+          </p>
+        ) : null}
+        {farStartPdv && visit.status === "en_curso" ? (
+          <p className={`visit-gps-span is-warn`}>
+            Inicio a ~{Math.round(startPdvM!)} m del PDV. Actualiza el GPS si no estás en el local.
+          </p>
+        ) : startPdvM != null ? (
+          <p className={`visit-gps-span ${farStartPdv ? "is-warn" : ""}`.trim()}>
+            Inicio a ~{Math.round(startPdvM)} m del PDV
+          </p>
+        ) : null}
+        {endPdvM != null ? (
+          <p className={`visit-gps-span ${farEndPdv ? "is-warn" : ""}`.trim()}>
+            Cierre a ~{Math.round(endPdvM)} m del PDV
+          </p>
+        ) : null}
+        {gpsOk ? <p className="gps-ok-note">{gpsOk}</p> : null}
+        {proof !== "none" ? (
+          <p className="visit-gps-proof">
+            <ShieldCheck size={14} aria-hidden />
+            {proof === "full"
+              ? "Prueba de visita: GPS de inicio y cierre"
+              : proof === "photo"
+                ? "Prueba de visita: foto del PDV"
+                : "Prueba de visita: GPS parcial"}
+          </p>
+        ) : null}
+      </div>
+      <div className="visit-gps-actions">
+        {canPinGps ? (
+          <Button
+            type="button"
+            variant={hasGps ? "secondary" : "accent"}
+            disabled={gpsBusy}
+            onClick={onPinGps}
+          >
+            <Crosshair size={16} />
+            {gpsBusy ? "Obteniendo…" : hasGps ? "Actualizar GPS" : "Guardar GPS ahora"}
+          </Button>
+        ) : null}
+        {visit.id > 0 ? (
+          <Button type="button" variant="secondary" onClick={onShowMap}>
+            <MapPin size={16} />
+            Ver mapa
+          </Button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 /** Ficha de visita: identidad, GPS accionable, OV y cierre. */
 export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
   const { user } = useAuth();
@@ -102,19 +270,30 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [current, setCurrent] = useState(visit);
   const [saleJustConfirmed, setSaleJustConfirmed] = useState(false);
+  const [gpsConfirm, setGpsConfirm] = useState(false);
+  const [gpsConfirmNote, setGpsConfirmNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setCurrent(visit);
+  }, [open, visit]);
+
+  useEffect(() => {
+    if (!open) {
+      setGpsConfirm(false);
+      return;
+    }
     setError(null);
     setGpsOk(null);
     setClosing(false);
     setSelling((prev) => prev || hasVisitSaleDraft(visit.id));
     setShowMap(false);
+    setGpsConfirm(false);
+    setGpsConfirmNote(null);
     setViewSaleDoc(false);
     setConfirmCancel(false);
     setSaleJustConfirmed(false);
-  }, [open, visit]);
+  }, [open, visit.id]);
 
   const clientName = current.client?.name ?? `Cliente #${current.client_id}`;
   const clientId =
@@ -142,8 +321,11 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
   async function onStart() {
     setBusy(true);
     setError(null);
+    setGpsConfirmNote(null);
     try {
-      const geo = await getCurrentPosition(15_000, coordsFromClient(current.client));
+      const geo = await getCurrentPosition(15_000, coordsFromClient(current.client), {
+        maximumAge: 0,
+      });
       const updated = await startVisit(current.id, {
         latitude: geo.ok ? geo.fix.latitude : null,
         longitude: geo.ok ? geo.fix.longitude : null,
@@ -152,7 +334,8 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
       });
       setCurrent(updated);
       onUpdated(updated);
-      if (!geo.ok) setError(`Iniciada sin GPS: ${geo.reason}`);
+      setGpsConfirmNote(gpsConfirmMessage(updated, geo.ok ? null : geo.reason));
+      setGpsConfirm(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar la visita");
     } finally {
@@ -165,9 +348,14 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
     setError(null);
     setGpsOk(null);
     try {
-      const geo = await getCurrentPosition(15_000, coordsFromClient(current.client));
+      const geo = await getCurrentPosition(15_000, coordsFromClient(current.client), {
+        maximumAge: 0,
+      });
       if (!geo.ok) {
-        setError(geo.reason);
+        const fail =
+          `${geo.reason}. Mala señal o sin conexión. Puedes continuar y reintentar; el cierre también toma GPS.`;
+        setError(fail);
+        setGpsConfirmNote(fail);
         return;
       }
       const updated = await pinVisitGps(current.id, {
@@ -175,14 +363,16 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
         longitude: geo.fix.longitude,
         gps_accuracy_m: geo.fix.accuracy_m,
         gps_offline: Boolean(geo.fix.mocked),
+        replace_start: true,
       });
       setCurrent(updated);
       onUpdated(updated);
       const acc =
         geo.fix.accuracy_m != null ? ` · ±${Math.round(geo.fix.accuracy_m)} m` : "";
       setGpsOk(
-        `${geo.fix.mocked ? "GPS de prueba" : "GPS"} guardado${acc}`,
+        `${geo.fix.mocked ? "GPS de prueba" : "Posición de inicio"} actualizada${acc}`,
       );
+      setGpsConfirmNote(gpsConfirmMessage(updated, null));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar el GPS");
     } finally {
@@ -214,7 +404,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
   const canCancel =
     !sale && (current.status === "programada" || current.status === "en_curso");
 
-  const overlayOpen = closing || selling || showMap || viewSaleDoc;
+  const overlayOpen = closing || selling || showMap || viewSaleDoc || gpsConfirm;
   const note = rewriteCloseNote(current.description, sale);
 
   return (
@@ -368,62 +558,26 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
                 </strong>
               </article>
             ) : null}
-            {note ? (
-              <article className="visit-ficha-fact">
-                <span className="muted small">Nota</span>
-                <strong>{note}</strong>
-              </article>
-            ) : null}
           </div>
 
-          <section className={`visit-gps-card ${hasGps ? "has-fix" : "needs-fix"}`.trim()}>
-            <div className="visit-gps-copy">
-              <p className="eyebrow">Ubicación GPS</p>
-              {hasGps ? (
-                <>
-                  <strong>
-                    {Number(current.latitude).toFixed(5)}, {Number(current.longitude).toFixed(5)}
-                  </strong>
-                  <span className="muted small">
-                    {current.gps_accuracy_m
-                      ? `±${Number(current.gps_accuracy_m).toFixed(0)} m`
-                      : "Precisión no reportada"}
-                    {current.gps_offline ? " · prueba / offline" : ""}
-                    {current.gps_captured_at ? ` · ${formatWhen(current.gps_captured_at)}` : ""}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <strong>Sin coordenada aún</strong>
-                  <span className="muted small">
-                    {isMockGpsEnabled()
-                      ? "GPS de prueba activo en el header. Pulsa guardar para fijar el punto."
-                      : "Captura ahora para dejar evidencia en la visita."}
-                  </span>
-                </>
-              )}
-              {gpsOk ? <p className="gps-ok-note">{gpsOk}</p> : null}
-            </div>
-            <div className="visit-gps-actions">
-              {canPinGps ? (
-                <Button
-                  type="button"
-                  variant={hasGps ? "secondary" : "accent"}
-                  disabled={gpsBusy}
-                  onClick={() => void onPinGps()}
-                >
-                  <Crosshair size={16} />
-                  {gpsBusy ? "Obteniendo…" : hasGps ? "Actualizar GPS" : "Guardar GPS ahora"}
-                </Button>
-              ) : null}
-              {current.id > 0 ? (
-                <Button type="button" variant="secondary" onClick={() => setShowMap(true)}>
-                  <MapPin size={16} />
-                  Ver mapa
-                </Button>
-              ) : null}
-            </div>
-          </section>
+          {note ? (
+            <section className="visit-note-card" aria-label="Nota de la visita">
+              <p className="eyebrow">
+                <StickyNote size={12} aria-hidden /> Nota de campo
+              </p>
+              <p>{note}</p>
+            </section>
+          ) : null}
+
+          <VisitGpsEvidence
+            visit={current}
+            hasGps={hasGps}
+            canPinGps={canPinGps}
+            gpsBusy={gpsBusy}
+            gpsOk={gpsOk}
+            onPinGps={() => void onPinGps()}
+            onShowMap={() => setShowMap(true)}
+          />
 
           {error ? (
             <p className="form-error" role="alert">
@@ -463,10 +617,6 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
             onUpdated(updated);
             onClose();
           }}
-          onVisitPatched={(updated) => {
-            setCurrent(updated);
-            onUpdated(updated);
-          }}
         />
       ) : null}
 
@@ -480,8 +630,53 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
         />
       ) : null}
 
-      {showMap ? (
-        <VisitMapSheet visit={current} open onClose={() => setShowMap(false)} />
+      {showMap || gpsConfirm ? (
+        <VisitMapSheet
+          visit={current}
+          open
+          eyebrow={gpsConfirm ? "Confirmar posición" : undefined}
+          blurb={
+            gpsConfirm
+              ? hasGps
+                ? `¿Estás en ${clientName}?`
+                : "No hay GPS aún. Reintenta o continúa sin conexión (temporal)."
+              : undefined
+          }
+          notice={
+            gpsConfirm && gpsConfirmNote ? (
+              <p className="visit-gps-span is-warn" role="status">
+                {gpsConfirmNote}
+              </p>
+            ) : null
+          }
+          footer={
+            gpsConfirm ? (
+              <div className="side-sheet-actions">
+                <Button
+                  type="button"
+                  variant={hasGps ? "accent" : "ghost"}
+                  disabled={gpsBusy}
+                  onClick={() => setGpsConfirm(false)}
+                >
+                  {hasGps ? "Sí, estoy aquí" : "Continuar sin GPS"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={gpsBusy}
+                  onClick={() => void onPinGps()}
+                >
+                  <Crosshair size={16} />
+                  {gpsBusy ? "Actualizando…" : "Actualizar GPS"}
+                </Button>
+              </div>
+            ) : undefined
+          }
+          onClose={() => {
+            setShowMap(false);
+            setGpsConfirm(false);
+          }}
+        />
       ) : null}
     </>
   );

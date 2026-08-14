@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
+import { ProductThumb } from "./ProductThumb";
 import { QuoteDocument } from "./QuoteDocument";
 import { fetchProducts } from "../lib/api";
 import {
@@ -211,6 +212,7 @@ export function SaleDetailSheet({
               <span className="field-label">Productos</span>
               <div className="sale-detail-lines">
                 <div className="sale-detail-lines-head" aria-hidden>
+                  <span />
                   <span>Producto</span>
                   <span>Cant.</span>
                   <span>P. unit.</span>
@@ -220,17 +222,19 @@ export function SaleDetailSheet({
                   {(sale.items ?? []).map((line) => {
                     const product = byId.get(line.product_id);
                     return (
-                      <li key={`${sale.id}-${line.product_id}`}>
-                        <span>
+                      <li key={`${sale.id}-${line.product_id}`} className="sale-detail-line">
+                        <ProductThumb src={product?.image_url} alt="" />
+                        <span className="sale-detail-line-product">
                           <strong>{product?.name ?? `Producto #${line.product_id}`}</strong>
                           <span className="muted small">
                             {line.quantity} × ${Number(line.unit_price).toFixed(2)}
+                            {product?.presentation ? ` · ${product.presentation}` : ""}
                             {product?.sku ? ` · ${product.sku}` : ""}
                           </span>
                         </span>
-                        <span>{line.quantity}</span>
-                        <span>${Number(line.unit_price).toFixed(2)}</span>
-                        <span>
+                        <span className="sale-detail-line-qty">{line.quantity}</span>
+                        <span className="sale-detail-line-unit">${Number(line.unit_price).toFixed(2)}</span>
+                        <span className="sale-detail-line-total">
                           <strong>${Number(line.line_total).toFixed(2)}</strong>
                         </span>
                       </li>

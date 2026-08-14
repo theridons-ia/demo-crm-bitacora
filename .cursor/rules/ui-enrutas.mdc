@@ -68,7 +68,8 @@ Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pant
 - **En curso:** componente `LiveLed` (punto coral parpadeante) en ficha, card activa, lista y agenda.
 - Al crear visita (ahora/programada): cerrar form y **abrir la ficha** de esa visita (`setDetailVisit`), no solo dejar el listado.
 - Cancelar visita: `POST /api/visits/{id}/cancel` desde la ficha (programada o en curso **sin OV**).
-- **Lista de visitas:** chips **Programadas · Culminadas · Canceladas** (default Programadas). El carrusel de fechas vive **dentro** de Programadas (hoy por defecto; **Todas** para el backlog). En curso: LED en la misma fila. Orden horario ASC. **Culminadas:** más reciente primero. Ficha: nombre del PDV una sola vez. Sin GPS/Trail en la fila. Pieza: `VisitRow`.
+- **Lista de visitas:** chips **Programadas · Culminadas · Canceladas** (default Programadas). El carrusel de fechas vive **dentro** de Programadas (hoy por defecto; **Todas** para el backlog). En curso: LED en la misma fila. Orden horario ASC. **Culminadas:** más reciente primero. Ficha: nombre del PDV una sola vez. Sin coords en la fila; si hay evidencia, meta **Prueba GPS**. Pieza: `VisitRow`.
+- Tras **Iniciar**: mapa «¿Estás en el PDV?». **Actualizar GPS** recaptura y **reemplaza el punto de inicio** (`pinVisitGps` + `replace_start`). No hay botón de trail. Sin señal: mensaje + continuar sin GPS (temporal). Al cerrar se toma un GPS nuevo.
 - **GPS de prueba (solo `npm run dev`):** toggle en el **header** (`GPS simular`). Simula estar **junto al PDV** (coords del cliente ± ~20 m) al iniciar, guardar GPS o cerrar. **No** genera un trail de puntos en movimiento. Al apagarlo, el muestreo continuo se detiene.
 - Mapa de evidencia (`VisitMapSheet`): PDV fucsia · Inicio negro · Trail coral · **Ahora** teal con etiqueta (posición actual, distinto del trail) · Cierre rojo.
 
@@ -93,15 +94,16 @@ Layout si hay OV y GPS (formato canónico):
 
 1. Card tiempo (`.visit-close-time`): **Hora iniciada** (`visited_at`) · **Hora de cierre** (ahora) · **Duración**.
 2. Card OV (`.visit-sale-confirmed`, borde coral): eyebrow **ORDEN DE VENTA** · `OV-#` · total e ítems.
-3. Card GPS (`.visit-gps-card.has-fix`): pin + **GPS EN ESTA VISITA** · coords · precisión (prueba/offline si aplica).
-4. Acciones en la card GPS (`.visit-gps-actions`): **Ver mapa** (`VisitMapSheet`) y **Actualizar GPS** (`pinVisitGps` / recaptura). El usuario revisa el punto y puede refrescarlo antes de confirmar.
+3. Card GPS (`.visit-gps-card`): **GPS de cierre** (se captura al abrir el cierre, fresco). Muestra el de inicio como referencia; no lo reutiliza.
+4. Acciones: **Ver mapa** y **Capturar de nuevo**. El cierre **no** llama `pinVisitGps` (eso pisa o ensucia el punto de inicio).
 5. **Nota (opcional)** con `TextField`.
 6. Footer: Cancelar + Confirmar cierre.
 
 Reglas de evidencia:
 
-- Si la visita **ya tiene lat/lng** (inicio o pin): reutilizar ese punto. No pedir foto ni “Omitir GPS”.
-- Si **no hay GPS**: al confirmar se intenta capturar; o omitir con `PhotoDrop` (español, nunca “Choose File”).
+- `visited_at` + lat/lng de la visita = **inicio** (automático al iniciar).
+- Al cerrar siempre se intenta un GPS **nuevo** (`end_*` / payload de close). Fecha/hora de fin = `closed_at` del servidor, no la hora del GPS de inicio.
+- Si falla el GPS de cierre: omitir con `PhotoDrop` (español, nunca “Choose File”).
 - Sin OV: advertencia → «Registrar venta» o «Cerrar sin venta».
 
 ## Wizard de venta standalone

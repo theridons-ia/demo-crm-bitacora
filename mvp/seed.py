@@ -113,29 +113,93 @@ def _ensure_suppliers(db) -> list[Supplier]:
 
 
 def _ensure_products(db) -> list[Product]:
+    today = _today()
     rows = [
-        ("COLA1", "Cola #1", "caja", "12.00", 420),
-        ("COLA2", "Cola #2", "caja", "15.00", 380),
-        ("LECHEABC", "Leche ABC", "pack", "8.00", 510),
-        ("AGUA600", "Agua 600ml", "paquete", "6.50", 640),
-        ("JUGO1L", "Jugo Naranja 1L", "caja", "14.00", 290),
-        ("MALTALATA", "Malta lata", "caja", "11.50", 310),
-        ("ARROZ5K", "Arroz 5kg", "saco", "9.80", 220),
-        ("ACEITE1L", "Aceite vegetal 1L", "caja", "18.50", 180),
-        ("HARINA1K", "Harina PAN 1kg", "paquete", "2.40", 800),
-        ("CAFE250", "Café molido 250g", "unidad", "4.75", 260),
-        ("GALLETAS", "Galletas surtidas", "caja", "7.20", 340),
-        ("JABON", "Jabón en polvo 1kg", "unidad", "3.90", 400),
+        ("COLA1", "Glup! Cola 1L", "caja", "12.00", 420, "/products/glup-cola-1l.jpg"),
+        ("COLA2", "Cola #2", "caja", "15.00", 380, None),
+        ("LECHEABC", "Purísima Leche Completa 1L", "pack", "8.00", 510, "/products/leche-purisima-completa.jpg"),
+        ("AGUA600", "Agua Minalba 600ml", "paquete", "6.50", 640, "/products/minalba-600.jpg"),
+        ("JUGO1L", "Jugo Naranja 1L", "caja", "14.00", 290, None),
+        ("MALTALATA", "Malta lata", "caja", "11.50", 310, None),
+        ("ARROZ5K", "Arroz 5kg", "saco", "9.80", 220, None),
+        ("ACEITE1L", "Aceite vegetal 1L", "caja", "18.50", 180, None),
+        ("HARINA1K", "Harina P.A.N. 1kg", "paquete", "2.40", 800, "/products/harina-pan.jpg"),
+        ("CAFE250", "Café molido 250g", "unidad", "4.75", 260, None),
+        ("GALLETAS", "Galletas surtidas", "caja", "7.20", 340, None),
+        ("JABON", "Jabón en polvo 1kg", "unidad", "3.90", 400, None),
+        ("LECHEDESC", "Purísima Leche Descremada 1L", "unidad", "1.85", 420, "/products/leche-purisima-descremada.jpg"),
+        ("GLUPMANZ", "Glup! Manzanita 2L", "unidad", "2.20", 280, "/products/glup-manzanita-2l.jpg"),
+        ("GLUPUVA", "Glup! Uva 1L", "unidad", "1.50", 300, "/products/glup-uva-1l.jpg"),
+        ("GREENSPOT", "Green Spot Iced Tea Limón", "unidad", "1.20", 240, "/products/greenspot-te-limon.jpg"),
+        ("ARIZMANGO", "AriZona Mucho Mango 200ml", "unidad", "1.60", 260, "/products/arizona-mucho-mango.jpg"),
+        ("PASTORENA", "La Pastoreña Leche Completa 1L", "unidad", "1.75", 360, "/products/leche-pastorena.jpg"),
+        ("MINALBA15", "Agua Minalba 1.5L", "unidad", "1.10", 400, "/products/minalba-15l.jpg"),
     ]
+    extras: dict[str, dict] = {
+        "COLA1": dict(brand="Glup!", category="Bebidas", presentation="Caja x12 · botella 1 L", barcode="759100000011", cost_usd="8.40", pack_units=12, min_stock=40, lot="G2607C", expires_on=today + timedelta(days=180)),
+        "COLA2": dict(brand="Cola", category="Bebidas", presentation="Caja x12", barcode="759100000012", cost_usd="10.50", pack_units=12, min_stock=40),
+        "LECHEABC": dict(brand="Purísima", category="Lácteos", presentation="Pack x6 · cartón 1 L", barcode="759200000021", cost_usd="6.20", pack_units=6, min_stock=50, lot="PU2608A", expires_on=today + timedelta(days=50), notes="UHT larga duración, vitaminas A y D."),
+        "AGUA600": dict(brand="Minalba", category="Bebidas", presentation="Paquete x12 · 600 ml", barcode="759300000031", cost_usd="4.10", pack_units=12, min_stock=60, notes="Agua mineral de manantial, libre de sodio."),
+        "JUGO1L": dict(brand="Jugo", category="Bebidas", presentation="Caja x6 · 1 L", barcode="759400000041", cost_usd="10.20", pack_units=6, min_stock=30, expires_on=today + timedelta(days=90)),
+        "MALTALATA": dict(brand="Malta", category="Bebidas", presentation="Caja x24 latas", barcode="759100000042", cost_usd="8.00", pack_units=24, min_stock=30),
+        "ARROZ5K": dict(brand="Abarrotes", category="Abarrotes", presentation="Saco 5 kg", barcode="759500000051", cost_usd="7.40", pack_units=1, min_stock=40, lot="AR2606"),
+        "ACEITE1L": dict(brand="Abarrotes", category="Abarrotes", presentation="Caja x12 · 1 L", barcode="759500000052", cost_usd="14.80", pack_units=12, min_stock=24),
+        "HARINA1K": dict(brand="P.A.N.", category="Abarrotes", presentation="Bolsa 1 kg", barcode="759000100001", cost_usd="1.90", pack_units=1, min_stock=80, lot="PAN2608", expires_on=today + timedelta(days=210), notes="Harina de maíz blanco precocida. Libre de gluten."),
+        "CAFE250": dict(brand="Café", category="Abarrotes", presentation="Bolsa 250 g", barcode="759500000053", cost_usd="3.40", pack_units=1, min_stock=30, expires_on=today + timedelta(days=240)),
+        "GALLETAS": dict(brand="Snacks", category="Snacks", presentation="Caja surtida", barcode="759600000061", cost_usd="5.10", pack_units=12, min_stock=40, expires_on=today + timedelta(days=150)),
+        "JABON": dict(brand="Limpieza", category="Limpieza", presentation="Bolsa 1 kg", barcode="759700000071", cost_usd="2.60", pack_units=1, min_stock=40),
+        "LECHEDESC": dict(brand="Purísima", category="Lácteos", presentation="Cartón 1 L", barcode="759200000022", cost_usd="1.35", pack_units=1, min_stock=40, lot="PD2608B", expires_on=today + timedelta(days=45), notes="Descremada UHT, menos de 1% de grasa."),
+        "GLUPMANZ": dict(brand="Glup!", category="Bebidas", presentation="Botella 2 L", barcode="759100000013", cost_usd="1.55", pack_units=1, min_stock=36, lot="GM2607", expires_on=today + timedelta(days=160)),
+        "GLUPUVA": dict(brand="Glup!", category="Bebidas", presentation="Botella 1 L", barcode="759100000014", cost_usd="1.05", pack_units=1, min_stock=36, lot="GU2607", expires_on=today + timedelta(days=160)),
+        "GREENSPOT": dict(brand="Green Spot", category="Bebidas", presentation="Botella 500 ml", barcode="759400000043", cost_usd="0.82", pack_units=1, min_stock=30, lot="GS2608", expires_on=today + timedelta(days=90)),
+        "ARIZMANGO": dict(brand="AriZona", category="Bebidas", presentation="Caja 200 ml", barcode="850000000201", cost_usd="1.10", pack_units=1, min_stock=24, lot="AZ2606", expires_on=today + timedelta(days=120), notes="Jugo cocktail de mango. Libre de gluten."),
+        "PASTORENA": dict(brand="La Pastoreña", category="Lácteos", presentation="Cartón 1 L", barcode="759200000023", cost_usd="1.25", pack_units=1, min_stock=40, lot="LP2608", expires_on=today + timedelta(days=55), notes="Leche completa larga vida, vitaminas A y D."),
+        "MINALBA15": dict(brand="Minalba", category="Bebidas", presentation="Botella 1.5 L", barcode="759300000032", cost_usd="0.72", pack_units=1, min_stock=48, notes="Agua mineral de manantial, libre de sodio."),
+    }
     out: list[Product] = []
-    for sku, name, unit, price, stock in rows:
+    for sku, name, unit, price, stock, image_url in rows:
+        extra = extras.get(sku, {})
+        cost = extra.get("cost_usd")
         p = db.query(Product).filter(Product.sku == sku).first()
         if not p:
-            p = Product(sku=sku, name=name, unit=unit, price_usd=Decimal(price), stock=stock)
+            p = Product(
+                sku=sku,
+                name=name,
+                unit=unit,
+                price_usd=Decimal(price),
+                stock=stock,
+                image_url=image_url,
+                brand=extra.get("brand"),
+                category=extra.get("category"),
+                presentation=extra.get("presentation"),
+                barcode=extra.get("barcode"),
+                cost_usd=Decimal(cost) if cost else None,
+                pack_units=extra.get("pack_units"),
+                min_stock=extra.get("min_stock") or 40,
+                lot=extra.get("lot"),
+                expires_on=extra.get("expires_on"),
+                notes=extra.get("notes"),
+            )
             db.add(p)
             db.flush()
-        elif p.stock < 80:
-            p.stock = stock
+        else:
+            if p.stock < 80:
+                p.stock = stock
+            p.name = name
+            # No pisar fotos que el supervisor ya cargó (data URL u otra ruta).
+            if image_url and (not p.image_url or p.image_url.startswith("/products/")):
+                p.image_url = image_url
+            if extra and p.brand is None:
+                p.brand = extra.get("brand")
+                p.category = extra.get("category")
+                p.presentation = extra.get("presentation")
+                p.barcode = extra.get("barcode")
+                p.cost_usd = Decimal(cost) if cost else None
+                p.pack_units = extra.get("pack_units")
+                p.min_stock = extra.get("min_stock") or 40
+                p.lot = extra.get("lot")
+                p.expires_on = extra.get("expires_on")
+                p.notes = extra.get("notes")
         out.append(p)
     return out
 
@@ -364,10 +428,15 @@ def seed_rich_demo(db, users: dict[str, User], products: list[Product], supplier
             scheduled_date=visited.date(),
             scheduled_time=time(10, 0),
             visited_at=visited,
+            closed_at=visited + timedelta(minutes=25),
             latitude=c.latitude,
             longitude=c.longitude,
             gps_accuracy_m=Decimal("18.0") if c.latitude is not None else None,
             gps_captured_at=visited if c.latitude is not None else None,
+            end_latitude=c.latitude,
+            end_longitude=c.longitude,
+            end_gps_accuracy_m=Decimal("16.0") if c.latitude is not None else None,
+            end_gps_captured_at=visited + timedelta(minutes=25) if c.latitude is not None else None,
             gps_skipped=c.latitude is None,
             gps_skip_reason="Sin pin PDV" if c.latitude is None else None,
             created_at=visited - timedelta(hours=2),
@@ -697,10 +766,15 @@ def sync_marina_today_route(db, users: dict[str, User], products: list[Product])
                 scheduled_date=today,
                 scheduled_time=time(hour, minute),
                 visited_at=visited,
+                closed_at=visited + timedelta(minutes=18),
                 latitude=c.latitude,
                 longitude=c.longitude,
                 gps_accuracy_m=Decimal("12.0"),
                 gps_captured_at=visited,
+                end_latitude=c.latitude,
+                end_longitude=c.longitude,
+                end_gps_accuracy_m=Decimal("10.0"),
+                end_gps_captured_at=visited + timedelta(minutes=18),
                 created_at=visited - timedelta(hours=1),
             )
             db.add(visit)

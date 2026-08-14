@@ -1,6 +1,6 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal } from "./Modal";
 import { ApiError, fetchVisitGpsPoints } from "../lib/api";
 import { clientPdvIconFor, sellerNowIcon, trailIconForSource } from "../lib/mapMarkers";
@@ -16,25 +16,49 @@ type Props = {
   visit: Visit;
   open: boolean;
   onClose: () => void;
+  eyebrow?: string;
+  blurb?: string;
+  notice?: ReactNode;
+  footer?: ReactNode;
 };
 
 function visitFallbackPoints(visit: Visit): VisitGpsPoint[] {
-  if (visit.latitude == null || visit.longitude == null) return [];
-  return [
-    {
+  const points: VisitGpsPoint[] = [];
+  if (visit.latitude != null && visit.longitude != null) {
+    points.push({
       id: 0,
       visit_id: visit.id,
       latitude: String(visit.latitude),
       longitude: String(visit.longitude),
       accuracy_m: visit.gps_accuracy_m,
-      captured_at: visit.gps_captured_at ?? visit.created_at,
-      source: visit.status === "completada" ? "end" : "start",
-    },
-  ];
+      captured_at: visit.gps_captured_at ?? visit.visited_at ?? visit.created_at,
+      source: "start",
+    });
+  }
+  if (visit.end_latitude != null && visit.end_longitude != null) {
+    points.push({
+      id: -1,
+      visit_id: visit.id,
+      latitude: String(visit.end_latitude),
+      longitude: String(visit.end_longitude),
+      accuracy_m: visit.end_gps_accuracy_m ?? null,
+      captured_at: visit.end_gps_captured_at ?? visit.closed_at ?? visit.created_at,
+      source: "end",
+    });
+  }
+  return points;
 }
 
 /** Mapa Leaflet: PDV (fucsia + nombre) + trail del vendedor. */
-export function VisitMapSheet({ visit, open, onClose }: Props) {
+export function VisitMapSheet({
+  visit,
+  open,
+  onClose,
+  eyebrow,
+  blurb,
+  notice,
+  footer,
+}: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [points, setPoints] = useState<VisitGpsPoint[]>([]);
@@ -181,18 +205,21 @@ export function VisitMapSheet({ visit, open, onClose }: Props) {
       open={open}
       onClose={onClose}
       size="wide"
-      eyebrow="Evidencia GPS"
+      eyebrow={eyebrow ?? "Evidencia GPS"}
       title={clientName}
       blurb={
-        loading
+        blurb ??
+        (loading
           ? "Cargando puntos…"
           : points.length
             ? `${points.length} punto(s) vendedor${hasPdv ? " · PDV en mapa" : ""}`
             : hasPdv
               ? "Solo pin del PDV (sin trail aún)"
-              : "Sin coordenadas"
+              : "Sin coordenadas")
       }
+      footer={footer}
     >
+      {notice}
       {error ? <p className="form-error">{error}</p> : null}
 
       <div className="map-legend" aria-hidden>

@@ -1,12 +1,17 @@
 import { Clock, Crosshair, MapPin } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 import { PhotoDrop } from "./PhotoDrop";
-import { TextField } from "./TextField";
+import { TextAreaField, TextField } from "./TextField";
 import { VisitMapSheet } from "./VisitMapSheet";
-import { ApiError, closeVisit, pinVisitGps, type VisitCloseInput } from "../lib/api";
-import { coordsFromClient, getCurrentPosition, GPS_ACCURACY_WARN_M } from "../lib/gps";
+import { ApiError, closeVisit, type VisitCloseInput } from "../lib/api";
+import {
+  coordsFromClient,
+  getCurrentPosition,
+  GPS_ACCURACY_WARN_M,
+  type GeoFix,
+} from "../lib/gps";
 import { removeLocalVisit } from "../lib/offlineDb";
 import { enqueueCloseVisit, enqueueOfflineVisitSync } from "../lib/offlineQueue";
 import { formatDateTime } from "../lib/caracasTime";
@@ -20,8 +25,6 @@ type Props = {
   onClosed: (visit: Visit) => void;
   /** Si no hay OV: volver a la ficha para registrar venta. */
   onGoRegisterSale?: () => void;
-  /** Si se actualiza el GPS antes de cerrar, avisar a la ficha/lista. */
-  onVisitPatched?: (visit: Visit) => void;
 };
 
 function isLocalPendingVisit(visit: Visit): boolean {
@@ -51,15 +54,8 @@ function formatStay(startedIso: string, ended: Date): string {
   return `${hours} h ${minutes} min`;
 }
 
-function existingGpsFields(visit: Visit): Partial<VisitCloseInput> {
-  return {
-    latitude: Number(visit.latitude),
-    longitude: Number(visit.longitude),
-    gps_accuracy_m: visit.gps_accuracy_m != null ? Number(visit.gps_accuracy_m) : null,
-    gps_offline: Boolean(visit.gps_offline),
-    gps_captured_at: visit.gps_captured_at,
-    gps_skipped: false,
-  };
+function formatFix(fix: { latitude: number; longitude: number; accuracy_m?: number | null }): string {
+  return `${fix.latitude.toFixed(5)}, ${fix.longitude.toFixed(5)}`;
 }
 
 function CloseTimeSummary({ visit }: { visit: Visit }) {
@@ -88,7 +84,7 @@ function CloseTimeSummary({ visit }: { visit: Visit }) {
 }
 
 /**
- * Cierre de visita: evidencia solo si falta GPS.
+ * Cierre de visita: captura GPS de cierre (distinto del de inicio).
  * La venta se registra antes, en la visita abierta — aquí no se cotiza de nuevo.
  */
 export function CloseVisitSheet({
@@ -97,7 +93,6 @@ export function CloseVisitSheet({
   onClose,
   onClosed,
   onGoRegisterSale,
-  onVisitPatched,
 }: Props) {
   const [draft, setDraft] = useState(visit);
   const [phase, setPhase] = useState<"warn" | "close">(
@@ -112,6 +107,9 @@ export function CloseVisitSheet({
   const [submitting, setSubmitting] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [closeFix, setCloseFix] = useState<GeoFix | null>(null);
+  const [closeGpsError, setCloseGpsError] = useState<string | null>(null);
+  const closeGpsStarted = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -124,68 +122,61 @@ export function CloseVisitSheet({
     setAccuracyWarn(null);
     setError(null);
     setShowMap(false);
+    setCloseFix(null);
+    setCloseGpsError(null);
+    closeGpsStarted.current = false;
   }, [open, visit.id, visit.sale]);
 
   const existingSale = draft.sale ?? visit.sale ?? null;
-  const hasGps = visitHasGpsFix(draft);
+  const hasStartGps = visitHasGpsFix(draft);
 
-  if (!open) return null;
-
-  function applyGpsToDraft(next: Visit) {
-    setDraft(next);
-    onVisitPatched?.(next);
-  }
-
-  async function refreshGps() {
+  async function captureCloseGps() {
     setGpsBusy(true);
     setError(null);
+    setCloseGpsError(null);
     setAccuracyWarn(null);
     try {
-      const geo = await getCurrentPosition(15_000, coordsFromClient(draft.client));
+      const geo = await getCurrentPosition(
+        15_000,
+        coordsFromClient(draft.client),
+        { maximumAge: 0 },
+      );
       if (!geo.ok) {
-        setError(geo.reason);
+        setCloseGpsError(geo.reason);
         return;
       }
+      setCloseFix(geo.fix);
       const acc = geo.fix.accuracy_m;
       if (acc != null && acc > GPS_ACCURACY_WARN_M) {
         setAccuracyWarn(
-          `GPS poco preciso (±${Math.round(acc)} m). Puedes confirmar o volver a actualizar.`,
+          `GPS de cierre poco preciso (±${Math.round(acc)} m). Puedes confirmar o volver a capturar.`,
         );
       }
-      if (draft.id > 0 && navigator.onLine) {
-        const updated = await pinVisitGps(draft.id, {
-          latitude: geo.fix.latitude,
-          longitude: geo.fix.longitude,
-          gps_accuracy_m: geo.fix.accuracy_m,
-          gps_offline: Boolean(geo.fix.mocked),
-        });
-        applyGpsToDraft(updated);
-      } else {
-        applyGpsToDraft({
-          ...draft,
-          latitude: String(geo.fix.latitude),
-          longitude: String(geo.fix.longitude),
-          gps_accuracy_m: acc != null ? String(acc) : draft.gps_accuracy_m,
-          gps_captured_at: geo.fix.captured_at,
-          gps_offline: Boolean(geo.fix.mocked),
-        });
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo actualizar el GPS");
+    } catch {
+      setCloseGpsError("No se pudo obtener el GPS de cierre");
     } finally {
       setGpsBusy(false);
     }
   }
 
+  useEffect(() => {
+    if (!open || phase !== "close") return;
+    if (closeGpsStarted.current) return;
+    closeGpsStarted.current = true;
+    void captureCloseGps();
+  }, [open, phase]);
+
+  if (!open) return null;
+
   async function submitClose(result: "sin_venta" | "venta_cerrada") {
     setError(null);
     setAccuracyWarn(null);
 
-    if (!hasGps && skipGps && !photoDataUrl) {
-      setError("Si omites el GPS, adjunta una foto del PDV");
+    if (skipGps && !photoDataUrl) {
+      setError("Si omites el GPS de cierre, adjunta una foto del PDV");
       return;
     }
-    if (!hasGps && skipGps && !skipReason.trim()) {
+    if (skipGps && !skipReason.trim()) {
       setError("Indica el motivo de omitir el GPS");
       return;
     }
@@ -193,11 +184,9 @@ export function CloseVisitSheet({
     setSubmitting(true);
     try {
       let gpsFields: Partial<VisitCloseInput>;
+      let usedFix: GeoFix | null = skipGps ? null : closeFix;
 
-      if (hasGps) {
-        gpsFields = existingGpsFields(draft);
-        if (photoDataUrl) gpsFields.photo_evidence = photoDataUrl;
-      } else if (skipGps) {
+      if (skipGps) {
         gpsFields = {
           gps_offline: true,
           gps_skipped: true,
@@ -205,37 +194,49 @@ export function CloseVisitSheet({
           photo_evidence: photoDataUrl,
         };
       } else {
-        const geo = await getCurrentPosition(15_000, coordsFromClient(draft.client));
-        if (geo.ok) {
-          const acc = geo.fix.accuracy_m;
+        if (!usedFix) {
+          const geo = await getCurrentPosition(
+            15_000,
+            coordsFromClient(draft.client),
+            { maximumAge: 0 },
+          );
+          if (geo.ok) {
+            usedFix = geo.fix;
+            setCloseFix(geo.fix);
+          } else if (photoDataUrl) {
+            gpsFields = {
+              gps_offline: true,
+              gps_skipped: true,
+              gps_skip_reason: skipReason.trim() || geo.reason,
+              photo_evidence: photoDataUrl,
+            };
+          } else {
+            setCloseGpsError(geo.reason);
+            setError(`${geo.reason}. Adjunta una foto o activa GPS de prueba.`);
+            setSubmitting(false);
+            return;
+          }
+        }
+
+        if (usedFix) {
+          const acc = usedFix.accuracy_m;
           if (acc != null && acc > GPS_ACCURACY_WARN_M) {
             setAccuracyWarn(
-              `GPS poco preciso (±${Math.round(acc)} m). Se guardará con alerta para el supervisor.`,
+              `GPS de cierre poco preciso (±${Math.round(acc)} m). Se guardará con alerta para el supervisor.`,
             );
           }
           gpsFields = {
-            latitude: geo.fix.latitude,
-            longitude: geo.fix.longitude,
-            gps_accuracy_m: geo.fix.accuracy_m,
-            gps_offline: false,
-            gps_captured_at: geo.fix.captured_at,
+            latitude: usedFix.latitude,
+            longitude: usedFix.longitude,
+            gps_accuracy_m: usedFix.accuracy_m,
+            gps_offline: Boolean(usedFix.mocked),
+            gps_captured_at: usedFix.captured_at,
             gps_skipped: false,
           };
-        } else if (photoDataUrl) {
-          gpsFields = {
-            gps_offline: true,
-            gps_skipped: true,
-            gps_skip_reason: skipReason.trim() || geo.reason,
-            photo_evidence: photoDataUrl,
-          };
-        } else {
-          setError(`${geo.reason}. Adjunta una foto o activa GPS de prueba.`);
-          setSubmitting(false);
-          return;
         }
       }
 
-      if (photoDataUrl && !gpsFields.photo_evidence) {
+      if (photoDataUrl && gpsFields! && !gpsFields.photo_evidence) {
         gpsFields.photo_evidence = photoDataUrl;
       }
 
@@ -246,21 +247,25 @@ export function CloseVisitSheet({
           (existingSale
             ? `Cierre con ${saleOrderCode(existingSale)}`
             : "Cerrada sin venta"),
-        ...gpsFields,
+        ...gpsFields!,
       };
 
+      const closedAt = new Date().toISOString();
       const finished: Visit = {
         ...draft,
         status: "completada",
         result: payload.result,
         description: payload.description ?? visit.description,
-        latitude: payload.latitude != null ? String(payload.latitude) : visit.latitude,
-        longitude: payload.longitude != null ? String(payload.longitude) : visit.longitude,
-        gps_accuracy_m:
-          payload.gps_accuracy_m != null
-            ? String(payload.gps_accuracy_m)
-            : visit.gps_accuracy_m,
+        closed_at: closedAt,
+        end_latitude: payload.latitude != null ? String(payload.latitude) : null,
+        end_longitude: payload.longitude != null ? String(payload.longitude) : null,
+        end_gps_accuracy_m:
+          payload.gps_accuracy_m != null ? String(payload.gps_accuracy_m) : null,
+        end_gps_captured_at: payload.gps_captured_at ?? closedAt,
         gps_offline: Boolean(payload.gps_offline),
+        gps_skipped: payload.gps_skipped,
+        gps_skip_reason: payload.gps_skip_reason ?? null,
+        photo_evidence: payload.photo_evidence ?? draft.photo_evidence,
       };
 
       const offlineOrLocal = !navigator.onLine || isLocalPendingVisit(visit);
@@ -271,11 +276,15 @@ export function CloseVisitSheet({
           client_id: visit.client_id,
           description: payload.description,
           result: payload.result,
-          latitude: payload.latitude ?? null,
-          longitude: payload.longitude ?? null,
-          gps_accuracy_m: payload.gps_accuracy_m ?? null,
-          gps_captured_at: payload.gps_captured_at ?? new Date().toISOString(),
-          visited_at: new Date().toISOString(),
+          latitude: draft.latitude != null ? Number(draft.latitude) : null,
+          longitude: draft.longitude != null ? Number(draft.longitude) : null,
+          gps_accuracy_m: draft.gps_accuracy_m != null ? Number(draft.gps_accuracy_m) : null,
+          gps_captured_at: draft.gps_captured_at ?? visit.visited_at ?? visit.created_at,
+          visited_at: visit.visited_at || visit.created_at,
+          end_latitude: payload.latitude ?? null,
+          end_longitude: payload.longitude ?? null,
+          end_gps_accuracy_m: payload.gps_accuracy_m ?? null,
+          end_gps_captured_at: payload.gps_captured_at ?? closedAt,
           gps_skipped: payload.gps_skipped ?? false,
           gps_skip_reason: payload.gps_skip_reason ?? null,
           photo_evidence: payload.photo_evidence ?? null,
@@ -316,9 +325,15 @@ export function CloseVisitSheet({
 
   const clientName = draft.client?.name ?? visit.client?.name ?? `Cliente #${visit.client_id}`;
   const itemCount = existingSale?.items?.length ?? 0;
-  const gpsLabel = hasGps
+  const startLabel = hasStartGps
     ? `${Number(draft.latitude).toFixed(5)}, ${Number(draft.longitude).toFixed(5)}`
     : null;
+  const closeReady = Boolean(closeFix) && !skipGps;
+  const blurb = existingSale
+    ? `${saleOrderCode(existingSale)}${closeReady ? " · GPS de cierre listo" : " · capturando GPS de cierre"}`
+    : closeReady
+      ? "Cierre sin venta · GPS de cierre listo"
+      : "Cierre sin venta · GPS de cierre";
 
   if (phase === "warn" && !existingSale) {
     return (
@@ -371,13 +386,7 @@ export function CloseVisitSheet({
       onClose={onClose}
       eyebrow="Cerrar visita"
       title={clientName}
-      blurb={
-        existingSale
-          ? `${saleOrderCode(existingSale)}${hasGps ? " · GPS ya capturado" : " · falta evidencia GPS"}`
-          : hasGps
-            ? "Cierre sin venta · GPS ya capturado"
-            : "Cierre sin venta · falta GPS"
-      }
+      blurb={blurb}
       footer={
         <div className="side-sheet-actions">
           <Button type="button" variant="ghost" disabled={submitting} onClick={onClose}>
@@ -389,7 +398,7 @@ export function CloseVisitSheet({
             variant="accent"
             disabled={submitting || gpsBusy}
           >
-            {submitting ? "Cerrando…" : gpsBusy ? "Actualizando GPS…" : "Confirmar cierre"}
+            {submitting ? "Cerrando…" : gpsBusy ? "Capturando GPS…" : "Confirmar cierre"}
           </Button>
         </div>
       }
@@ -415,85 +424,104 @@ export function CloseVisitSheet({
           </p>
         )}
 
-        {hasGps ? (
-          <section className="visit-gps-card has-fix">
-            <div className="visit-gps-copy">
-              <p className="eyebrow">
-                <MapPin size={12} aria-hidden /> GPS en esta visita
-              </p>
-              <strong>{gpsLabel}</strong>
-              <span className="muted small">
-                {draft.gps_accuracy_m
-                  ? `±${Number(draft.gps_accuracy_m).toFixed(0)} m`
-                  : "Precisión no reportada"}
-                {draft.gps_offline ? " · prueba / offline" : ""}
-                . Revisa el mapa o actualiza el punto si no coincide.
-              </span>
-            </div>
-            <div className="visit-gps-actions">
+        <section className={`visit-gps-card ${closeReady ? "has-fix" : "needs-fix"}`.trim()}>
+          <div className="visit-gps-copy">
+            <p className="eyebrow">
+              <MapPin size={12} aria-hidden /> GPS de cierre
+            </p>
+            {closeFix && !skipGps ? (
+              <>
+                <strong>{formatFix(closeFix)}</strong>
+                <span className="muted small">
+                  {closeFix.accuracy_m != null
+                    ? `±${Math.round(closeFix.accuracy_m)} m`
+                    : "Precisión no reportada"}
+                  {closeFix.mocked ? " · prueba / offline" : ""}
+                  {" · se toma ahora, distinto del inicio"}
+                </span>
+              </>
+            ) : skipGps ? (
+              <>
+                <strong>GPS de cierre omitido</strong>
+                <span className="muted small">Se guardará la foto del PDV como evidencia.</span>
+              </>
+            ) : gpsBusy ? (
+              <>
+                <strong>Obteniendo ubicación…</strong>
+                <span className="muted small">Fecha y hora de cierre van con este punto.</span>
+              </>
+            ) : (
+              <>
+                <strong>Falta el punto de cierre</strong>
+                <span className="muted small">
+                  {closeGpsError ??
+                    "Al confirmar se intentará de nuevo. Si no hay señal, omite y adjunta foto."}
+                </span>
+              </>
+            )}
+            {hasStartGps ? (
+              <span className="muted small">Inicio: {startLabel}</span>
+            ) : (
+              <span className="muted small">Esta visita no tenía GPS de inicio.</span>
+            )}
+          </div>
+          <div className="visit-gps-actions">
+            {draft.id > 0 || hasStartGps ? (
               <Button type="button" variant="secondary" onClick={() => setShowMap(true)}>
                 <MapPin size={16} />
                 Ver mapa
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={gpsBusy || submitting}
-                onClick={() => void refreshGps()}
-              >
-                <Crosshair size={16} />
-                {gpsBusy ? "Actualizando…" : "Actualizar GPS"}
-              </Button>
-            </div>
-          </section>
-        ) : (
-          <>
-            <section className="visit-gps-card needs-fix">
-              <div className="visit-gps-copy">
-                <p className="eyebrow">Evidencia GPS</p>
-                <strong>Esta visita no tiene coordenada</strong>
-                <span className="muted small">
-                  Al confirmar se intentará capturar el GPS. Si no hay señal, omite y adjunta
-                  foto del PDV.
-                </span>
-              </div>
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={skipGps}
-                  onChange={(e) => setSkipGps(e.target.checked)}
-                />
-                Omitir GPS (requiere foto)
-              </label>
-            </section>
-
-            {skipGps ? (
-              <TextField
-                id="skip-reason"
-                label="Motivo de omitir GPS"
-                value={skipReason}
-                onChange={(e) => setSkipReason(e.target.value)}
-                required
-              />
             ) : null}
-
-            <PhotoDrop
-              id="visit-photo"
-              label={skipGps ? "Foto del PDV (obligatoria)" : "Foto del PDV (si falla el GPS)"}
-              hint={skipGps ? "Obligatoria · galería o cámara · JPG o PNG" : "Opcional · galería o cámara · JPG o PNG"}
-              readyHint="Evidencia de cierre"
-              value={photoDataUrl}
-              disabled={submitting}
-              onChange={setPhotoDataUrl}
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={gpsBusy || submitting || skipGps}
+              onClick={() => void captureCloseGps()}
+            >
+              <Crosshair size={16} />
+              {gpsBusy ? "Capturando…" : closeFix ? "Capturar de nuevo" : "Capturar GPS"}
+            </Button>
+          </div>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={skipGps}
+              onChange={(e) => setSkipGps(e.target.checked)}
             />
-          </>
-        )}
+            Omitir GPS de cierre (requiere foto)
+          </label>
+        </section>
 
-        <TextField
+        {skipGps ? (
+          <TextField
+            id="skip-reason"
+            label="Motivo de omitir GPS"
+            value={skipReason}
+            onChange={(e) => setSkipReason(e.target.value)}
+            required
+          />
+        ) : null}
+
+        {skipGps || closeGpsError || !closeFix ? (
+          <PhotoDrop
+            id="visit-photo"
+            label={skipGps ? "Foto del PDV (obligatoria)" : "Foto del PDV (si falla el GPS)"}
+            hint={skipGps ? "Obligatoria · galería o cámara · JPG o PNG" : "Opcional · galería o cámara · JPG o PNG"}
+            readyHint="Evidencia de cierre"
+            value={photoDataUrl}
+            disabled={submitting}
+            onChange={setPhotoDataUrl}
+          />
+        ) : null}
+
+        <TextAreaField
           id="close-notes"
-          label="Nota (opcional)"
+          label="Nota de campo"
+          hint="Queda en la bitácora de esta visita. Visible para el equipo."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          placeholder="Ej. PDV cerrado, prometió pedido el sábado, cobrar saldo…"
+          className="input-area is-visit-note"
         />
 
         {accuracyWarn ? <p className="gps-ok-note">{accuracyWarn}</p> : null}

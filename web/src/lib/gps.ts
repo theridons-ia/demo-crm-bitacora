@@ -97,6 +97,7 @@ export function mockCurrentPosition(near?: GeoNear | null): GeoResult {
 export function getCurrentPosition(
   timeoutMs = 15000,
   near?: GeoNear | null,
+  opts?: { maximumAge?: number },
 ): Promise<GeoResult> {
   if (isMockGpsEnabled()) {
     return Promise.resolve(mockCurrentPosition(near));
@@ -140,12 +141,30 @@ export function getCurrentPosition(
               : "No se pudo obtener ubicación";
         resolve({ ok: false, skipped: true, reason });
       },
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 10_000 },
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: opts?.maximumAge ?? 10_000 },
     );
   });
 }
 
 export const GPS_ACCURACY_WARN_M = 100;
+
+/** Distancia en metros (Haversine). */
+export function distanceMeters(
+  aLat: number,
+  aLng: number,
+  bLat: number,
+  bLng: number,
+): number {
+  const R = 6371000;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLng = ((bLng - aLng) * Math.PI) / 180;
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((aLat * Math.PI) / 180) *
+      Math.cos((bLat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
 
 export function mapsUrl(lat: string | number, lng: string | number): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;

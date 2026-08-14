@@ -1,4 +1,4 @@
-import { Package, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { formatQuoteAmount, IVA_RATE, quoteMoney, roundMoney } from "../lib/quoteMoney";
 import type { CurrencyCode, Product } from "../lib/types";
@@ -114,9 +114,6 @@ export function SaleQuoter({
             return (
               <li key={line.key} className="sale-quoter-row">
                 <div className="sale-quoter-product">
-                  <span className="stock-product-icon" aria-hidden>
-                    <Package size={16} />
-                  </span>
                   <SearchPickField
                     id={`ql-prod-${line.key}`}
                     aria-label="Producto"
@@ -130,7 +127,8 @@ export function SaleQuoter({
                     ).map((p) => ({
                       id: p.id,
                       title: p.name,
-                      subtitle: `${p.sku} · stock ${p.stock}`,
+                      subtitle: [p.presentation, p.sku, `stock ${p.stock}`].filter(Boolean).join(" · "),
+                      imageUrl: p.image_url,
                     }))}
                     onChange={(id) => {
                       const next = id != null ? byId.get(id) : undefined;

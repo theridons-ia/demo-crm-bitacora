@@ -6,6 +6,7 @@ import { StockTable, stockState, type StockState } from "../components/StockTabl
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchProducts } from "../lib/api";
 import { getCachedProducts } from "../lib/offlineQueue";
+import { productSearchHay } from "../lib/productFields";
 import type { Product } from "../lib/types";
 
 /** Inventario vendedor — tabla de existencias (sin ajuste rápido). */
@@ -43,17 +44,17 @@ export function InventoryPage() {
     [products],
   );
   const toRestock = useMemo(
-    () => products.filter((p) => stockState(p.stock) !== "disponible").length,
+    () => products.filter((p) => stockState(p.stock, p.min_stock) !== "disponible").length,
     [products],
   );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
-      const st = stockState(p.stock);
+      const st = stockState(p.stock, p.min_stock);
       if (status !== "todos" && st !== status) return false;
       if (!q) return true;
-      return `${p.name} ${p.sku}`.toLowerCase().includes(q);
+      return productSearchHay(p).includes(q);
     });
   }, [products, query, status]);
 

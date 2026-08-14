@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
@@ -11,8 +11,12 @@ router = APIRouter(prefix="/api/sales", tags=["sales"])
 
 
 @router.get("", response_model=list[SaleOut])
-def list_sales(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return list_sales_for_user(db, current_user)
+def list_sales(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    client_id: int | None = Query(default=None),
+):
+    return list_sales_for_user(db, current_user, client_id=client_id)
 
 
 @router.post("", response_model=SaleOut)

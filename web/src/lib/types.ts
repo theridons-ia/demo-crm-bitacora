@@ -45,6 +45,13 @@ export type Visit = {
   gps_accuracy_m: string | null;
   gps_captured_at: string | null;
   gps_offline: boolean;
+  gps_skipped?: boolean;
+  gps_skip_reason?: string | null;
+  photo_evidence?: string | null;
+  end_latitude?: string | null;
+  end_longitude?: string | null;
+  end_gps_accuracy_m?: string | null;
+  end_gps_captured_at?: string | null;
   local_uuid: string | null;
   created_at: string;
   client: Client | null;
@@ -59,6 +66,17 @@ export type Product = {
   unit: string;
   price_usd: string;
   stock: number;
+  image_url?: string | null;
+  brand?: string | null;
+  category?: string | null;
+  presentation?: string | null;
+  barcode?: string | null;
+  cost_usd?: string | null;
+  pack_units?: number | null;
+  min_stock?: number;
+  lot?: string | null;
+  expires_on?: string | null;
+  notes?: string | null;
   is_active: boolean;
 };
 
@@ -145,6 +163,7 @@ export type Sale = {
   created_at: string;
   items: SaleItem[];
   client: Client | null;
+  seller?: User | null;
 };
 
 export type GpsPointSource = "start" | "watch" | "end";

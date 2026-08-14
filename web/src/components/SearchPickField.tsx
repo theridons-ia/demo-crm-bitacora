@@ -1,10 +1,13 @@
 import { ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { ProductThumb } from "./ProductThumb";
 
 export type SearchPickOption = {
   id: number;
   title: string;
   subtitle?: string;
+  /** Si viene (aunque sea null), se muestra miniatura de producto. */
+  imageUrl?: string | null;
 };
 
 type Props = {
@@ -49,9 +52,10 @@ export function SearchPickField({
   const fieldId = id ?? autoId;
   const listId = `${fieldId}-list`;
   const rootRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const searchArmedRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [searchArmed, setSearchArmed] = useState(false);
 
   const selected = useMemo(
     () => options.find((option) => option.id === valueId) ?? null,
@@ -64,8 +68,12 @@ export function SearchPickField({
   }, [options, query]);
 
   useEffect(() => {
-    if (!open) return;
-    const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 40);
+    if (!open) {
+      searchArmedRef.current = false;
+      setSearchArmed(false);
+      setQuery("");
+      return;
+    }
     const onDoc = (event: MouseEvent) => {
       if (rootRef.current?.contains(event.target as Node)) return;
       setOpen(false);
@@ -79,11 +87,18 @@ export function SearchPickField({
     document.addEventListener("mousedown", onDoc);
     window.addEventListener("keydown", onKey, true);
     return () => {
-      window.clearTimeout(focusTimer);
       document.removeEventListener("mousedown", onDoc);
       window.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
+
+  /** El teclado solo sale si el vendedor toca Buscar, no al abrir la lista. */
+  function armSearch(el: HTMLInputElement) {
+    if (searchArmedRef.current) return;
+    el.readOnly = false;
+    searchArmedRef.current = true;
+    setSearchArmed(true);
+  }
 
   function choose(option: SearchPickOption) {
     onChange(option.id);
@@ -111,19 +126,24 @@ export function SearchPickField({
           });
         }}
       >
-        <span className="search-pick-copy">
-          {selected ? (
-            <>
-              <strong className="search-pick-title">{selected.title}</strong>
-              {selected.subtitle ? (
-                <span className="search-pick-sub">{selected.subtitle}</span>
-              ) : null}
-            </>
-          ) : (
-            <span className="search-pick-placeholder">{placeholder}</span>
-          )}
+        <span className="search-pick-trigger-main">
+          {selected && "imageUrl" in selected ? (
+            <ProductThumb src={selected.imageUrl} alt="" />
+          ) : null}
+          <span className="search-pick-copy">
+            {selected ? (
+              <>
+                <strong className="search-pick-title">{selected.title}</strong>
+                {selected.subtitle ? (
+                  <span className="search-pick-sub">{selected.subtitle}</span>
+                ) : null}
+              </>
+            ) : (
+              <span className="search-pick-placeholder">{placeholder}</span>
+            )}
+          </span>
         </span>
-        <ChevronDown size={16} aria-hidden />
+        <ChevronDown className="search-pick-chevron" size={16} aria-hidden />
       </button>
 
       {open ? (
@@ -131,17 +151,22 @@ export function SearchPickField({
           <div className="search-pick-search">
             <Search size={15} aria-hidden />
             <input
-              ref={searchRef}
               className="input"
-                    type="text"
-                    inputMode="search"
-                    enterKeyHint="search"
+              type="text"
+              inputMode="search"
+              enterKeyHint="search"
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
+              readOnly={!searchArmed}
               placeholder="Buscar…"
               value={query}
               aria-label="Buscar"
+              onTouchStart={(e) => armSearch(e.currentTarget)}
+              onMouseDown={(e) => armSearch(e.currentTarget)}
+              onFocus={(e) => {
+                if (e.currentTarget.readOnly) e.currentTarget.blur();
+              }}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.preventDefault();
@@ -161,10 +186,15 @@ export function SearchPickField({
                       className={active ? "search-pick-option is-active" : "search-pick-option"}
                       onClick={() => choose(option)}
                     >
-                      <strong className="search-pick-title">{option.title}</strong>
-                      {option.subtitle ? (
-                        <span className="search-pick-sub">{option.subtitle}</span>
+                      {"imageUrl" in option ? (
+                        <ProductThumb src={option.imageUrl} alt="" />
                       ) : null}
+                      <span className="search-pick-option-copy">
+                        <strong className="search-pick-title">{option.title}</strong>
+                        {option.subtitle ? (
+                          <span className="search-pick-sub">{option.subtitle}</span>
+                        ) : null}
+                      </span>
                     </button>
                   </li>
                 );

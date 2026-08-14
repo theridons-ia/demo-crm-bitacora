@@ -74,7 +74,7 @@ def _persist_sale(
         if existing:
             return (
                 db.query(Sale)
-                .options(joinedload(Sale.items), joinedload(Sale.client))
+                .options(joinedload(Sale.items), joinedload(Sale.client), joinedload(Sale.seller))
                 .filter(Sale.id == existing.id)
                 .one()
             )
@@ -133,7 +133,7 @@ def _persist_sale(
     db.commit()
     return (
         db.query(Sale)
-        .options(joinedload(Sale.items), joinedload(Sale.client))
+        .options(joinedload(Sale.items), joinedload(Sale.client), joinedload(Sale.seller))
         .filter(Sale.id == sale.id)
         .one()
     )
@@ -181,12 +181,21 @@ def create_sale_without_visit(db: Session, payload: SaleCreate, *, seller: User)
     )
 
 
-def list_sales_for_user(db: Session, user: User, *, limit: int = 100) -> list[Sale]:
+def list_sales_for_user(
+    db: Session,
+    user: User,
+    *,
+    client_id: int | None = None,
+    limit: int = 100,
+) -> list[Sale]:
     query = (
         db.query(Sale)
-        .options(joinedload(Sale.items), joinedload(Sale.client))
+        .options(joinedload(Sale.items), joinedload(Sale.client), joinedload(Sale.seller))
         .order_by(Sale.created_at.desc())
     )
     if user.role == UserRole.vendedor:
         query = query.filter(Sale.seller_id == user.id)
+    if client_id is not None:
+        query = query.filter(Sale.client_id == client_id)
+        limit = max(limit, 40)
     return query.limit(limit).all()

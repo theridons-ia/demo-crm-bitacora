@@ -10,7 +10,7 @@ from ..services.client_assignments import assign_client_to_seller, seller_can_se
 from ..models import Client, GpsPointSource, Sale, User, UserRole, Visit, VisitGpsPoint, VisitStatus
 from ..schemas import SaleIn, SaleOut, VisitAssign, VisitCancel, VisitClose, VisitCreate, VisitOut, VisitStart
 from ..services.sales import create_sale_for_open_visit
-from ..services.visits import close_visit_with_optional_sale
+from ..services.visits import close_visit_with_optional_sale, maybe_alert_gps_vs_pdv
 from ..timeutil import now_utc
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
@@ -157,6 +157,17 @@ def create_visit(
                 source=GpsPointSource.start if payload.status == VisitStatus.en_curso else GpsPointSource.watch,
             )
         )
+        if payload.status == VisitStatus.en_curso:
+            visit.client = client
+            maybe_alert_gps_vs_pdv(
+                db,
+                visit,
+                seller_id=current_user.id,
+                latitude=payload.latitude,
+                longitude=payload.longitude,
+                gps_accuracy_m=payload.gps_accuracy_m,
+                when_label="Inicio",
+            )
     db.commit()
     return _visit_query(db).filter(Visit.id == visit.id).one()
 
@@ -197,6 +208,17 @@ def start_visit(
                 source=GpsPointSource.start,
             )
         )
+        if visit.client is None:
+            visit.client = db.query(Client).filter(Client.id == visit.client_id).first()
+        maybe_alert_gps_vs_pdv(
+            db,
+            visit,
+            seller_id=current_user.id,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            gps_accuracy_m=body.gps_accuracy_m,
+            when_label="Inicio",
+        )
     db.add(visit)
     db.commit()
     return _visit_query(db).filter(Visit.id == visit_id).one()
@@ -209,7 +231,7 @@ def pin_visit_gps(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Fuerza guardar coordenadas en la visita (ficha) y deja un punto en el trail."""
+    """Recalibra el GPS de inicio (ficha) o deja un punto de trail si no se pide reemplazo."""
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
         raise HTTPException(status_code=404, detail="Visita no encontrada")
@@ -221,12 +243,24 @@ def pin_visit_gps(
         raise HTTPException(status_code=400, detail="No hay coordenada para guardar")
 
     now = now_utc()
-    had_fix = visit.latitude is not None and visit.longitude is not None
-    visit.latitude = payload.latitude
-    visit.longitude = payload.longitude
-    visit.gps_accuracy_m = payload.gps_accuracy_m
-    visit.gps_offline = payload.gps_offline
-    visit.gps_captured_at = now
+    replace_start = bool(payload.replace_start) or visit.latitude is None
+    if replace_start:
+        visit.latitude = payload.latitude
+        visit.longitude = payload.longitude
+        visit.gps_accuracy_m = payload.gps_accuracy_m
+        visit.gps_offline = payload.gps_offline
+        visit.gps_captured_at = now
+        if visit.client is None:
+            visit.client = db.query(Client).filter(Client.id == visit.client_id).first()
+        maybe_alert_gps_vs_pdv(
+            db,
+            visit,
+            seller_id=current_user.id,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            gps_accuracy_m=payload.gps_accuracy_m,
+            when_label="Inicio",
+        )
     db.add(
         VisitGpsPoint(
             visit_id=visit.id,
@@ -234,7 +268,7 @@ def pin_visit_gps(
             longitude=payload.longitude,
             accuracy_m=payload.gps_accuracy_m,
             captured_at=now,
-            source=GpsPointSource.watch if had_fix else GpsPointSource.start,
+            source=GpsPointSource.start if replace_start else GpsPointSource.watch,
         )
     )
     db.add(visit)
