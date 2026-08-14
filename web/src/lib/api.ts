@@ -98,6 +98,22 @@ export function fetchSellers(): Promise<User[]> {
   return request<User[]>("/api/users/sellers");
 }
 
+export type SellerCreateInput = {
+  email: string;
+  full_name: string;
+  password: string;
+  route_name?: string | null;
+  initials?: string | null;
+};
+
+export function createSeller(payload: SellerCreateInput): Promise<User> {
+  return request<User>("/api/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, role: "vendedor" }),
+  });
+}
+
 export function fetchClients(params?: { seller_id?: number }): Promise<Client[]> {
   const q = new URLSearchParams();
   if (params?.seller_id != null) q.set("seller_id", String(params.seller_id));
@@ -569,6 +585,23 @@ export type Supplier = {
 
 export function fetchSuppliers(): Promise<Supplier[]> {
   return request<Supplier[]>("/api/suppliers");
+}
+
+export type SupplierCreateInput = {
+  name: string;
+  rif?: string | null;
+  ci?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+};
+
+export function createSupplier(payload: SupplierCreateInput): Promise<Supplier> {
+  return request<Supplier>("/api/suppliers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function fetchBankAccounts(params?: {

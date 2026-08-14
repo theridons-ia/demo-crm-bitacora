@@ -34,3 +34,5 @@ Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
 - Un signo de moneda: `Total` + `$ 13.57`, nunca `Total $ $`.
 - Pago: USD = Efectivo USD / Zelle / USDT. Bs = Efectivo Bs / Pago móvil / Transferencia.
 - Wizard 1-2-3: `WizardSteps` (sin blurb de pasos). Footer **Anterior** + **Siguiente / Confirmar OV**. Nombre de producto completo. Cuenta destino una vez.
+- Inventario: fila nombre · cantidad · estado. SKU / mínimo / $ no apilan 6 renglones en el teléfono.
+- Cliente: tap = ficha. Sin pin, coords ni Ver|Editar|Re-asignar en la fila.

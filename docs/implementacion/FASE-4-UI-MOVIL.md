@@ -1,6 +1,6 @@
 # Fase 4 — Homogeneizar UI móvil
 
-**Estado:** SF-4.0–4.6 hechas. Siguiente: SF-4.7 inventario/clientes.  
+**Estado:** SF-4.0–4.7 hechas. Siguiente: SF-4.8 supervisor móvil.  
 **Fecha de arranque:** 2026-08-13  
 **No toca:** `startVisit`, `createVisitSale`, paleta EnRutas, Overlay Modal vs SideSheet.
 
@@ -151,7 +151,7 @@ El contenido (lista, mapa, Iniciar) cabe en la primera pantalla.
 - Un `+`: en vendedor móvil se oculta el CTA del header (Visitas / Ventas / Clientes); el FAB abre esas mismas altas (`?nueva=1` / `?nuevo=1`).
 - FAB oculto con overlay (`body.has-overlay`). Padding extra en listas vendedor y en acciones de «En curso» para no tapar botones.
 - Chips en una sola fila con scroll horizontal (`Canceladas`, `Agotado`, …).
-- `Cargando…` con clase `.list-loading` en listas vendedor.
+- `Cargando…` con clase `.list-loading` en listas vendedor. Listas densas usan `ListSkeleton` (filas fantasma).
 
 ### Cómo
 | Pieza | Ruta |
@@ -299,7 +299,7 @@ Repetir el video 12-56: 2 líneas + IVA + Zelle + resumen + Confirmar OV. Produc
 
 ## SF-4.7 — Inventario y clientes densos
 
-**Estado:** pendiente  
+**Estado:** hecho  
 **Modelo:** GPT-5.6 Terra  
 **Videos:** 12-17 · 12-38
 
@@ -311,8 +311,24 @@ Más de 2 productos por pantalla; cliente = una acción.
 - Clientes vendedor: tap = ficha (ya va bien). Quitar Pin + coords de la fila.
 - Clientes supervisor: una acción por card (no Ver | Editar | Re-asignar a la vez); el resto en la ficha.
 
+### Qué se hizo
+- Inventario móvil: una fila (nombre · cantidad · estado). SKU, barra, mínimo, categoría y valor quedan en desktop (≥860px).
+- Clientes: `ClientRow` (nombre · RIF/zona · chevron). Sin pin, coords ni tres botones.
+- Supervisor: tap abre ficha; Asignar / Editar viven en la ficha.
+
+### Cómo
+| Pieza | Ruta |
+|-------|------|
+| Tabla stock | `web/src/components/StockTable.tsx` |
+| Fila cliente | `web/src/components/ClientRow.tsx` |
+| Cartera vendedor | `web/src/pages/ClientsPage.tsx` |
+| Cartera supervisor | `web/src/pages/ClientAssignmentsPage.tsx` |
+| Ficha | `web/src/components/ClientDetailSheet.tsx` |
+
 ### Cómo probarlo
-Inventario: ≥6 SKU visibles. Clientes: tap único.
+1. Inventario (marina o supervisor): en ~400px se ven ≥6 SKU sin bajar mucho. No hay 6 renglones por producto.
+2. Clientes vendedor: tap = ficha. No aparece Pin ni lat/lng en la lista.
+3. Clientes supervisor: una fila; Ver/Editar/Re-asignar no están juntos. Asignar y Editar salen de la ficha.
 
 ---
 

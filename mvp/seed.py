@@ -5,7 +5,7 @@ el cliente marcador «Autoservicio El Parque».
 
 Usuarios (password demo1234):
   marina@bitacora.local · carlos@bitacora.local · laura@bitacora.local
-  supervisor@bitacora.local · admin@bitacora.local
+  arodriguez@bitacora.local · supervisor@bitacora.local · admin@bitacora.local
 """
 
 from __future__ import annotations
@@ -73,6 +73,7 @@ def _ensure_users(db) -> dict[str, User]:
         ("marina@bitacora.local", "Marina Gómez", UserRole.vendedor, "MG", "Ruta Centro · Lara"),
         ("carlos@bitacora.local", "Carlos Ruiz", UserRole.vendedor, "CR", "Ruta Este · Yaracuy"),
         ("laura@bitacora.local", "Laura Méndez", UserRole.vendedor, "LM", "Ruta Sur · Carabobo"),
+        ("arodriguez@bitacora.local", "Ali Rodríguez", UserRole.vendedor, "AR", "Valencia · Puerto Cabello"),
         ("supervisor@bitacora.local", "Yuliana Supervisor", UserRole.supervisor, "YS", "Equipo Occidente"),
         ("admin@bitacora.local", "Admin Bitácora", UserRole.admin, "AD", None),
     ]
@@ -603,6 +604,7 @@ def seed_rich_demo(db, users: dict[str, User], products: list[Product], supplier
 
 MARINA_TODAY_MARKER = "Ruta hoy ·"
 MARINA_OVERDUE_MARKER = "Sin asistir ·"
+ALI_TODAY_MARKER = "Ruta Ali ·"
 
 
 def sync_marina_today_route(db, users: dict[str, User], products: list[Product]) -> None:
@@ -799,6 +801,148 @@ def sync_marina_today_route(db, users: dict[str, User], products: list[Product])
     print("Marina hoy: 6 visitas (3 cerradas + 3 pendientes) + 2 sin asistir")
 
 
+def _coming_saturday(today: date) -> date:
+    """Sábado de esta semana (si hoy es sábado, el mismo día)."""
+    if today.weekday() == 5:
+        return today
+    return today + timedelta(days=(5 - today.weekday()) % 7)
+
+
+def sync_ali_today_route(db, users: dict[str, User]) -> None:
+    """Ali Rodríguez: paradas reales Valencia (hoy) y Puerto Cabello (sábado).
+
+    Idempotente: recrea las programadas con marcador; no toca las ya cerradas.
+    """
+    ali = users.get("arodriguez")
+    if not ali:
+        print("  aviso: falta usuario arodriguez")
+        return
+
+    today = _today()
+    saturday = _coming_saturday(today)
+
+    # name, rif, address, phone, lat, lng, day, hour, minute
+    stops: list[tuple[str, str, str, str, float, float, date, int, int]] = [
+        (
+            "Bodegas Contigo",
+            "J-29504620-0",
+            "Av. Lisandro Alvarado, Valencia",
+            "+58-241-5553201",
+            10.16092,
+            -68.02793,
+            today,
+            9,
+            0,
+        ),
+        (
+            "Bodega Plaza Los Almendrones",
+            "J-44120011-1",
+            "Plaza Los Almendrones, Candelaria, Valencia",
+            "+58-241-5553202",
+            10.16963,
+            -68.01266,
+            today,
+            11,
+            0,
+        ),
+        (
+            "Licorería Playa Sonrisa",
+            "J-44120022-2",
+            "Frente a Playa Sonrisa, Calle 10 Mercado, Puerto Cabello",
+            "+58-242-5553203",
+            10.47475,
+            -68.01188,
+            saturday,
+            10,
+            0,
+        ),
+        (
+            "Hotel Ensenada Suites",
+            "J-44120033-3",
+            "Av. La Paz, CC Paseo Caribe, Cumboto Sur, Puerto Cabello",
+            "+58-242-3641824",
+            10.47158,
+            -68.02718,
+            saturday,
+            12,
+            0,
+        ),
+    ]
+
+    planned: list[tuple[Client, date, int, int, str]] = []
+    for name, rif, address, phone, lat, lng, day, hour, minute in stops:
+        c = _client_by_name(db, name)
+        if not c:
+            c = Client(
+                name=name,
+                rif=rif,
+                state="Carabobo",
+                address=address,
+                phone=phone,
+                latitude=Decimal(str(lat)),
+                longitude=Decimal(str(lng)),
+                notes="Ruta prueba Ali Rodríguez · Valencia / Puerto Cabello",
+            )
+            db.add(c)
+            db.flush()
+        else:
+            c.latitude = Decimal(str(lat))
+            c.longitude = Decimal(str(lng))
+            c.address = address
+            c.phone = c.phone or phone
+        _assign(db, ali, c)
+        planned.append((c, day, hour, minute, name))
+
+    stale = (
+        db.query(Visit)
+        .filter(
+            Visit.seller_id == ali.id,
+            Visit.description.isnot(None),
+            Visit.description.startswith(ALI_TODAY_MARKER),
+            Visit.status == VisitStatus.programada,
+        )
+        .all()
+    )
+    for v in stale:
+        db.delete(v)
+    db.flush()
+
+    kept = {
+        v.client_id
+        for v in db.query(Visit)
+        .filter(
+            Visit.seller_id == ali.id,
+            Visit.description.isnot(None),
+            Visit.description.startswith(ALI_TODAY_MARKER),
+            Visit.status != VisitStatus.programada,
+        )
+        .all()
+    }
+
+    created = 0
+    total = len(planned)
+    for i, (c, day, hour, minute, name) in enumerate(planned, start=1):
+        if c.id in kept:
+            continue
+        when = "hoy" if day == today else "sábado"
+        db.add(
+            Visit(
+                seller_id=ali.id,
+                client_id=c.id,
+                status=VisitStatus.programada,
+                description=f"{ALI_TODAY_MARKER}{i}/{total} · {when} · {name}",
+                scheduled_date=day,
+                scheduled_time=time(hour, minute),
+            )
+        )
+        created += 1
+
+    print(
+        f"Ali: 2 Valencia hoy + 2 Puerto Cabello sábado ({saturday.isoformat()}) "
+        f"· {created} visitas programadas nuevas"
+    )
+
+
 def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
     specs = [
         ("Caja USD", "Efectivo", BankAccountType.cash, CurrencyCode.USD, "Caja física oficina", 10),
@@ -862,6 +1006,7 @@ def run() -> None:
 
         seed_rich_demo(db, users, products, suppliers)
         sync_marina_today_route(db, users, products)
+        sync_ali_today_route(db, users)
 
         # Movimientos demo si la caja está vacía
         if db.query(BankMovement).count() == 0 and banks.get("Caja USD"):
@@ -912,7 +1057,7 @@ def run() -> None:
             f"Alertas abiertas: {n_alerts} · Mov. stock: {n_stock} · Productos: {db.query(Product).count()} "
             f"· Cuentas banco: {n_banks}"
         )
-        print("Usuarios: marina / carlos / laura / supervisor / admin @bitacora.local")
+        print("Usuarios: marina / carlos / laura / arodriguez / supervisor / admin @bitacora.local")
         print("Password: demo1234")
     finally:
         db.close()

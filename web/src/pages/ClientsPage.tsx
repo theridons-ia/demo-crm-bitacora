@@ -1,10 +1,12 @@
-import { Plus, Store } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
+import { ClientRow } from "../components/ClientRow";
 import { ListSearch } from "../components/ListSearch";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchClients } from "../lib/api";
 import { getCachedClients } from "../lib/offlineQueue";
@@ -100,11 +102,9 @@ export function ClientsPage() {
           </section>
         }
       >
-        <header className="page-header page-header-stack">
+        <header className="page-header page-header-with-action">
           <div>
-            <p className="eyebrow">Cartera</p>
             <h1 className="display-title">Clientes</h1>
-            <p className="muted">{clients.length} clientes en cartera</p>
           </div>
           <Button
             variant="accent"
@@ -128,44 +128,17 @@ export function ClientsPage() {
           />
         </div>
 
-        {loading ? <p className="muted list-loading">Cargando…</p> : null}
-        {error ? <p className="form-error">{error}</p> : null}
-
-        <ul className="ficha-stack">
-          {filtered.map((client) => {
-            const pin = hasPdvPin(client);
-            const id = client.rif ?? client.ci ?? "—";
-            return (
-              <li key={client.id}>
-                <button type="button" className="ficha" onClick={() => setSelected(client)}>
-                  <span className="ficha-icon" aria-hidden>
-                    <Store size={16} />
-                  </span>
-                  <span className="ficha-body">
-                    <span className="ficha-row">
-                      <h3 className="ficha-title">{client.name}</h3>
-                      {pin ? (
-                        <span className="badge badge-success">Pin</span>
-                      ) : (
-                        <span className="badge badge-progress">Sin pin</span>
-                      )}
-                    </span>
-                    <p className="ficha-meta">
-                      {id}
-                      {client.state ? ` · ${client.state}` : ""}
-                    </p>
-                    <p className="ficha-stats">
-                      {client.address ?? "Sin dirección"}
-                      {pin
-                        ? ` · ${Number(client.latitude).toFixed(3)}, ${Number(client.longitude).toFixed(3)}`
-                        : ""}
-                    </p>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+        {loading ? <ListSkeleton /> : (
+        <ul className="client-row-list">
+          {filtered.map((client) => (
+            <ClientRow
+              key={client.id}
+              client={client}
+              onClick={() => setSelected(client)}
+            />
+          ))}
         </ul>
+        )}
 
         {!loading && filtered.length === 0 ? (
           <p className="muted">Sin coincidencias. Pide asignación al supervisor o crea un cliente.</p>

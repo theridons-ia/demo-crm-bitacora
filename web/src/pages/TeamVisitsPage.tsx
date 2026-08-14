@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListSearch } from "../components/ListSearch";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchSellers, fetchVisits } from "../lib/api";
 import { formatDateTimeLong } from "../lib/caracasTime";
@@ -187,7 +188,7 @@ export function TeamVisitsPage() {
         </div>
       </div>
 
-      {loading ? <p className="muted">Cargando…</p> : null}
+      {loading ? <ListSkeleton /> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
       <ul className="ficha-stack">

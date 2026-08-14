@@ -39,6 +39,7 @@ export type Visit = {
   scheduled_date: string | null;
   scheduled_time?: string | null;
   visited_at: string | null;
+  closed_at?: string | null;
   latitude: string | null;
   longitude: string | null;
   gps_accuracy_m: string | null;

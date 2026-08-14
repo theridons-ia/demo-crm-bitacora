@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { MonthCalendar, calendarTodayISO } from "../components/MonthCalendar";
 import { Modal } from "../components/Modal";
 import { FormStep, SideSheet } from "../components/SideSheet";
@@ -335,7 +336,7 @@ export function RouteDayPage() {
           </div>
         </div>
 
-        {loading ? <p className="muted">Cargando…</p> : null}
+        {loading ? <ListSkeleton /> : null}
 
         <ul className="ficha-stack">
           {filtered.map((v) => {

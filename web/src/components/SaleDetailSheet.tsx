@@ -85,6 +85,17 @@ export function SaleDetailSheet({
     sale.client?.rif ?? (sale.client?.ci ? `CI ${sale.client.ci}` : null);
   const items = saleItemCount(sale);
   const units = saleUnitCount(sale);
+  const payLabel = sale.is_credit
+    ? "Crédito"
+    : PAYMENT_METHOD_LABEL[sale.payment_method] ?? sale.payment_method;
+  const avatar = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase() || "?";
 
   return (
     <Modal
@@ -121,68 +132,80 @@ export function SaleDetailSheet({
         </div>
 
         {tab === "resumen" ? (
-          <>
-            <div className="visit-sale-quote-summary" role="status">
-              <div>
-                <span className="muted small">Total</span>
+          <div className="profile-ficha">
+            <div className="visit-ficha-id">
+              <span className="visit-ficha-avatar" aria-hidden>
+                {avatar}
+              </span>
+              <div className="visit-ficha-id-copy">
+                <p className="eyebrow">Cliente</p>
+                <strong>{name}</strong>
+                <span className="muted small">
+                  {clientId ?? "Sin RIF/CI"}
+                  {sellerName ? ` · ${sellerName}` : ""}
+                </span>
+              </div>
+              <span className="badge badge-completada">{payLabel}</span>
+            </div>
+
+            <div className="visit-sale-confirmed" role="status">
+              <div className="visit-sale-confirmed-copy">
+                <p className="eyebrow">Resumen</p>
                 <strong>
                   ${Number(sale.total_amount).toFixed(2)} {sale.currency}
                 </strong>
-              </div>
-              <div>
-                <span className="muted small">IVA</span>
-                <strong>{sale.apply_iva || quoteData?.applyIva ? "16%" : "Sin IVA"}</strong>
-              </div>
-              <div>
-                <span className="muted small">Ítems</span>
-                <strong>
-                  {items} · {units} ud
-                </strong>
-              </div>
-              <div>
-                <span className="muted small">Pago</span>
-                <strong>
-                  {sale.is_credit
-                    ? "Crédito"
-                    : PAYMENT_METHOD_LABEL[sale.payment_method] ?? sale.payment_method}
-                </strong>
+                <div className="visit-sale-metrics sale-resumen-metrics">
+                  <div>
+                    <span className="muted small">IVA</span>
+                    <b>{sale.apply_iva || quoteData?.applyIva ? "16%" : "Sin IVA"}</b>
+                  </div>
+                  <div>
+                    <span className="muted small">Ítems</span>
+                    <b>
+                      {items} · {units} ud
+                    </b>
+                  </div>
+                  <div>
+                    <span className="muted small">Pago</span>
+                    <b>{payLabel}</b>
+                  </div>
+                  <div>
+                    <span className="muted small">Origen</span>
+                    <b>{SALE_ORIGIN_LABEL[sale.origin]}</b>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <dl className="visit-detail-grid">
-              <div className="visit-detail-row">
-                <dt>Cliente</dt>
-                <dd>
-                  {name}
-                  {clientId ? ` · ${clientId}` : ""}
-                </dd>
-              </div>
-              {sellerName ? (
-                <div className="visit-detail-row">
-                  <dt>Vendedor</dt>
-                  <dd>{sellerName}</dd>
-                </div>
-              ) : null}
-              <div className="visit-detail-row">
-                <dt>Origen</dt>
-                <dd>
-                  {SALE_ORIGIN_LABEL[sale.origin]}
-                  {sale.visit_id ? ` · visita #${sale.visit_id}` : " · sin visita"}
-                </dd>
-              </div>
+            <div className="visit-ficha-facts">
+              <article className="visit-ficha-fact">
+                <span className="muted small">Fecha</span>
+                <strong>{formatSaleWhen(sale.created_at)}</strong>
+              </article>
+              {sale.visit_id ? (
+                <article className="visit-ficha-fact">
+                  <span className="muted small">Visita</span>
+                  <strong>#{sale.visit_id}</strong>
+                </article>
+              ) : (
+                <article className="visit-ficha-fact">
+                  <span className="muted small">Visita</span>
+                  <strong>Sin visita</strong>
+                </article>
+              )}
               {sale.payment_reference ? (
-                <div className="visit-detail-row">
-                  <dt>Referencia</dt>
-                  <dd>{sale.payment_reference}</dd>
-                </div>
+                <article className="visit-ficha-fact visit-ficha-fact-wide">
+                  <span className="muted small">Referencia</span>
+                  <strong>{sale.payment_reference}</strong>
+                </article>
               ) : null}
               {sale.notes ? (
-                <div className="visit-detail-row">
-                  <dt>Nota</dt>
-                  <dd>{sale.notes}</dd>
-                </div>
+                <article className="visit-ficha-fact visit-ficha-fact-wide">
+                  <span className="muted small">Nota</span>
+                  <strong>{sale.notes}</strong>
+                </article>
               ) : null}
-            </dl>
+            </div>
 
             <div className="field">
               <span className="field-label">Productos</span>
@@ -201,7 +224,8 @@ export function SaleDetailSheet({
                         <span>
                           <strong>{product?.name ?? `Producto #${line.product_id}`}</strong>
                           <span className="muted small">
-                            {product?.sku ?? `ID ${line.product_id}`}
+                            {line.quantity} × ${Number(line.unit_price).toFixed(2)}
+                            {product?.sku ? ` · ${product.sku}` : ""}
                           </span>
                         </span>
                         <span>{line.quantity}</span>
@@ -215,7 +239,7 @@ export function SaleDetailSheet({
                 </ul>
               </div>
             </div>
-          </>
+          </div>
         ) : null}
 
         {tab === "documento" && quoteData ? (

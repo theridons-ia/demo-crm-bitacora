@@ -1,4 +1,4 @@
-import { Calendar, Clock, Crosshair, MapPin, Play, ShoppingCart, Square, XCircle } from "lucide-react";
+import { Calendar, Crosshair, MapPin, Play, ShoppingCart, Square, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
@@ -8,8 +8,8 @@ import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
 import { VisitMapSheet } from "./VisitMapSheet";
 import { VisitSaleWizard } from "./VisitSaleWizard";
-import { formatDateTime, todayISO } from "../lib/caracasTime";
-import { saleOrderCode } from "../lib/saleLabels";
+import { formatDateTime, formatPillParts, todayISO } from "../lib/caracasTime";
+import { rewriteCloseNote, saleOrderCode } from "../lib/saleLabels";
 import { hasVisitSaleDraft } from "../lib/saleWizardDraft";
 import { isVisitOverdue } from "../lib/visitOrder";
 import { ApiError, cancelVisit, pinVisitGps, startVisit } from "../lib/api";
@@ -40,6 +40,52 @@ function initials(name: string): string {
   if (!parts.length) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function VisitRangePills({ visit }: { visit: Visit }) {
+  const start = formatPillParts(visit.visited_at);
+  if (!start && visit.status !== "en_curso" && visit.status !== "completada") {
+    return null;
+  }
+  const endIso =
+    visit.closed_at ?? (visit.status === "completada" ? visit.gps_captured_at : null);
+  const end = formatPillParts(endIso);
+  const endPending = visit.status === "en_curso";
+
+  return (
+    <div className="visit-range" role="group" aria-label="Inicio y fin de la visita">
+      <article className="visit-range-pill">
+        <Calendar size={18} aria-hidden />
+        <div className="visit-range-copy">
+          <span className="muted small">Inicio</span>
+          {start ? (
+            <>
+              <strong>{start.date}</strong>
+              <span className="visit-range-time">{start.time}</span>
+            </>
+          ) : (
+            <strong>Pendiente</strong>
+          )}
+        </div>
+      </article>
+      <article className={`visit-range-pill ${endPending ? "is-live" : ""}`.trim()}>
+        <Calendar size={18} aria-hidden />
+        <div className="visit-range-copy">
+          <span className="muted small">Fin</span>
+          {endPending ? (
+            <strong>En curso</strong>
+          ) : end ? (
+            <>
+              <strong>{end.date}</strong>
+              <span className="visit-range-time">{end.time}</span>
+            </>
+          ) : (
+            <strong>—</strong>
+          )}
+        </div>
+      </article>
+    </div>
+  );
 }
 
 /** Ficha de visita: identidad, GPS accionable, OV y cierre. */
@@ -169,6 +215,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
     !sale && (current.status === "programada" || current.status === "en_curso");
 
   const overlayOpen = closing || selling || showMap || viewSaleDoc;
+  const note = rewriteCloseNote(current.description, sale);
 
   return (
     <>
@@ -301,6 +348,8 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
             </div>
           ) : null}
 
+          <VisitRangePills visit={current} />
+
           <div className="visit-ficha-facts">
             {current.client?.address ? (
               <article className="visit-ficha-fact">
@@ -319,18 +368,10 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
                 </strong>
               </article>
             ) : null}
-            {current.visited_at ? (
-              <article className="visit-ficha-fact">
-                <span className="muted small">
-                  <Clock size={12} /> Inicio
-                </span>
-                <strong>{formatWhen(current.visited_at)}</strong>
-              </article>
-            ) : null}
-            {current.description ? (
+            {note ? (
               <article className="visit-ficha-fact">
                 <span className="muted small">Nota</span>
-                <strong>{current.description}</strong>
+                <strong>{note}</strong>
               </article>
             ) : null}
           </div>

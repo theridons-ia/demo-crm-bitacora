@@ -1,9 +1,11 @@
-import { Plus, Store, UserPlus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
+import { ClientRow } from "../components/ClientRow";
 import { ListSearch } from "../components/ListSearch";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { SideSheet } from "../components/SideSheet";
 import { SelectField } from "../components/TextField";
 import { WorkspacePage } from "../layout/WorkspacePage";
@@ -20,11 +22,6 @@ function clientIdLabel(client: Client): string {
   if (client.rif) return client.rif;
   if (client.ci) return `CI ${client.ci}`;
   return "Sin RIF/CI";
-}
-
-function hasPdvPin(client: Client): boolean {
-  if (client.latitude == null || client.longitude == null) return false;
-  return Number.isFinite(Number(client.latitude)) && Number.isFinite(Number(client.longitude));
 }
 
 /** Supervisor: lista de clientes + alta/edición + asignar cartera (dropdown). */
@@ -180,17 +177,14 @@ export function ClientAssignmentsPage() {
           </section>
         }
       >
-        <header className="page-header page-header-stack">
+        <header className="page-header page-header-with-action">
           <div>
-            <p className="eyebrow">Cartera · PDV</p>
             <h1 className="display-title">Clientes</h1>
-            <p className="muted">
-              {clients.length} clientes · {unassignedCount} sin vendedor
-            </p>
           </div>
           <Button
             type="button"
             variant="accent"
+            className="header-plus-cta"
             onClick={() => {
               setEditing(null);
               setFormOpen(true);
@@ -238,72 +232,28 @@ export function ClientAssignmentsPage() {
           </label>
         </div>
 
-        {loading ? <p className="muted">Cargando…</p> : null}
-
-        <ul className="ficha-stack">
-          {filtered.map((client) => {
-            const sellerIds = assignedByClient.get(client.id) ?? [];
-            const sellerLabel =
-              sellerIds.length === 0
-                ? "Sin vendedor"
-                : sellerIds.map((id) => sellerNameById.get(id) ?? `#${id}`).join(", ");
-            const pin = hasPdvPin(client);
-            return (
-              <li key={client.id}>
-                <article className="ficha">
-                  <span className="ficha-icon" aria-hidden>
-                    <Store size={16} />
-                  </span>
-                  <div className="ficha-body">
-                    <div className="ficha-row">
-                      <h3 className="ficha-title">{client.name}</h3>
-                      {pin ? (
-                        <span className="badge badge-success">Pin</span>
-                      ) : (
-                        <span className="badge badge-progress">Sin pin</span>
-                      )}
-                    </div>
-                    <p className="ficha-meta">
-                      {clientIdLabel(client)}
-                      {client.state ? ` · ${client.state}` : ""}
-                    </p>
-                    <p className="ficha-stats">
-                      {client.address ?? "Sin dirección"}
-                    </p>
-                    <p className={`ficha-follow${sellerIds.length ? "" : " is-warn"}`}>
-                      {sellerLabel}
-                    </p>
-                    <div className="ficha-actions">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => {
-                          setSelected(client);
-                        }}
-                      >
-                        Ver
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditing(client);
-                          setFormOpen(true);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button type="button" variant="accent" onClick={() => openAssign(client)}>
-                        <UserPlus size={16} />
-                        {sellerIds.length ? "Re-asignar" : "Asignar"}
-                      </Button>
-                    </div>
-                  </div>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
+        {loading ? (
+          <ListSkeleton />
+        ) : (
+          <ul className="client-row-list">
+            {filtered.map((client) => {
+              const sellerIds = assignedByClient.get(client.id) ?? [];
+              const sellerLabel =
+                sellerIds.length === 0
+                  ? "Sin vendedor"
+                  : sellerIds.map((id) => sellerNameById.get(id) ?? `#${id}`).join(", ");
+              return (
+                <ClientRow
+                  key={client.id}
+                  client={client}
+                  extra={sellerLabel}
+                  warn={sellerIds.length === 0}
+                  onClick={() => setSelected(client)}
+                />
+              );
+            })}
+          </ul>
+        )}
 
         {!loading && filtered.length === 0 ? (
           <p className="muted">Sin coincidencias. Crea un cliente o cambia el filtro.</p>
@@ -332,11 +282,20 @@ export function ClientAssignmentsPage() {
         <ClientDetailSheet
           client={selected}
           open
+          sellerLabel={
+            (assignedByClient.get(selected.id) ?? [])
+              .map((id) => sellerNameById.get(id) ?? `#${id}`)
+              .join(", ") || "Sin vendedor"
+          }
+          assignLabel={
+            (assignedByClient.get(selected.id)?.length ?? 0) > 0 ? "Re-asignar" : "Asignar"
+          }
           onClose={() => setSelected(null)}
           onEdit={() => {
             setEditing(selected);
             setFormOpen(true);
           }}
+          onAssign={() => openAssign(selected)}
         />
       ) : null}
 

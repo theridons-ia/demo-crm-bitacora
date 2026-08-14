@@ -44,20 +44,20 @@ function StockTableRow({ product, onClick }: RowProps) {
         <span className="stock-product-icon" aria-hidden>
           <Package size={16} />
         </span>
-        <span>
+        <span className="stock-product-copy">
           <strong className="stock-product-name">{product.name}</strong>
           <span className="stock-product-sku">{product.sku}</span>
         </span>
       </div>
       <div className="stock-col stock-col-cat muted">{productCategory(product)}</div>
       <div className="stock-col stock-col-stock">
-        <strong>
+        <strong className="stock-qty">
           {product.stock} {product.unit}
         </strong>
         <div className="inv-bar-wrap" aria-hidden>
           <span className={`inv-bar inv-bar-${st}`} style={{ width: `${stockPct(product.stock)}%` }} />
         </div>
-        <span className="muted small">mínimo {LOW_STOCK}</span>
+        <span className="stock-min muted small">mínimo {LOW_STOCK}</span>
       </div>
       <div className="stock-col stock-col-state">
         <span

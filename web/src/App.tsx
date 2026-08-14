@@ -25,6 +25,7 @@ import { SellerRouteMapPage } from "./pages/SellerRouteMapPage";
 import { SellersPage } from "./pages/SellersPage";
 import { SupervisorHomePage } from "./pages/SupervisorHomePage";
 import { SupervisorStockPage } from "./pages/SupervisorStockPage";
+import { SuppliersPage } from "./pages/SuppliersPage";
 import { TeamMapPage } from "./pages/TeamMapPage";
 import { TeamVisitsPage } from "./pages/TeamVisitsPage";
 import { VisitsPage } from "./pages/VisitsPage";
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="vendedores" element={<SellersPage />} />
             <Route path="alertas" element={<AlertsInboxPage />} />
             <Route path="clientes" element={<ClientAssignmentsPage />} />
+            <Route path="proveedores" element={<SuppliersPage />} />
             <Route path="catalogo" element={<CatalogVisibilityPage />} />
             <Route path="inventario" element={<SupervisorStockPage />} />
             <Route path="finanzas" element={<FinanceHubPage />} />

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 from math import asin, cos, radians, sin, sqrt
 
@@ -131,6 +132,7 @@ def close_visit_with_optional_sale(
     visit.result = result
     if description is not None:
         visit.description = description
+    visit.closed_at = gps_captured_at or datetime.now(timezone.utc)
     # visited_at = inicio (start_visit). No pisarlo con el GPS de cierre.
     if visit.visited_at is None:
         visit.visited_at = gps_captured_at

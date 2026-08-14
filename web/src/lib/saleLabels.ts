@@ -1,4 +1,4 @@
-import { formatDateTime } from "./caracasTime";
+import { formatDateTime, formatSaleStamp } from "./caracasTime";
 import type { PaymentMethod, Sale, SaleOrigin } from "./types";
 
 export const SALE_ORIGIN_LABEL: Record<SaleOrigin, string> = {
@@ -37,14 +37,26 @@ export function sortSalesNewestFirst(sales: Sale[]): Sale[] {
   );
 }
 
-/** Código de OV confirmada (snapshot) o fallback OV-{id} en ventas viejas. */
+/** Código de OV confirmada (snapshot) o sello OV-YYMMDD-HHMM-id en ventas viejas. */
 export function saleOrderCode(sale: Sale): string {
-  if (!sale.quote_snapshot?.trim()) return `OV-${sale.id}`;
-  try {
-    const data = JSON.parse(sale.quote_snapshot) as { code?: unknown };
-    if (typeof data?.code === "string" && data.code.trim()) return data.code.trim();
-  } catch {
-    /* snapshot viejo o corrupto */
+  if (sale.quote_snapshot?.trim()) {
+    try {
+      const data = JSON.parse(sale.quote_snapshot) as { code?: unknown };
+      const code = typeof data?.code === "string" ? data.code.trim() : "";
+      if (code && !/^OV-\d+$/.test(code)) return code;
+    } catch {
+      /* snapshot viejo o corrupto */
+    }
   }
-  return `OV-${sale.id}`;
+  return formatSaleStamp(sale.created_at, sale.id);
+}
+
+/** Notas de cierre antiguas «Cierre con OV-41» → código actual. */
+export function rewriteCloseNote(description: string | null | undefined, sale: Sale | null): string | null {
+  if (!description?.trim()) return null;
+  if (!sale) return description;
+  const code = saleOrderCode(sale);
+  const next = description.replace(/\bOV-\d+\b/g, code);
+  if (/^Cierre con OV-[\w-]+\s*$/i.test(next.trim())) return null;
+  return next;
 }

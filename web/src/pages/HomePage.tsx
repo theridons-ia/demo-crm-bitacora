@@ -6,6 +6,7 @@ import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { PageWorkspace } from "../layout/PageWorkspace";
 import { ApiError, fetchClients, fetchSales, fetchVisits } from "../lib/api";
 import { formatLongDate, isSameCaracasDay, todayISO } from "../lib/caracasTime";
@@ -153,8 +154,9 @@ export function HomePage() {
           </div>
 
           {error ? <p className="form-error">{error}</p> : null}
-          {loading ? <p className="muted list-loading">Cargando…</p> : null}
-          {!loading && upcoming.length === 0 ? (
+          {loading ? (
+            <ListSkeleton count={4} />
+          ) : upcoming.length === 0 ? (
             <p className="muted">No hay visitas abiertas para hoy.</p>
           ) : (
             <ul className="visit-row-list">

@@ -56,6 +56,52 @@ export function formatDateTime(iso: string | Date | null | undefined): string {
   });
 }
 
+/** Inicio/Fin en pastilla: fecha corta + hora. */
+export function formatPillParts(
+  iso: string | Date | null | undefined,
+): { date: string; time: string } | null {
+  if (iso == null || iso === "") return null;
+  const d = asDate(iso);
+  if (!d) return null;
+  const date = d.toLocaleDateString(CARACAS_LOCALE, {
+    timeZone: CARACAS_TZ,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const time = d.toLocaleTimeString(CARACAS_LOCALE, {
+    timeZone: CARACAS_TZ,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return { date, time };
+}
+
+/** Inicio/Fin en una línea: «jue, 13 ago. · 11:48 p. m.» */
+export function formatPillWhen(iso: string | Date | null | undefined): string {
+  const parts = formatPillParts(iso);
+  if (!parts) return "—";
+  return `${parts.date} · ${parts.time}`;
+}
+
+/** Código OV-YYMMDD-HHMM-0001 a partir de un instante Caracas. */
+export function formatSaleStamp(iso: string | Date, seq: number): string {
+  const d = asDate(iso);
+  if (!d) return `OV-${String(seq).padStart(4, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: CARACAS_TZ,
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "00";
+  return `OV-${get("year")}${get("month")}${get("day")}-${get("hour")}${get("minute")}-${String(seq).padStart(4, "0")}`;
+}
+
 export function formatDateTimeLong(iso: string | Date | null | undefined): string {
   if (iso == null || iso === "") return "";
   const d = asDate(iso);

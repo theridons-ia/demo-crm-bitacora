@@ -110,7 +110,7 @@ Detalle y videos: [`implementacion/FASE-4-UI-MOVIL.md`](implementacion/FASE-4-UI
 | **SF-4.4** | Inicio vendedor | Un progreso; agenda horaria; CTA mapa | hecho |
 | **SF-4.5** | Mapa = agendado | Trazo y números = `scheduled_time`; seed del día limpio | hecho |
 | **SF-4.6** | Wizard 1-2-3 | Nombres, footer, teclado, cuenta una vez | hecho |
-| **SF-4.7** | Densidad catálogo | Inventario compacto; cliente una acción | pendiente |
+| **SF-4.7** | Densidad catálogo | Inventario compacto; cliente una acción | hecho |
 | **SF-4.8** | Supervisor móvil | Mismas piezas 4.3–4.5; Ruta/Visitas/Mapa = lentes | pendiente |
 
 **Criterio “Fase 4 lista”:** vendedor y supervisor en ~400px usan la misma fila, el mapa coincide con la agenda, y cotizar no se pierde al cancelar una foto.
@@ -131,9 +131,15 @@ Siguientes SF se abren al cerrar Fase 4: modelo `Route`, UI supervisor (tarjeta 
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-4.6** wizard 1-2-3 (y lo anterior de 4.4/4.5/logo/boot si aún no estaba).
+**Listo para commit / tu push:** **SF-4.7** inventario y clientes densos.
 
-**Siguiente:** **SF-4.7** densidad inventario/clientes. Luego 4.8 supervisor.
+**Siguiente:** **SF-4.8** supervisor móvil. Luego Fase 5 (ruta semanal, solo docs hasta cerrar 4).
+
+### Cómo verificar SF-4.7
+
+1. Inventario (~400px): ≥6 productos a la vista. Cada fila = nombre · cantidad · estado. No SKU + barra + mínimo + $ apilados.
+2. Clientes vendedor: tap = ficha. Sin badge Pin ni coordenadas.
+3. Clientes supervisor: una fila; Asignar y Editar salen de la ficha, no de tres botones.
 
 ### Cómo verificar SF-4.4
 

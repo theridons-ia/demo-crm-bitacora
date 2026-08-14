@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { AsideStats } from "../components/AsideStats";
 import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { MetricGrid, MetricTile } from "../components/MetricTile";
 import { Modal } from "../components/Modal";
 import { SearchPickField } from "../components/SearchPickField";
@@ -547,7 +548,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           />
         </div>
 
-        {loading ? <p className="muted list-loading">Cargando…</p> : null}
+        {loading ? <ListSkeleton /> : null}
         {error ? <p className="form-error">{error}</p> : null}
         {!loading && !filteredSales.length ? (
           <p className="muted">

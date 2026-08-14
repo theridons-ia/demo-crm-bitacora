@@ -44,6 +44,15 @@ class UserOut(ORMModel):
     is_active: bool
 
 
+class UserCreate(BaseModel):
+    email: str = Field(min_length=5, max_length=180)
+    full_name: str = Field(min_length=3, max_length=160)
+    password: str = Field(min_length=6, max_length=80)
+    role: UserRole = UserRole.vendedor
+    route_name: str | None = Field(default=None, max_length=160)
+    initials: str | None = Field(default=None, max_length=4)
+
+
 class ClientCreate(BaseModel):
     name: str = Field(min_length=2, max_length=180)
     rif: str | None = Field(default=None, max_length=20)
@@ -432,6 +441,7 @@ class VisitOut(ORMModel):
     scheduled_date: date | None
     scheduled_time: time | None = None
     visited_at: datetime | None
+    closed_at: datetime | None = None
     latitude: Decimal | None
     longitude: Decimal | None
     gps_accuracy_m: Decimal | None

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AsideStats } from "../components/AsideStats";
 import { ListSearch } from "../components/ListSearch";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { StockTable, stockState, type StockState } from "../components/StockTable";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchProducts } from "../lib/api";
@@ -72,15 +73,11 @@ export function InventoryPage() {
         />
       }
     >
-      <header className="page-header page-header-stack">
-        <div>
-          <p className="eyebrow">Operación · bodega</p>
-          <h1 className="display-title">Existencias actuales</h1>
-          <p className="muted">
-            {filtered.length} productos visibles · ${valueStock.toFixed(0)} en stock
-          </p>
-        </div>
-      </header>
+        <header className="page-header">
+          <div>
+            <h1 className="display-title">Inventario</h1>
+          </div>
+        </header>
 
       <div className="list-page-tools">
         <ListSearch
@@ -110,7 +107,7 @@ export function InventoryPage() {
         </div>
       </div>
 
-      {loading ? <p className="muted list-loading">Cargando…</p> : null}
+      {loading ? <ListSkeleton kind="stock" /> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
       {!loading && filtered.length ? <StockTable products={filtered} /> : null}

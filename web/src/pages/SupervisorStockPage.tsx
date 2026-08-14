@@ -2,6 +2,7 @@ import { PackagePlus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { SideSheet } from "../components/SideSheet";
 import { StockTable, stockState, type StockState } from "../components/StockTable";
 import { TextField } from "../components/TextField";
@@ -173,13 +174,9 @@ export function SupervisorStockPage() {
           </>
         }
       >
-        <header className="page-header page-header-stack">
+        <header className="page-header page-header-with-action">
           <div>
-            <p className="eyebrow">Supervisor · bodega</p>
-            <h1 className="display-title">Existencias actuales</h1>
-            <p className="muted">
-              {filtered.length} productos visibles · ${valueStock.toFixed(0)} en stock
-            </p>
+            <h1 className="display-title">Inventario</h1>
           </div>
           <Button type="button" variant="accent" onClick={() => openMovement()}>
             <PackagePlus size={18} />
@@ -222,7 +219,7 @@ export function SupervisorStockPage() {
           </div>
         </div>
 
-        {loading ? <p className="muted">Cargando…</p> : null}
+        {loading ? <ListSkeleton kind="stock" /> : null}
 
         {!loading && filtered.length ? (
           <StockTable products={filtered} onRowClick={(p) => openMovement(p)} />

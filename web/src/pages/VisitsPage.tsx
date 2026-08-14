@@ -9,6 +9,7 @@ import { FormStep } from "../components/SideSheet";
 import { SelectField, TextField } from "../components/TextField";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
@@ -375,13 +376,15 @@ export function VisitsPage() {
         </p>
       ) : null}
 
-      {loading ? <p className="muted list-loading">Cargando…</p> : null}
+      {loading ? <ListSkeleton /> : null}
 
+      {!loading ? (
       <ul className="visit-row-list">
         {filtered.map((visit) => (
           <VisitRow key={visit.id} visit={visit} onClick={() => setDetailVisit(visit)} />
         ))}
       </ul>
+      ) : null}
 
       {!loading && filtered.length === 0 ? (
         <p className="muted">

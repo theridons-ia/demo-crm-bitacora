@@ -151,6 +151,11 @@ export function mapsUrl(lat: string | number, lng: string | number): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
 }
 
+/** Google Maps — navegación en el teléfono. */
+export function mapsNavigateUrl(lat: string | number, lng: string | number): string {
+  return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
 export type WatchHandle = { stop: () => void };
 
 /**
