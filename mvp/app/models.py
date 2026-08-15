@@ -59,6 +59,7 @@ class PaymentMethod(str, enum.Enum):
     usdt = "usdt"
     cash_ves = "cash_ves"
     transfer_ves = "transfer_ves"
+    transfer_usd = "transfer_usd"
     cash_eur = "cash_eur"
     credit = "credit"
     pago_movil = "pago_movil"
@@ -397,6 +398,7 @@ class BankAccount(Base):
     )
     currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode), default=CurrencyCode.USD)
     pay_hint: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    holder_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

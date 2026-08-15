@@ -2,8 +2,10 @@ import { Copy, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { ListSkeleton } from "../components/ListSkeleton";
+import { PayMark } from "../components/PayMark";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchBankAccounts } from "../lib/api";
+import { payMarkSlugs } from "../lib/payMarks";
 import {
   copyText,
   payAccountShareText,
@@ -20,7 +22,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 function isShareable(account: BankAccount): boolean {
-  return account.account_type !== "cash" && Boolean(account.pay_hint);
+  return account.account_type !== "cash" && Boolean(account.pay_hint || account.holder_name);
 }
 
 /** Datos de cobro para el vendedor: copiar o mandar por WhatsApp. */
@@ -97,6 +99,7 @@ export function PayAccountsPage() {
           return (
             <li key={account.id}>
               <article className="ficha pay-share-card">
+                <PayMark slugs={payMarkSlugs(account)} label={account.bank_name || account.name} />
                 <div className="ficha-body">
                   <p className="eyebrow">{TYPE_LABEL[account.account_type] ?? account.account_type}</p>
                   <h3 className="ficha-title">{account.name}</h3>
@@ -104,6 +107,11 @@ export function PayAccountsPage() {
                     {account.bank_name ? `${account.bank_name} · ` : ""}
                     {account.currency === "VES" ? "Bs" : account.currency}
                   </p>
+                  {account.holder_name || account.account_type === "zelle" ? (
+                    <p className="pay-share-holder">
+                      Nombre: {account.holder_name?.trim() || account.name}
+                    </p>
+                  ) : null}
                   <p className="pay-share-hint">{account.pay_hint}</p>
                   <div className="pay-share-actions">
                     <Button

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 from sqlalchemy import func
@@ -154,7 +155,13 @@ def computed_status(route: Route, in_progress: int, planned: int, today: date | 
     return route.status.value if route.status else RouteStatus.publicada.value
 
 
-def notify_route_assigned(db: Session, visit: Visit, client_name: str) -> None:
+def notify_route_assigned(
+    db: Session,
+    visit: Visit,
+    client_name: str,
+    *,
+    assigned_by: str | None = None,
+) -> None:
     """Aviso en la campanita del vendedor: le metieron una parada a la semana."""
     if visit.scheduled_date:
         d = visit.scheduled_date
@@ -165,6 +172,12 @@ def notify_route_assigned(db: Session, visit: Visit, client_name: str) -> None:
             when = f"{when} · sin hora"
     else:
         when = "sin día"
+    meta = {
+        "assigned_by": (assigned_by or "").strip() or None,
+        "scheduled_date": visit.scheduled_date.isoformat() if visit.scheduled_date else None,
+        "scheduled_time": visit.scheduled_time.strftime("%H:%M") if visit.scheduled_time else None,
+        "client_name": client_name,
+    }
     db.add(
         VisitAlert(
             visit_id=visit.id,
@@ -172,6 +185,7 @@ def notify_route_assigned(db: Session, visit: Visit, client_name: str) -> None:
             alert_type=AlertType.route_assigned,
             severity=AlertSeverity.info,
             message=f"Nueva parada: {client_name} · {when}",
+            meta_json=json.dumps(meta, ensure_ascii=False),
         )
     )
 

@@ -727,6 +727,7 @@ export function createBankAccount(payload: {
   account_type?: import("./types").BankAccountType;
   currency?: CurrencyCode;
   pay_hint?: string | null;
+  holder_name?: string | null;
   is_active?: boolean;
   sort_order?: number;
 }): Promise<import("./types").BankAccount> {
@@ -745,6 +746,7 @@ export function updateBankAccount(
     account_type: import("./types").BankAccountType;
     currency: CurrencyCode;
     pay_hint: string | null;
+    holder_name: string | null;
     is_active: boolean;
     sort_order: number;
   }>,

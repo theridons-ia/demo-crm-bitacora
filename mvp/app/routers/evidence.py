@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,8 +21,22 @@ def _get_visit_for_user(db: Session, visit_id: int, user: User) -> Visit:
     return visit
 
 
+def _alert_meta(alert: VisitAlert) -> dict:
+    if not alert.meta_json:
+        return {}
+    try:
+        data = json.loads(alert.meta_json)
+    except (TypeError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def _alert_out(alert: VisitAlert) -> VisitAlertOut:
     client = alert.visit.client if alert.visit else None
+    meta = _alert_meta(alert)
+    assigned = meta.get("assigned_by")
+    stop_date = meta.get("scheduled_date")
+    stop_time = meta.get("scheduled_time")
     return VisitAlertOut(
         id=alert.id,
         visit_id=alert.visit_id,
@@ -35,6 +50,9 @@ def _alert_out(alert: VisitAlert) -> VisitAlertOut:
         seller_name=alert.seller.full_name if alert.seller else None,
         client_name=client.name if client else None,
         client_id=client.id if client else None,
+        assigned_by=assigned if isinstance(assigned, str) else None,
+        stop_date=stop_date if isinstance(stop_date, str) else None,
+        stop_time=stop_time if isinstance(stop_time, str) else None,
     )
 
 

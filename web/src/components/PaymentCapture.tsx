@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { BankAccount, CurrencyCode, PaymentMethod } from "../lib/types";
+import { payMarkSlugs } from "../lib/payMarks";
 import { copyText, payAccountShareText, whatsappShareUrl } from "../lib/sharePay";
+import { PayMark } from "./PayMark";
 import { PhotoDrop } from "./PhotoDrop";
 import { SelectField, TextField } from "./TextField";
 
@@ -40,6 +42,7 @@ const METHOD_OPTIONS: {
 }[] = [
   { id: "cash_usd", label: "Efectivo USD", cash: true, icon: Banknote, currencies: ["USD"] },
   { id: "zelle", label: "Zelle", icon: Send, currencies: ["USD"] },
+  { id: "transfer_usd", label: "Banco US", icon: Landmark, currencies: ["USD"] },
   { id: "usdt", label: "USDT", icon: CircleDollarSign, currencies: ["USD"] },
   { id: "cash_ves", label: "Efectivo Bs", cash: true, icon: Banknote, currencies: ["VES"] },
   { id: "pago_movil", label: "Pago móvil", icon: Smartphone, currencies: ["VES"] },
@@ -59,6 +62,7 @@ function methodMatchesAccount(method: PaymentMethod, account: BankAccount): bool
   if (method === "usdt") return account.account_type === "usdt" || account.account_type === "other";
   if (method === "pago_movil") return account.account_type === "pago_movil";
   if (method === "transfer_ves") return account.account_type === "bank";
+  if (method === "transfer_usd") return account.account_type === "bank";
   return true;
 }
 
@@ -169,7 +173,23 @@ export function PaymentCapture({
       ) : null}
       {shareText ? (
         <div className="pay-share-inline">
-          <p className="pay-share-hint">{selected?.pay_hint}</p>
+          <div className="pay-share-head">
+            {selected ? (
+              <PayMark
+                slugs={payMarkSlugs(selected)}
+                label={selected.bank_name || selected.name}
+                size="md"
+              />
+            ) : null}
+            <div className="pay-share-copy">
+              {selected?.holder_name || selected?.account_type === "zelle" ? (
+                <p className="pay-share-holder">
+                  Nombre: {selected.holder_name?.trim() || selected.name}
+                </p>
+              ) : null}
+              <p className="pay-share-hint">{selected?.pay_hint}</p>
+            </div>
+          </div>
           <div className="pay-share-actions">
             <button
               type="button"
@@ -224,7 +244,7 @@ export function PaymentCapture({
 }
 
 function isShareableAccount(account: BankAccount): boolean {
-  return account.account_type !== "cash" && Boolean(account.pay_hint);
+  return account.account_type !== "cash" && Boolean(account.pay_hint || account.holder_name);
 }
 
 function distinctPayHint(account: BankAccount | undefined): string | undefined {

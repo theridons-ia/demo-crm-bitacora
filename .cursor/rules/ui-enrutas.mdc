@@ -63,8 +63,8 @@ Semana = lunes–domingo Caracas (`weekStartISO`, `weekDayISOs`, `formatWeekSpan
 
 | Pieza | Qué es | Dónde |
 |---|---|---|
-| `WeekNav` | `< 17–23 ago >` cambia la semana | Supervisor Ruta (equipo). **SF-5.2** Ruta vendedor |
-| `WeekDayStrip` | 7 chips Lun–Dom + **Sin día**. Punto coral = hay paradas | Supervisor (detalle vendedor) · Armar la semana. **SF-5.2** Ruta vendedor |
+| `WeekNav` | `< 17–23 ago >` cambia la semana | Supervisor Ruta (equipo). Ruta vendedor |
+| `WeekDayStrip` | 7 chips Lun–Dom + **Sin día**. Punto coral = hay paradas | Supervisor (detalle vendedor) · Armar · Ruta vendedor |
 | `.week-pick` | Esta / Próxima / +2 sem | Solo el wizard Armar |
 | `week-strip` / `day-chip` | Bitácora: Todas + vencidas + semana, **con conteo** | Visitas → Programadas. **No** es la ruta |
 
@@ -186,8 +186,11 @@ Reglas de evidencia:
 - Crédito: checkbox con texto de ayuda (“sin cobro ahora; va a cobranza”). Si está activo, ocultar captura de cobro y mostrar nota, no un vacío.
 - Métodos: chips/botones del design system (`.choice-group` / `.pay-method`), no radios nativos.
 - **Nunca** `<input type="file">` nativo a la vista (sale “Choose File” en inglés). Usar `PhotoDrop`: tap **Subir foto** → Galería o Cámara trasera. Cancelar el picker no cierra el wizard.
-- Métodos según moneda: **USD** → Efectivo USD, Zelle, USDT. **Bs** → Efectivo Bs, Pago móvil, Transferencia. No mezclar.
+- Métodos según moneda: **USD** → Efectivo USD, Zelle, Banco US, USDT. **Bs** → Efectivo Bs, Pago móvil, Transferencia. No mezclar.
 - Cuenta destino con `SelectField`; referencia y nota con `TextField`.
+- Zelle: mostrar **nombre asociado** (`holder_name`) + correo/tel. El texto copiado/WhatsApp también lleva `Nombre:`.
+- Logos de cobro: `web/public/pay/{slug}.png` (zelle, usdt, slugs VE/US). `PayMark`; si no hay archivo, iniciales.
+- Alta de cuenta: **primero moneda** (Bs / USD / USDT). Bs → solo bancos VE + transferencia o pago móvil. USD → Zelle o banco US (`usBanks.ts`: BofA, Chase, Wells Fargo, Citi, Capital One). USDT → Binance.
 - Mismo componente en OV de visita, venta standalone y abonos de cobranza.
 
 ## Panel derecho (métricas)

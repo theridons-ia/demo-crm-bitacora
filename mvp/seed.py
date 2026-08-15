@@ -887,8 +887,12 @@ def _coming_saturday(today: date) -> date:
 def sync_ali_today_route(db, users: dict[str, User]) -> None:
     """Ali Rodríguez: paradas reales Valencia (hoy) y Puerto Cabello (sábado).
 
-    Idempotente: recrea las programadas con marcador; no toca las ya cerradas.
+    Idempotente de verdad: no clona un PDV si ya tiene visita ese día, ni si
+    ya se cerró / está en curso esa semana. El cierre pisa `description`, así
+    que no se puede confiar en el marcador «Ruta Ali ·».
     """
+    from app.timeutil import week_end_caracas, week_start_caracas
+
     ali = users.get("arodriguez")
     if not ali:
         print("  aviso: falta usuario arodriguez")
@@ -896,6 +900,8 @@ def sync_ali_today_route(db, users: dict[str, User]) -> None:
 
     today = _today()
     saturday = _coming_saturday(today)
+    week = week_start_caracas(today)
+    week_end = week_end_caracas(week)
 
     # name, rif, address, phone, lat, lng, day, hour, minute
     stops: list[tuple[str, str, str, str, float, float, date, int, int]] = [
@@ -984,22 +990,29 @@ def sync_ali_today_route(db, users: dict[str, User]) -> None:
         db.delete(v)
     db.flush()
 
-    kept = {
-        v.client_id
-        for v in db.query(Visit)
+    week_rows = (
+        db.query(Visit)
         .filter(
             Visit.seller_id == ali.id,
-            Visit.description.isnot(None),
-            Visit.description.startswith(ALI_TODAY_MARKER),
-            Visit.status != VisitStatus.programada,
+            Visit.status != VisitStatus.cancelada,
+            Visit.scheduled_date >= week,
+            Visit.scheduled_date <= week_end,
         )
         .all()
+    )
+    occupied = {(v.client_id, v.scheduled_date) for v in week_rows if v.scheduled_date}
+    done_clients = {
+        v.client_id
+        for v in week_rows
+        if v.status in (VisitStatus.completada, VisitStatus.en_curso)
     }
 
     created = 0
     total = len(planned)
     for i, (c, day, hour, minute, name) in enumerate(planned, start=1):
-        if c.id in kept:
+        if (c.id, day) in occupied:
+            continue
+        if c.id in done_clients:
             continue
         when = "hoy" if day == today else "sábado"
         db.add(
@@ -1021,9 +1034,10 @@ def sync_ali_today_route(db, users: dict[str, User]) -> None:
 
 
 def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
+    holder = "Distribuidora Rutas del Centro C.A."
     specs = [
-        ("Caja USD", "Efectivo", BankAccountType.cash, CurrencyCode.USD, "Caja física oficina", 10),
-        ("Caja Bs", "Efectivo", BankAccountType.cash, CurrencyCode.VES, "Caja bolívares", 20),
+        ("Caja USD", "Efectivo", BankAccountType.cash, CurrencyCode.USD, "Caja física oficina", 10, None),
+        ("Caja Bs", "Efectivo", BankAccountType.cash, CurrencyCode.VES, "Caja bolívares", 20, None),
         (
             "Zelle EnRutas",
             "Zelle",
@@ -1031,6 +1045,7 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             CurrencyCode.USD,
             "enrutas@enrutas.com.ve",
             30,
+            holder,
         ),
         (
             "USDT EnRutas",
@@ -1039,6 +1054,7 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             CurrencyCode.USD,
             "enrutas@enrutas.com.ve",
             40,
+            holder,
         ),
         (
             "Banesco empresa",
@@ -1047,6 +1063,7 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             CurrencyCode.VES,
             "0134-0074-89-0100123456 · J-500123456",
             50,
+            holder,
         ),
         (
             "Mercantil empresa",
@@ -1055,6 +1072,7 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             CurrencyCode.VES,
             "0105-0022-11-0100987654 · J-500123456",
             60,
+            holder,
         ),
         (
             "Pago móvil Banesco",
@@ -1063,6 +1081,7 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             CurrencyCode.VES,
             "0412-5557788 · J-500123456",
             70,
+            holder,
         ),
         (
             "Pago móvil Mercantil",
@@ -1071,10 +1090,11 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             CurrencyCode.VES,
             "0414-5558899 · J-500123456",
             80,
+            holder,
         ),
     ]
     out: dict[str, BankAccount] = {}
-    for name, bank, atype, currency, hint, order in specs:
+    for name, bank, atype, currency, hint, order, holder_name in specs:
         acc = db.query(BankAccount).filter(BankAccount.name == name).first()
         if not acc:
             acc = BankAccount(
@@ -1083,6 +1103,7 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
                 account_type=atype,
                 currency=currency,
                 pay_hint=hint,
+                holder_name=holder_name,
                 is_active=True,
                 sort_order=order,
             )
@@ -1093,6 +1114,7 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             acc.account_type = atype
             acc.currency = currency
             acc.pay_hint = hint
+            acc.holder_name = holder_name
             acc.is_active = True
             acc.sort_order = order
         out[name] = acc
@@ -1193,7 +1215,12 @@ def run() -> None:
                     .first()
                 )
                 if visit and visit.client:
-                    notify_route_assigned(db, visit, visit.client.name)
+                    notify_route_assigned(
+                        db,
+                        visit,
+                        visit.client.name,
+                        assigned_by="Yuliana Supervisor",
+                    )
         db.commit()
 
         n_clients = db.query(Client).count()

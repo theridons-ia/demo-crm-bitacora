@@ -115,6 +115,7 @@ export type PaymentMethod =
   | "usdt"
   | "cash_ves"
   | "transfer_ves"
+  | "transfer_usd"
   | "cash_eur"
   | "credit"
   | "pago_movil";
@@ -130,6 +131,7 @@ export type BankAccount = {
   account_type: BankAccountType;
   currency: CurrencyCode;
   pay_hint: string | null;
+  holder_name: string | null;
   is_active: boolean;
   sort_order: number;
   balance: string;
@@ -219,6 +221,9 @@ export type VisitAlert = {
   seller_name: string | null;
   client_name: string | null;
   client_id: number | null;
+  assigned_by?: string | null;
+  stop_date?: string | null;
+  stop_time?: string | null;
 };
 
 export type VisitGpsPoint = {

@@ -1,5 +1,6 @@
 import { ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { PayMark } from "./PayMark";
 import { ProductThumb } from "./ProductThumb";
 
 export type SearchPickOption = {
@@ -8,6 +9,8 @@ export type SearchPickOption = {
   subtitle?: string;
   /** Si viene (aunque sea null), se muestra miniatura de producto. */
   imageUrl?: string | null;
+  /** Logo de banco / medio de cobro (`/pay/{slug}`). */
+  markSlug?: string;
 };
 
 type Props = {
@@ -127,7 +130,9 @@ export function SearchPickField({
         }}
       >
         <span className="search-pick-trigger-main">
-          {selected && "imageUrl" in selected ? (
+          {selected?.markSlug ? (
+            <PayMark slugs={[selected.markSlug]} label={selected.title} />
+          ) : selected && "imageUrl" in selected ? (
             <ProductThumb src={selected.imageUrl} alt="" />
           ) : null}
           <span className="search-pick-copy">
@@ -186,7 +191,9 @@ export function SearchPickField({
                       className={active ? "search-pick-option is-active" : "search-pick-option"}
                       onClick={() => choose(option)}
                     >
-                      {"imageUrl" in option ? (
+                      {option.markSlug ? (
+                        <PayMark slugs={[option.markSlug]} label={option.title} />
+                      ) : "imageUrl" in option ? (
                         <ProductThumb src={option.imageUrl} alt="" />
                       ) : null}
                       <span className="search-pick-option-copy">

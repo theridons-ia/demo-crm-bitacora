@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import {
-  AlertTriangle,
   Bell,
-  Check,
   ChevronDown,
   DollarSign,
   Landmark,
@@ -18,13 +16,9 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
 import { canUseMockGps, isMockGpsEnabled, setMockGpsEnabled } from "../lib/gps";
 import type { VisitAlert } from "../lib/types";
-import { formatDateTime } from "../lib/caracasTime";
+import { AlertNoticeItem } from "../components/AlertNoticeItem";
 import { HeaderQuickRegister } from "../components/HeaderQuickRegister";
 import { accountBasePath, crumbForPath, roleLabel } from "./appNav";
-
-function formatAlertWhen(iso: string): string {
-  return formatDateTime(iso);
-}
 
 /** Header superior: breadcrumb + campana (dropdown alertas) + perfil. */
 export function AppHeader() {
@@ -220,28 +214,13 @@ export function AppHeader() {
 
                   <ul className="app-alerts-list">
                     {alerts.map((a) => (
-                      <li key={a.id} className="app-alerts-item">
-                        <span className="app-alerts-icon" aria-hidden>
-                          <AlertTriangle size={14} />
-                        </span>
-                        <div className="app-alerts-copy">
-                          <strong>{a.message}</strong>
-                          <span>
-                            {isSupervisor ? (a.seller_name ?? "Vendedor") : (a.client_name ?? "Ruta")}
-                            {isSupervisor && a.client_name ? ` · ${a.client_name}` : ""}
-                            {` · ${formatAlertWhen(a.created_at)}`}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="app-alerts-ack"
-                          disabled={ackBusy === a.id}
-                          onClick={() => void onAck(a.id)}
-                          title="Marcar vista"
-                        >
-                          <Check size={14} />
-                        </button>
-                      </li>
+                      <AlertNoticeItem
+                        key={a.id}
+                        alert={a}
+                        forSeller={!isSupervisor}
+                        ackBusy={ackBusy === a.id}
+                        onAck={() => void onAck(a.id)}
+                      />
                     ))}
                   </ul>
 

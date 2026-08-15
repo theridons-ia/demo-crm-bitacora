@@ -1,13 +1,40 @@
 import type { BankAccount } from "./types";
+import { findUsBank } from "./usBanks";
+import { findVeBank } from "./veBanks";
+
+function holderLine(account: BankAccount): string | null {
+  const holder = account.holder_name?.trim() || account.name.trim();
+  return holder ? `Nombre: ${holder}` : null;
+}
 
 export function payAccountShareText(account: BankAccount): string {
-  const lines = [
+  const hint = account.pay_hint?.trim() || null;
+  if (account.account_type === "zelle") {
+    return ["EnRutas — Zelle", holderLine(account), hint ? `Correo: ${hint}` : null]
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (account.account_type === "usdt") {
+    return ["EnRutas — USDT", holderLine(account), hint]
+      .filter(Boolean)
+      .join("\n");
+  }
+  const ve = findVeBank(account.bank_name);
+  const us = findUsBank(account.bank_name);
+  const bankLabel = ve
+    ? `${ve.name} (${ve.code})`
+    : us
+      ? us.name
+      : account.bank_name;
+  return [
     `EnRutas — ${account.name}`,
-    account.bank_name ? `Banco: ${account.bank_name}` : null,
+    bankLabel ? `Banco: ${bankLabel}` : null,
+    holderLine(account),
     account.currency === "VES" ? "Moneda: Bs" : `Moneda: ${account.currency}`,
-    account.pay_hint,
-  ].filter(Boolean);
-  return lines.join("\n");
+    hint,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function payAccountsBundleText(accounts: BankAccount[]): string {

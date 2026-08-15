@@ -379,6 +379,7 @@ class BankAccountCreate(BaseModel):
     account_type: BankAccountType = BankAccountType.bank
     currency: CurrencyCode = CurrencyCode.USD
     pay_hint: str | None = Field(default=None, max_length=160)
+    holder_name: str | None = Field(default=None, max_length=80)
     is_active: bool = True
     sort_order: int = 0
 
@@ -389,6 +390,7 @@ class BankAccountUpdate(BaseModel):
     account_type: BankAccountType | None = None
     currency: CurrencyCode | None = None
     pay_hint: str | None = Field(default=None, max_length=160)
+    holder_name: str | None = Field(default=None, max_length=80)
     is_active: bool | None = None
     sort_order: int | None = None
 
@@ -400,6 +402,7 @@ class BankAccountOut(ORMModel):
     account_type: BankAccountType
     currency: CurrencyCode
     pay_hint: str | None
+    holder_name: str | None = None
     is_active: bool
     sort_order: int
     balance: Decimal = Decimal("0")
@@ -611,6 +614,9 @@ class VisitAlertOut(ORMModel):
     seller_name: str | None = None
     client_name: str | None = None
     client_id: int | None = None
+    assigned_by: str | None = None
+    stop_date: str | None = None
+    stop_time: str | None = None
 
 
 class FxRateOut(ORMModel):

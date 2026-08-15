@@ -1,19 +1,21 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { MapPin, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
+import { ListSkeleton } from "../components/ListSkeleton";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
+import { WeekDayStrip } from "../components/WeekDayStrip";
+import { WeekNav } from "../components/WeekNav";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
-import { ApiError, fetchVisits } from "../lib/api";
-import { todayISO } from "../lib/caracasTime";
+import { ApiError, fetchCurrentRoute } from "../lib/api";
+import { addDaysISO, formatAgendaDay, todayISO, weekDayISOs, weekStartISO } from "../lib/caracasTime";
 import { teamVisitIcon } from "../lib/mapMarkers";
 import type { LatLng } from "../lib/routeOrder";
-import { isOnDayAgenda, sortVisitsRoute } from "../lib/visitOrder";
-import type { Visit, VisitStatus } from "../lib/types";
+import { sortVisitsRoute } from "../lib/visitOrder";
+import type { RouteDetail, Visit, VisitStatus } from "../lib/types";
 
 const DEFAULT_CENTER: LatLng = { lat: 10.07, lng: -69.32 };
 const LINE_DONE = "#18312f";
@@ -36,59 +38,77 @@ const STATUS_LABEL: Record<VisitStatus, string> = {
   cancelada: "Cancelada",
 };
 
-/** Mapa del día = agenda (`scheduled_time`), no vecino más cercano. */
+function defaultDayChip(weekStart: string): string | "sin-dia" {
+  const today = todayISO();
+  const days = weekDayISOs(weekStart);
+  return days.includes(today) ? today : weekStart;
+}
+
+/** Semana del vendedor (SF-5.2). El mapa es el slice de hoy. */
 export function SellerRouteMapPage() {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
 
-  const [visits, setVisits] = useState<Visit[]>([]);
+  const [weekStart, setWeekStart] = useState(() => weekStartISO());
+  const [dayChip, setDayChip] = useState<string | "sin-dia">(() => defaultDayChip(weekStartISO()));
+  const [route, setRoute] = useState<RouteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Visit | null>(null);
-  const day = todayISO();
+  const today = todayISO();
+  const showMap = dayChip === today;
+
+  const visits = useMemo(
+    () => (route?.visits ?? []).filter((v) => v.status !== "cancelada"),
+    [route],
+  );
+
+  const dayVisits = useMemo(() => {
+    const slice =
+      dayChip === "sin-dia"
+        ? visits.filter((v) => !v.scheduled_date)
+        : visits.filter((v) => v.scheduled_date === dayChip);
+    return sortVisitsRoute(slice);
+  }, [visits, dayChip]);
+
+  const occupiedDays = useMemo(() => {
+    const set = new Set<string>();
+    for (const v of visits) {
+      if (v.scheduled_date) set.add(v.scheduled_date);
+    }
+    return set;
+  }, [visits]);
+
   useRestoreVisitSheet(setSelected, visits, loading);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await fetchVisits({ scheduled_date: day });
-      setVisits(list.filter((v) => isOnDayAgenda(v, day)));
+      const next = await fetchCurrentRoute({ week_start: weekStart });
+      setRoute(next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar la ruta");
-      setVisits([]);
+      setRoute(null);
     } finally {
       setLoading(false);
     }
-  }, [day]);
+  }, [weekStart]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
   useEffect(() => {
-    const onFocus = () => {
-      void reload();
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") onFocus();
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [reload]);
-
-  const ordered = useMemo(() => sortVisitsRoute(visits), [visits]);
-  const doneCount = ordered.filter((v) => v.status === "completada").length;
-  const pendingCount = ordered.length - doneCount;
-  const progressPct = ordered.length ? Math.round((doneCount / ordered.length) * 100) : 0;
-
-  useEffect(() => {
-    if (!mapEl.current) return;
+    if (!showMap || !mapEl.current) {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        layerRef.current = null;
+      }
+      return;
+    }
     if (!mapRef.current) {
       const map = L.map(mapEl.current, { zoomControl: true });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -104,7 +124,7 @@ export function SellerRouteMapPage() {
     layer.clearLayers();
 
     const pinned: { v: Visit; n: number; c: LatLng }[] = [];
-    ordered.forEach((v, idx) => {
+    dayVisits.forEach((v, idx) => {
       const c = stopCoords(v);
       if (!c) return;
       pinned.push({ v, n: idx + 1, c });
@@ -149,7 +169,7 @@ export function SellerRouteMapPage() {
       );
     }
     window.setTimeout(() => map.invalidateSize(), 80);
-  }, [ordered]);
+  }, [showMap, dayVisits]);
 
   useEffect(() => {
     return () => {
@@ -159,44 +179,52 @@ export function SellerRouteMapPage() {
     };
   }, []);
 
+  function shiftWeek(delta: -1 | 1) {
+    const next = addDaysISO(weekStart, delta * 7);
+    setWeekStart(next);
+    setDayChip(defaultDayChip(next));
+  }
+
   function applyVisitUpdate(updated: Visit) {
-    setVisits((prev) =>
-      prev
-        .map((v) => (v.id === updated.id ? updated : v))
-        .filter((v) => isOnDayAgenda(v, day)),
-    );
+    setRoute((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        visits: prev.visits.map((v) => (v.id === updated.id ? updated : v)),
+      };
+    });
     setSelected((cur) => (cur && cur.id === updated.id ? updated : cur));
   }
+
+  const weekDone = route?.done ?? 0;
+  const weekPlanned = route?.planned ?? 0;
+  const dayDone = dayVisits.filter((v) => v.status === "completada").length;
 
   return (
     <WorkspacePage
       eyebrow="Ruta"
-      title="Hoy"
-      blurb="El trazo sigue el horario agendado."
+      title={route?.title ?? "Tu semana"}
+      blurb="Plan de la semana. El mapa es el recorrido de hoy."
     >
       <header className="page-header">
         <div>
-          <p className="eyebrow">Hoy · {day}</p>
-          <h1 className="display-title">Recorrido</h1>
+          <p className="eyebrow">{route?.code ?? "Semana"}</p>
+          <h1 className="display-title">{route?.title ?? "Tu semana"}</h1>
           <p className="muted">
             {loading
               ? "Cargando…"
-              : ordered.length
-                ? `${doneCount} culminadas · ${pendingCount} pendientes · ${progressPct}%`
-                : "Nada agendado hoy"}
+              : weekPlanned
+                ? `${weekDone} de ${weekPlanned} paradas`
+                : "Semana vacía"}
           </p>
         </div>
-        <div className="page-header-actions">
-          <Link to="/app/inicio" className="btn btn-ghost">
-            <ArrowLeft size={16} />
-            Inicio
-          </Link>
-          <Button type="button" variant="secondary" onClick={() => void reload()} disabled={loading}>
-            <RefreshCw size={16} />
-            Actualizar
-          </Button>
-        </div>
+        <Button type="button" variant="secondary" onClick={() => void reload()} disabled={loading}>
+          <RefreshCw size={16} />
+          Actualizar
+        </Button>
       </header>
+
+      <WeekNav weekStart={weekStart} onShift={shiftWeek} />
 
       {error ? (
         <p className="form-error" role="alert">
@@ -204,26 +232,60 @@ export function SellerRouteMapPage() {
         </p>
       ) : null}
 
-      <div className="map-stage is-bleed">
-        <div ref={mapEl} className="map-stage-canvas" role="img" aria-label="Mapa de ruta del día" />
-        <div className="map-stage-legend" aria-hidden>
-          <span className="route-map-legend-item">
-            <i className="route-map-swatch is-done" /> Hecho
-          </span>
-          <span className="route-map-legend-item">
-            <i className="route-map-swatch is-todo" /> Pendiente
-          </span>
+      <WeekDayStrip
+        weekStart={weekStart}
+        value={dayChip}
+        onChange={setDayChip}
+        occupiedDays={occupiedDays}
+        unscheduled={route?.unscheduled ?? 0}
+        label="Día de tu ruta"
+      />
+
+      {showMap ? (
+        <div className="map-stage is-bleed">
+          <div ref={mapEl} className="map-stage-canvas" role="img" aria-label="Mapa de ruta de hoy" />
+          <div className="map-stage-legend" aria-hidden>
+            <span className="route-map-legend-item">
+              <i className="route-map-swatch is-done" /> Hecho
+            </span>
+            <span className="route-map-legend-item">
+              <i className="route-map-swatch is-todo" /> Pendiente
+            </span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <p className="muted small seller-week-map-hint">
+          <MapPin size={14} aria-hidden />
+          El mapa aparece al ver el día de hoy.
+        </p>
+      )}
 
       <section className="card route-day-list">
-        <h2 className="section-heading">Orden del día</h2>
-        {loading ? <p className="muted list-loading">Cargando…</p> : null}
-        {!loading && ordered.length === 0 ? (
-          <p className="muted">No hay visitas agendadas hoy.</p>
-        ) : (
+        <h2 className="section-heading">
+          {dayChip === "sin-dia"
+            ? "Sin día"
+            : dayChip === today
+              ? "Hoy"
+              : formatAgendaDay(dayChip)}
+        </h2>
+        <p className="muted small">
+          {loading
+            ? "…"
+            : dayVisits.length
+              ? `${dayDone} de ${dayVisits.length} en este día`
+              : "Nada en este día"}
+        </p>
+        {loading ? <ListSkeleton count={4} /> : null}
+        {!loading && dayVisits.length === 0 ? (
+          <p className="muted">
+            {dayChip === "sin-dia"
+              ? "No tienes paradas sueltas. El supervisor puede dejarte PDVs sin fecha."
+              : "Sin paradas este día."}
+          </p>
+        ) : null}
+        {!loading && dayVisits.length ? (
           <ul className="visit-row-list">
-            {ordered.map((v, i) => (
+            {dayVisits.map((v, i) => (
               <VisitRow
                 key={v.id}
                 visit={v}
@@ -234,7 +296,7 @@ export function SellerRouteMapPage() {
               />
             ))}
           </ul>
-        )}
+        ) : null}
       </section>
 
       {selected ? (

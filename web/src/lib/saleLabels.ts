@@ -13,6 +13,7 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   usdt: "USDT",
   cash_ves: "Efectivo Bs",
   transfer_ves: "Transferencia",
+  transfer_usd: "Banco US",
   cash_eur: "Efectivo EUR",
   credit: "Crédito",
   pago_movil: "Pago móvil",

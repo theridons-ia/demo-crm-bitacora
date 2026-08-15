@@ -90,6 +90,7 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "sale_payments", "bank_account_id", "INTEGER")
     _add_column_if_missing(engine, "sale_payments", "payment_reference", "VARCHAR(64)")
     _add_column_if_missing(engine, "sale_payments", "payment_evidence", "TEXT")
+    _add_column_if_missing(engine, "bank_accounts", "holder_name", "VARCHAR(80)")
 
     # Extender enum PaymentMethod si es nativo en Postgres
     with engine.begin() as conn:
@@ -99,6 +100,12 @@ def ensure_schema(engine: Engine) -> None:
                     """
                     DO $$ BEGIN
                       ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'pago_movil';
+                    EXCEPTION
+                      WHEN duplicate_object THEN null;
+                      WHEN undefined_object THEN null;
+                    END $$;
+                    DO $$ BEGIN
+                      ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'transfer_usd';
                     EXCEPTION
                       WHEN duplicate_object THEN null;
                       WHEN undefined_object THEN null;

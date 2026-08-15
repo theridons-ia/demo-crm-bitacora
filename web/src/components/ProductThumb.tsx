@@ -1,4 +1,5 @@
 import { Package } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type Size = "sm" | "md";
 
@@ -10,10 +11,14 @@ type Props = {
 
 /** Miniatura de producto. Si no hay foto, icono de paquete. */
 export function ProductThumb({ src, alt = "", size = "sm" }: Props) {
-  if (src) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+  if (src && !failed) {
     return (
       <span className={`product-thumb is-${size}`} aria-hidden={!alt}>
-        <img src={src} alt={alt} />
+        <img src={src} alt={alt} onError={() => setFailed(true)} />
       </span>
     );
   }

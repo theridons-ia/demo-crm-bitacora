@@ -657,6 +657,58 @@ a {
   margin: 0;
 }
 
+.pay-share-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.pay-share-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.pay-share-holder {
+  margin: 0 0 0.15rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.pay-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--primary);
+}
+
+.pay-mark.is-md {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+
+.pay-mark.is-fallback {
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.pay-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .pay-methods {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -7598,6 +7650,15 @@ canvas {
   background: var(--secondary);
 }
 
+.app-alerts-item.is-route_assigned {
+  background: linear-gradient(180deg, #fff8f6 0%, var(--secondary) 80%);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+}
+
+.app-alerts-item.sev-info:not(.is-route_assigned) {
+  background: #eef4f2;
+}
+
 .app-alerts-icon {
   width: 28px;
   height: 28px;
@@ -7606,6 +7667,52 @@ canvas {
   place-items: center;
   background: #ffe2d7;
   color: #b4453c;
+}
+
+.app-alerts-item.is-route_assigned .app-alerts-icon {
+  background: #f6d7cf;
+  color: #b4453c;
+}
+
+.alert-stop-when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.28rem 0 0.1rem;
+}
+
+.alert-date-chip,
+.alert-time-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.alert-date-chip {
+  background: var(--accent);
+  color: #fff;
+}
+
+.alert-date-chip.is-open {
+  background: color-mix(in srgb, var(--accent) 18%, var(--card));
+  color: var(--accent);
+}
+
+.alert-time-chip {
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  color: var(--primary);
+}
+
+.alert-inbox-list {
+  margin-top: 0.75rem;
+}
+
+.alert-inbox-list .app-alerts-item {
+  padding: 0.75rem 0.7rem;
 }
 
 .app-alerts-copy {
@@ -7620,12 +7727,21 @@ canvas {
   overflow-wrap: anywhere;
 }
 
-.app-alerts-copy span {
+.app-alerts-copy > span {
   display: block;
   margin-top: 2px;
   font-size: 0.72rem;
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
+}
+
+.app-alerts-copy .alert-date-chip {
+  color: #fffdfc;
+}
+
+.app-alerts-copy .alert-date-chip.is-open {
+  color: #fffdfc;
+  background: color-mix(in srgb, var(--accent) 78%, #18312f);
 }
 
 .app-alerts-ack {
@@ -8378,6 +8494,13 @@ body.has-overlay .fab-root {
   justify-content: space-between;
   gap: 0.75rem;
   margin: 0 0 1rem;
+}
+
+.seller-week-map-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.85rem;
 }
 
 .week-nav strong {

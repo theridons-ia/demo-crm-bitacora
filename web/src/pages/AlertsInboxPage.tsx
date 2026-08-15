@@ -1,30 +1,11 @@
-import { Check, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { AlertNoticeItem } from "../components/AlertNoticeItem";
 import { Button } from "../components/Button";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
-import { formatDateTime } from "../lib/caracasTime";
-import type { AlertSeverity, AlertType, VisitAlert } from "../lib/types";
-
-const TYPE_LABEL: Record<AlertType, string> = {
-  no_gps: "Sin GPS",
-  gps_far: "Lejos del PDV",
-  photo_only: "Solo foto",
-  gps_skipped: "GPS omitido",
-  gps_low_accuracy: "GPS impreciso",
-  route_assigned: "Ruta",
-};
-
-const SEVERITY_LABEL: Record<AlertSeverity, string> = {
-  info: "Info",
-  warning: "Aviso",
-  critical: "Crítica",
-};
-
-function formatWhen(iso: string): string {
-  return formatDateTime(iso);
-}
+import type { VisitAlert } from "../lib/types";
 
 /** Inbox: GPS/foto para supervisor; avisos de ruta para vendedor. */
 export function AlertsInboxPage() {
@@ -131,44 +112,16 @@ export function AlertsInboxPage() {
         </p>
       ) : null}
 
-      <ul className="alert-list">
-        {alerts.map((a) => {
-          const pending = !a.acknowledged_at;
-          return (
-            <li
-              key={a.id}
-              className={`card alert-row severity-${a.severity}${pending ? "" : " is-acked"}`}
-            >
-              <div className="alert-row-main">
-                <div className="alert-badges">
-                  <span className={`alert-sev sev-${a.severity}`}>{SEVERITY_LABEL[a.severity]}</span>
-                  <span className="alert-type">{TYPE_LABEL[a.alert_type]}</span>
-                </div>
-                <p className="alert-message">{a.message}</p>
-                <p className="muted small">
-                  {a.seller_name ?? `Vendedor #${a.seller_id}`}
-                  {a.client_name ? ` · ${a.client_name}` : ""}
-                  {` · visita #${a.visit_id}`}
-                  {` · ${formatWhen(a.created_at)}`}
-                </p>
-                {!pending && a.acknowledged_at ? (
-                  <p className="muted small">Vista · {formatWhen(a.acknowledged_at)}</p>
-                ) : null}
-              </div>
-              {pending ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={busyId === a.id}
-                  onClick={() => void onAck(a.id)}
-                >
-                  <Check size={16} />
-                  Marcar vista
-                </Button>
-              ) : null}
-            </li>
-          );
-        })}
+      <ul className="app-alerts-list alert-inbox-list">
+        {alerts.map((a) => (
+          <AlertNoticeItem
+            key={a.id}
+            alert={a}
+            forSeller={sellerInbox}
+            ackBusy={busyId === a.id}
+            onAck={!a.acknowledged_at ? () => void onAck(a.id) : undefined}
+          />
+        ))}
       </ul>
     </WorkspacePage>
   );

@@ -1,6 +1,6 @@
 # Fase 5 — Ruta semanal
 
-**Estado:** SF-5.0 brújula + **SF-5.1** modelo/API + tarjetas supervisor (2026-08-14).  
+**Estado:** SF-5.0–5.2 (semana vendedor + avisos) 2026-08-15.  
 **Decisiones:** 4, 17, 18, 21 en [`docs/DECISIONES_Y_ROADMAP.md`](../DECISIONES_Y_ROADMAP.md) §2.1.  
 **No toca:** `startVisit`, `createVisitSale`, paleta EnRutas.
 
@@ -111,6 +111,23 @@ Cuando Fase 4 esté lista: SF-5.0 brújula (este archivo ya vale) → modelo/API
 ### Siguiente
 
 SF-5.2 — pantalla Ruta del vendedor (plan L–S + Sin día). El mapa sigue siendo el slice de hoy.
+
+---
+
+## SF-5.2 — Semana del vendedor
+
+**Objetivo:** Marina ve la misma semana que arma el supervisor: L–D + Sin día. El mapa no deja de ser el día.
+
+### Qué se hizo
+
+- `/app/ruta`: `WeekNav` + `WeekDayStrip` + `VisitRow`. Hoy muestra el mapa; otros días, solo la lista.
+- Avisos: chip de **fecha de la parada**; el renglón chico dice **quién asignó**, no el PDV otra vez.
+
+### Cómo probarlo
+
+1. `marina@` → Ruta: semana `11–17 ago`, chips Lun–Dom. Hoy = mapa + lista. Vie = solo paradas de ese día.
+2. Sin día: PDVs sin fecha. Fila **Fija** / **Extra** si aplica.
+3. Campanita: “Super Bastos” + chip `19 ago` + “Asignó Yuliana · …”. No se repite el nombre abajo.
 
 ---
 

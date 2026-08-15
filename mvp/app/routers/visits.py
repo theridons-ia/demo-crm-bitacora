@@ -98,7 +98,7 @@ def list_visits(
 def assign_visit(
     payload: VisitAssign,
     db: Session = Depends(get_db),
-    _: User = Depends(require_supervisor),
+    current_user: User = Depends(require_supervisor),
 ):
     """Crea visita programada para un vendedor (ruta del día)."""
     seller = db.query(User).filter(User.id == payload.seller_id).first()
@@ -131,7 +131,7 @@ def assign_visit(
         locked=locked,
         week_start=payload.week_start,
     )
-    notify_route_assigned(db, visit, client.name)
+    notify_route_assigned(db, visit, client.name, assigned_by=current_user.full_name)
     db.commit()
     return _visit_query(db).filter(Visit.id == visit.id).one()
 

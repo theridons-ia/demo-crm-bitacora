@@ -54,6 +54,7 @@ def _account_out(db: Session, account: BankAccount) -> BankAccountOut:
         account_type=account.account_type,
         currency=account.currency,
         pay_hint=account.pay_hint,
+        holder_name=account.holder_name,
         is_active=account.is_active,
         sort_order=account.sort_order,
         balance=_balance_for(db, account.id),
@@ -170,6 +171,7 @@ def resolve_payment_account(
         PaymentMethod.zelle: BankAccountType.zelle,
         PaymentMethod.pago_movil: BankAccountType.pago_movil,
         PaymentMethod.transfer_ves: BankAccountType.bank,
+        PaymentMethod.transfer_usd: BankAccountType.bank,
         PaymentMethod.usdt: BankAccountType.usdt,
     }
     wanted = type_map.get(payment_method)
