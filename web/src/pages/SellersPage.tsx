@@ -132,7 +132,7 @@ export function SellersPage() {
             </p>
           </div>
           <div className="page-header-actions">
-            <Link to="/sup/ruta" className="btn btn-secondary">
+            <Link to="/sup/ruta" state={{ openAssign: true }} className="btn btn-secondary">
               Asignar ruta
             </Link>
             <Button

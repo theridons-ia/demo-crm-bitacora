@@ -143,6 +143,7 @@ def close_visit_with_optional_sale(
     *,
     result: SaleResult,
     description: str | None,
+    field_notes: str | None = None,
     latitude,
     longitude,
     gps_accuracy_m,
@@ -169,6 +170,8 @@ def close_visit_with_optional_sale(
     visit.result = result
     if description is not None:
         visit.description = description
+    if field_notes is not None:
+        visit.field_notes = field_notes.strip() or None
     now = datetime.now(timezone.utc)
     visit.closed_at = now
     # visited_at = inicio. Nunca pisarlo con el cierre.

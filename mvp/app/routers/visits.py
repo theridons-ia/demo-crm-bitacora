@@ -8,10 +8,39 @@ from ..auth import get_current_user, require_supervisor
 from ..database import get_db
 from ..services.client_assignments import assign_client_to_seller, seller_can_see_client
 from ..models import Client, GpsPointSource, Sale, User, UserRole, Visit, VisitGpsPoint, VisitStatus
-from ..schemas import SaleIn, SaleOut, VisitAssign, VisitCancel, VisitClose, VisitCreate, VisitOut, VisitStart
+from ..schemas import (
+    SaleIn,
+    SaleOut,
+    VisitAssign,
+    VisitCancel,
+    VisitClose,
+    VisitCreate,
+    VisitNotes,
+    VisitOut,
+    VisitStart,
+)
+
+ACTIVE_VISIT_MSG = "Ya tienes una visita en curso. Ciérrala antes de iniciar otra."
+
+
+def _ensure_single_open_visit(
+    db: Session,
+    seller_id: int,
+    *,
+    except_id: int | None = None,
+) -> None:
+    query = db.query(Visit.id).filter(
+        Visit.seller_id == seller_id,
+        Visit.status == VisitStatus.en_curso,
+    )
+    if except_id is not None:
+        query = query.filter(Visit.id != except_id)
+    if query.first():
+        raise HTTPException(status_code=400, detail=ACTIVE_VISIT_MSG)
+from ..services.routes import attach_visit_to_week_route, notify_route_assigned
 from ..services.sales import create_sale_for_open_visit
 from ..services.visits import close_visit_with_optional_sale, maybe_alert_gps_vs_pdv
-from ..timeutil import now_utc
+from ..timeutil import now_utc, today_caracas
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
@@ -35,6 +64,8 @@ def list_visits(
     ),
     seller_id: int | None = Query(default=None),
     status: VisitStatus | None = Query(default=None),
+    route_id: int | None = Query(default=None),
+    unscheduled: bool | None = Query(default=None),
 ):
     query = _visit_query(db).order_by(
         Visit.scheduled_date.asc().nullslast(),
@@ -54,6 +85,10 @@ def list_visits(
         )
     elif scheduled_date is not None:
         query = query.filter(Visit.scheduled_date == scheduled_date)
+    if route_id is not None:
+        query = query.filter(Visit.route_id == route_id)
+    if unscheduled is True:
+        query = query.filter(Visit.scheduled_date.is_(None))
     if status is not None:
         query = query.filter(Visit.status == status)
     return query.limit(200).all()
@@ -72,6 +107,8 @@ def assign_visit(
     client = db.query(Client).filter(Client.id == payload.client_id, Client.is_active.is_(True)).first()
     if not client:
         raise HTTPException(status_code=400, detail="Cliente no válido")
+    if payload.scheduled_date and payload.scheduled_date < today_caracas():
+        raise HTTPException(status_code=400, detail="Ese día ya pasó; elige hoy o uno futuro")
 
     # Asegurar cartera: al planificar ruta el cliente queda asignado al vendedor
     assign_client_to_seller(db, payload.seller_id, payload.client_id)
@@ -85,6 +122,16 @@ def assign_visit(
         scheduled_time=payload.scheduled_time,
     )
     db.add(visit)
+    db.flush()
+    locked = bool(payload.schedule_locked)
+    attach_visit_to_week_route(
+        db,
+        visit,
+        origin="supervisor",
+        locked=locked,
+        week_start=payload.week_start,
+    )
+    notify_route_assigned(db, visit, client.name)
     db.commit()
     return _visit_query(db).filter(Visit.id == visit.id).one()
 
@@ -109,6 +156,20 @@ def unassign_visit(
     return None
 
 
+@router.get("/{visit_id}", response_model=VisitOut)
+def get_visit(
+    visit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    visit = _visit_query(db).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visita no encontrada")
+    if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes ver visitas de otro vendedor")
+    return visit
+
+
 @router.post("", response_model=VisitOut)
 def create_visit(
     payload: VisitCreate,
@@ -127,6 +188,9 @@ def create_visit(
         if not seller_can_see_client(db, current_user, payload.client_id):
             # Alta de visita sobre cliente propio: lo mete en cartera
             assign_client_to_seller(db, current_user.id, payload.client_id)
+
+    if payload.status == VisitStatus.en_curso:
+        _ensure_single_open_visit(db, current_user.id)
 
     now = now_utc()
     visit = Visit(
@@ -168,6 +232,8 @@ def create_visit(
                 gps_accuracy_m=payload.gps_accuracy_m,
                 when_label="Inicio",
             )
+    origin = "vendedor" if current_user.role == UserRole.vendedor else "supervisor"
+    attach_visit_to_week_route(db, visit, origin=origin, locked=False)
     db.commit()
     return _visit_query(db).filter(Visit.id == visit.id).one()
 
@@ -188,6 +254,7 @@ def start_visit(
         raise HTTPException(status_code=403, detail="No puedes iniciar visitas de otro vendedor")
     if visit.status != VisitStatus.programada:
         raise HTTPException(status_code=400, detail="Solo se pueden iniciar visitas programadas")
+    _ensure_single_open_visit(db, visit.seller_id)
 
     now = now_utc()
     visit.status = VisitStatus.en_curso
@@ -237,8 +304,8 @@ def pin_visit_gps(
         raise HTTPException(status_code=404, detail="Visita no encontrada")
     if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
         raise HTTPException(status_code=403, detail="No puedes actualizar GPS de otro vendedor")
-    if visit.status not in (VisitStatus.programada, VisitStatus.en_curso):
-        raise HTTPException(status_code=400, detail="Solo puedes fijar GPS en visitas abiertas")
+    if visit.status != VisitStatus.en_curso:
+        raise HTTPException(status_code=400, detail="El GPS se captura al iniciar la visita")
     if payload.latitude is None or payload.longitude is None:
         raise HTTPException(status_code=400, detail="No hay coordenada para guardar")
 
@@ -271,6 +338,28 @@ def pin_visit_gps(
             source=GpsPointSource.start if replace_start else GpsPointSource.watch,
         )
     )
+    db.add(visit)
+    db.commit()
+    return _visit_query(db).filter(Visit.id == visit_id).one()
+
+
+@router.patch("/{visit_id}/notes", response_model=VisitOut)
+def patch_visit_notes(
+    visit_id: int,
+    payload: VisitNotes,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bitácora de campo mientras la visita está en curso (o al cancelar)."""
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visita no encontrada")
+    if current_user.role.value == "vendedor" and visit.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes anotar visitas de otro vendedor")
+    if visit.status not in (VisitStatus.en_curso, VisitStatus.programada):
+        raise HTTPException(status_code=400, detail="Esta visita ya no admite notas de campo")
+
+    visit.field_notes = (payload.field_notes or "").strip() or None
     db.add(visit)
     db.commit()
     return _visit_query(db).filter(Visit.id == visit_id).one()
@@ -356,6 +445,7 @@ def close_visit(
         visit,
         result=payload.result,
         description=payload.description,
+        field_notes=payload.field_notes,
         latitude=payload.latitude,
         longitude=payload.longitude,
         gps_accuracy_m=payload.gps_accuracy_m,

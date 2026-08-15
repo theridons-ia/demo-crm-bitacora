@@ -1,5 +1,6 @@
 import { Check, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/Button";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, acknowledgeAlert, fetchAlerts } from "../lib/api";
@@ -12,6 +13,7 @@ const TYPE_LABEL: Record<AlertType, string> = {
   photo_only: "Solo foto",
   gps_skipped: "GPS omitido",
   gps_low_accuracy: "GPS impreciso",
+  route_assigned: "Ruta",
 };
 
 const SEVERITY_LABEL: Record<AlertSeverity, string> = {
@@ -24,8 +26,10 @@ function formatWhen(iso: string): string {
   return formatDateTime(iso);
 }
 
-/** SF-2.3 — inbox de alertas GPS / foto para el supervisor. */
+/** Inbox: GPS/foto para supervisor; avisos de ruta para vendedor. */
 export function AlertsInboxPage() {
+  const { user } = useAuth();
+  const sellerInbox = user?.role === "vendedor";
   const [alerts, setAlerts] = useState<VisitAlert[]>([]);
   const [onlyPending, setOnlyPending] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -69,15 +73,21 @@ export function AlertsInboxPage() {
   return (
     <WorkspacePage
       eyebrow="Operación"
-      title="Alertas"
-      blurb="Revisa y marca como vistas las alertas GPS y foto del equipo."
+      title={sellerInbox ? "Avisos" : "Alertas"}
+      blurb={
+        sellerInbox
+          ? "Cuando el supervisor te mete una parada a la semana."
+          : "Revisa y marca como vistas las alertas GPS y foto del equipo."
+      }
     >
       <header className="page-header">
         <div>
-          <p className="eyebrow">Supervisor</p>
-          <h1>Alertas</h1>
+          <p className="eyebrow">{sellerInbox ? "Tu ruta" : "Supervisor"}</p>
+          <h1>{sellerInbox ? "Avisos" : "Alertas"}</h1>
           <p className="muted">
-            Cierres con GPS omitido, lejos del PDV, solo foto o precisión baja.
+            {sellerInbox
+              ? "Paradas nuevas de la semana. Márcalas cuando las veas."
+              : "Cierres con GPS omitido, lejos del PDV, solo foto o precisión baja."}
           </p>
         </div>
         <Button type="button" variant="secondary" onClick={() => void reload()} disabled={loading}>
@@ -115,7 +125,9 @@ export function AlertsInboxPage() {
         <p className="card muted" style={{ margin: 0 }}>
           {onlyPending
             ? "No hay alertas pendientes."
-            : "Aún no hay alertas. Se crean al cerrar visitas con GPS omitido, foto o lejos del pin."}
+            : sellerInbox
+              ? "Aún no hay avisos. Aparecen cuando te asignan una parada."
+              : "Aún no hay alertas. Se crean al cerrar visitas con GPS omitido, foto o lejos del pin."}
         </p>
       ) : null}
 

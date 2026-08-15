@@ -57,6 +57,24 @@ Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pant
 2. Si hay screenshot del usuario: listar inconsistencias y arreglar solo esas.
 3. No regenerar layouts “bonitos” desde cero.
 
+## Fechas de semana (ruta)
+
+Semana = lunes–domingo Caracas (`weekStartISO`, `weekDayISOs`, `formatWeekSpan`, `WEEKDAY_SHORT` en `caracasTime.ts`). No inventar otro carrusel.
+
+| Pieza | Qué es | Dónde |
+|---|---|---|
+| `WeekNav` | `< 17–23 ago >` cambia la semana | Supervisor Ruta (equipo). **SF-5.2** Ruta vendedor |
+| `WeekDayStrip` | 7 chips Lun–Dom + **Sin día**. Punto coral = hay paradas | Supervisor (detalle vendedor) · Armar la semana. **SF-5.2** Ruta vendedor |
+| `.week-pick` | Esta / Próxima / +2 sem | Solo el wizard Armar |
+| `week-strip` / `day-chip` | Bitácora: Todas + vencidas + semana, **con conteo** | Visitas → Programadas. **No** es la ruta |
+
+Reglas del strip de ruta:
+
+- Etiqueta + número (`Lun` / `17`). **Punto**, no `17 · 2`.
+- Pasado: `.is-past` (gris). En el planificador, disabled.
+- Sin día entra en el mismo strip. Mismo punto si hay paradas sueltas.
+- Hoy se selecciona por defecto si cae en esa semana.
+
 ## Inicio (vendedor)
 
 - Orden: tarjeta de ruta → **4 KPIs en una fila** (`.home-kpis`, desktop) → **agenda a ancho completo** (lista vertical `.home-agenda`, hasta 3 paradas; no 3 columnas a medio ancho).

@@ -17,7 +17,7 @@ type Props = {
   client: Client;
   open: boolean;
   onClose: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
   sellerLabel?: string;
   assignLabel?: string;
   onAssign?: () => void;
@@ -134,7 +134,9 @@ export function ClientDetailSheet({
       eyebrow="Ficha de cliente"
       title={client.name}
       blurb={
-        [client.state, pinned ? "Con pin GPS" : "Sin pin de mapa"].filter(Boolean).join(" · ")
+        [client.city, client.state, pinned ? "Con pin GPS" : "Sin pin de mapa"]
+          .filter(Boolean)
+          .join(" · ")
       }
       footer={
         <div className="side-sheet-actions">
@@ -146,9 +148,11 @@ export function ClientDetailSheet({
               {assignLabel ?? "Asignar"}
             </Button>
           ) : null}
-          <Button type="button" variant="accent" onClick={onEdit}>
-            Editar datos y pin
-          </Button>
+          {onEdit ? (
+            <Button type="button" variant="accent" onClick={onEdit}>
+              Editar datos y pin
+            </Button>
+          ) : null}
         </div>
       }
     >
@@ -162,6 +166,7 @@ export function ClientDetailSheet({
             <strong>{client.name}</strong>
             <span className="muted small">
               {idLabel(client)}
+              {client.city ? ` · ${client.city}` : ""}
               {client.state ? ` · ${client.state}` : ""}
             </span>
           </div>

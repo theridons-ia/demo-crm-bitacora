@@ -58,6 +58,7 @@ class ClientCreate(BaseModel):
     rif: str | None = Field(default=None, max_length=20)
     ci: str | None = Field(default=None, max_length=20)
     state: str | None = None
+    city: str = Field(min_length=2, max_length=80)
     address: str | None = None
     phone: str | None = None
     notes: str | None = None
@@ -70,10 +71,13 @@ class ClientCreate(BaseModel):
         ci = (self.ci or "").strip() or None
         self.rif = rif
         self.ci = ci
+        self.city = (self.city or "").strip()
         if rif and ci:
             raise ValueError("Usa RIF o CI, no ambos (un solo identificador)")
         if not rif and not ci:
             raise ValueError("Debes indicar RIF o CI")
+        if len(self.city) < 2:
+            raise ValueError("Indica la ciudad del PDV")
         return self
 
 
@@ -83,6 +87,7 @@ class ClientOut(ORMModel):
     rif: str | None = None
     ci: str | None = None
     state: str | None = None
+    city: str | None = None
     address: str | None = None
     phone: str | None = None
     notes: str | None = None
@@ -106,6 +111,7 @@ class ClientUpdate(BaseModel):
     rif: str | None = Field(default=None, max_length=20)
     ci: str | None = Field(default=None, max_length=20)
     state: str | None = None
+    city: str = Field(min_length=2, max_length=80)
     address: str | None = None
     phone: str | None = None
     notes: str | None = None
@@ -118,10 +124,13 @@ class ClientUpdate(BaseModel):
         ci = (self.ci or "").strip() or None
         self.rif = rif
         self.ci = ci
+        self.city = (self.city or "").strip()
         if rif and ci:
             raise ValueError("Usa RIF o CI, no ambos (un solo identificador)")
         if not rif and not ci:
             raise ValueError("Debes indicar RIF o CI")
+        if len(self.city) < 2:
+            raise ValueError("Indica la ciudad del PDV")
         return self
 
 
@@ -448,9 +457,14 @@ class VisitCancel(BaseModel):
     description: str | None = None
 
 
+class VisitNotes(BaseModel):
+    field_notes: str | None = None
+
+
 class VisitClose(BaseModel):
     result: SaleResult
     description: str | None = None
+    field_notes: str | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     gps_accuracy_m: Decimal | None = None
@@ -464,13 +478,15 @@ class VisitClose(BaseModel):
 
 
 class VisitAssign(BaseModel):
-    """Supervisor asigna visita planificada a un vendedor (SF-2.2)."""
+    """Supervisor asigna visita planificada a un vendedor (SF-2.2 / SF-5.1)."""
 
     seller_id: int
     client_id: int
-    scheduled_date: date
+    scheduled_date: date | None = None
     scheduled_time: time | None = None
     description: str | None = None
+    schedule_locked: bool | None = None
+    week_start: date | None = None
 
 
 class VisitOut(ORMModel):
@@ -480,6 +496,7 @@ class VisitOut(ORMModel):
     status: VisitStatus
     result: SaleResult | None
     description: str | None
+    field_notes: str | None = None
     scheduled_date: date | None
     scheduled_time: time | None = None
     visited_at: datetime | None
@@ -498,15 +515,45 @@ class VisitOut(ORMModel):
     end_gps_captured_at: datetime | None = None
     local_uuid: str | None
     created_at: datetime
+    route_id: int | None = None
+    sequence: int | None = None
+    schedule_locked: bool = False
+    origin_plan: str | None = None
     client: ClientOut | None = None
     seller: UserOut | None = None
     sale: SaleOut | None = None
+
+
+class RouteCreate(BaseModel):
+    seller_id: int
+    week_start: date | None = None
+
+
+class RouteCardOut(ORMModel):
+    id: int
+    seller_id: int
+    seller_name: str
+    seller_initials: str
+    week_start: date
+    week_end: date
+    code: str | None = None
+    title: str
+    status: str
+    planned: int
+    done: int
+    unscheduled: int
+    in_progress: int
+
+
+class RouteDetailOut(RouteCardOut):
+    visits: list[VisitOut] = Field(default_factory=list)
 
 
 class OfflineVisitSync(BaseModel):
     local_uuid: str
     client_id: int
     description: str | None = None
+    field_notes: str | None = None
     result: SaleResult
     latitude: Decimal | None = None
     longitude: Decimal | None = None

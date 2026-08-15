@@ -73,6 +73,8 @@ export function crumbForPath(pathname: string): { section: string; page: string 
     "/app/inventario": { section: "Mi operación", page: "Inventario" },
     "/app/clientes": { section: "Mi operación", page: "Clientes" },
     "/app/ruta": { section: "Mi operación", page: "Mi recorrido" },
+    "/app/cobro": { section: "Cobro", page: "Cuentas" },
+    "/app/avisos": { section: "Mi operación", page: "Avisos" },
     "/app/desempeno": { section: "Mi operación", page: "Desempeño" },
     "/app/perfil": { section: "Cuenta", page: "Perfil" },
     "/app/ajustes": { section: "Cuenta", page: "Ajustes" },

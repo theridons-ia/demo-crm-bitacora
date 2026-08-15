@@ -15,6 +15,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from app.auth import hash_password
+from app.services.client_location import infer_client_city
 from app.database import SessionLocal, engine
 from app.ensure_schema import ensure_schema
 from app.models import (
@@ -339,6 +340,7 @@ def seed_rich_demo(db, users: dict[str, User], products: list[Product], supplier
                 rif=rif,
                 ci=ci,
                 state=state,
+                city=infer_client_city(address, state),
                 address=address,
                 phone=phone,
                 latitude=Decimal(str(lat)) if lat is not None else None,
@@ -951,6 +953,7 @@ def sync_ali_today_route(db, users: dict[str, User]) -> None:
                 name=name,
                 rif=rif,
                 state="Carabobo",
+                city=infer_client_city(address, "Carabobo"),
                 address=address,
                 phone=phone,
                 latitude=Decimal(str(lat)),
@@ -1021,9 +1024,54 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
     specs = [
         ("Caja USD", "Efectivo", BankAccountType.cash, CurrencyCode.USD, "Caja física oficina", 10),
         ("Caja Bs", "Efectivo", BankAccountType.cash, CurrencyCode.VES, "Caja bolívares", 20),
-        ("Banesco empresa", "Banesco", BankAccountType.bank, CurrencyCode.VES, "Cuenta ****4521", 30),
-        ("Zelle EnRutas", "Zelle", BankAccountType.zelle, CurrencyCode.USD, "cobros@enrutas.ve", 40),
-        ("Pago Móvil", "Banesco", BankAccountType.pago_movil, CurrencyCode.VES, "0412-5557788 · V-12345678", 50),
+        (
+            "Zelle EnRutas",
+            "Zelle",
+            BankAccountType.zelle,
+            CurrencyCode.USD,
+            "enrutas@enrutas.com.ve",
+            30,
+        ),
+        (
+            "USDT EnRutas",
+            "USDT",
+            BankAccountType.usdt,
+            CurrencyCode.USD,
+            "enrutas@enrutas.com.ve",
+            40,
+        ),
+        (
+            "Banesco empresa",
+            "Banesco",
+            BankAccountType.bank,
+            CurrencyCode.VES,
+            "0134-0074-89-0100123456 · J-500123456",
+            50,
+        ),
+        (
+            "Mercantil empresa",
+            "Mercantil",
+            BankAccountType.bank,
+            CurrencyCode.VES,
+            "0105-0022-11-0100987654 · J-500123456",
+            60,
+        ),
+        (
+            "Pago móvil Banesco",
+            "Banesco",
+            BankAccountType.pago_movil,
+            CurrencyCode.VES,
+            "0412-5557788 · J-500123456",
+            70,
+        ),
+        (
+            "Pago móvil Mercantil",
+            "Mercantil",
+            BankAccountType.pago_movil,
+            CurrencyCode.VES,
+            "0414-5558899 · J-500123456",
+            80,
+        ),
     ]
     out: dict[str, BankAccount] = {}
     for name, bank, atype, currency, hint, order in specs:
@@ -1040,7 +1088,18 @@ def _ensure_bank_accounts(db) -> dict[str, BankAccount]:
             )
             db.add(acc)
             db.flush()
+        else:
+            acc.bank_name = bank
+            acc.account_type = atype
+            acc.currency = currency
+            acc.pay_hint = hint
+            acc.is_active = True
+            acc.sort_order = order
         out[name] = acc
+    # Cuenta vieja de seed (un solo Pago Móvil) deja de competir con las dos nuevas.
+    legacy = db.query(BankAccount).filter(BankAccount.name == "Pago Móvil").first()
+    if legacy and "Pago Móvil" not in out:
+        legacy.is_active = False
     return out
 
 
@@ -1111,6 +1170,30 @@ def run() -> None:
                     )
                 )
 
+        from app.models import AlertType
+        from app.services.routes import backfill_week_routes, notify_route_assigned
+        from app.timeutil import week_start_caracas, week_end_caracas
+
+        week = week_start_caracas()
+        backfill_week_routes(db, week)
+        if db.query(VisitAlert).filter(VisitAlert.alert_type == AlertType.route_assigned).count() == 0:
+            week_end = week_end_caracas(week)
+            for seller in (users.get("marina"), users.get("carlos"), users.get("laura"), users.get("arodriguez")):
+                if not seller:
+                    continue
+                visit = (
+                    db.query(Visit)
+                    .filter(
+                        Visit.seller_id == seller.id,
+                        Visit.status == VisitStatus.programada,
+                        Visit.scheduled_date >= week,
+                        Visit.scheduled_date <= week_end,
+                    )
+                    .order_by(Visit.scheduled_time.asc().nullslast())
+                    .first()
+                )
+                if visit and visit.client:
+                    notify_route_assigned(db, visit, visit.client.name)
         db.commit()
 
         n_clients = db.query(Client).count()

@@ -1,13 +1,16 @@
 import {
   Banknote,
   CircleDollarSign,
+  Copy,
   Landmark,
+  MessageCircle,
   Send,
   Smartphone,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BankAccount, CurrencyCode, PaymentMethod } from "../lib/types";
+import { copyText, payAccountShareText, whatsappShareUrl } from "../lib/sharePay";
 import { PhotoDrop } from "./PhotoDrop";
 import { SelectField, TextField } from "./TextField";
 
@@ -53,6 +56,7 @@ function methodMatchesAccount(method: PaymentMethod, account: BankAccount): bool
     return account.account_type === "cash";
   }
   if (method === "zelle") return account.account_type === "zelle";
+  if (method === "usdt") return account.account_type === "usdt" || account.account_type === "other";
   if (method === "pago_movil") return account.account_type === "pago_movil";
   if (method === "transfer_ves") return account.account_type === "bank";
   return true;
@@ -106,6 +110,8 @@ export function PaymentCapture({
 
   const selected = filteredAccounts.find((a) => a.id === value.bank_account_id);
   const accountHint = distinctPayHint(selected);
+  const shareText = selected && isShareableAccount(selected) ? payAccountShareText(selected) : null;
+  const [copied, setCopied] = useState(false);
   const emptyAccountHint =
     needsAccount && !filteredAccounts.length
       ? "No hay cuenta activa para este método. El supervisor la carga en Bancos, o elige otro medio."
@@ -161,6 +167,36 @@ export function PaymentCapture({
           {emptyAccountHint}
         </p>
       ) : null}
+      {shareText ? (
+        <div className="pay-share-inline">
+          <p className="pay-share-hint">{selected?.pay_hint}</p>
+          <div className="pay-share-actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={disabled}
+              onClick={() => {
+                void copyText(shareText).then((ok) => {
+                  setCopied(ok);
+                  if (ok) window.setTimeout(() => setCopied(false), 1800);
+                });
+              }}
+            >
+              <Copy size={16} />
+              {copied ? "Copiado" : "Copiar datos"}
+            </button>
+            <a
+              className="btn btn-secondary"
+              href={whatsappShareUrl(shareText)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <MessageCircle size={16} />
+              WhatsApp
+            </a>
+          </div>
+        </div>
+      ) : null}
       {!needsAccount ? (
         <p className="muted small pay-hint">El efectivo se registra en caja {currency}.</p>
       ) : null}
@@ -185,6 +221,10 @@ export function PaymentCapture({
       />
     </div>
   );
+}
+
+function isShareableAccount(account: BankAccount): boolean {
+  return account.account_type !== "cash" && Boolean(account.pay_hint);
 }
 
 function distinctPayHint(account: BankAccount | undefined): string | undefined {

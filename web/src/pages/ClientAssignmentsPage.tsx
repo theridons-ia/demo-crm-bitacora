@@ -89,7 +89,7 @@ export function ClientAssignmentsPage() {
       }
       if (!q) return true;
       const sellerNames = sellersFor.map((id) => sellerNameById.get(id) ?? "").join(" ");
-      return `${c.name} ${c.rif ?? ""} ${c.ci ?? ""} ${c.state ?? ""} ${c.address ?? ""} ${sellerNames}`
+      return `${c.name} ${c.rif ?? ""} ${c.ci ?? ""} ${c.city ?? ""} ${c.state ?? ""} ${c.address ?? ""} ${sellerNames}`
         .toLowerCase()
         .includes(q);
     });

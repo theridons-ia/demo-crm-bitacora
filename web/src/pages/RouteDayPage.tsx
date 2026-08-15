@@ -1,156 +1,193 @@
-import { Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
-import { ListSearch } from "../components/ListSearch";
 import { ListSkeleton } from "../components/ListSkeleton";
-import { MonthCalendar, calendarTodayISO } from "../components/MonthCalendar";
-import { Modal } from "../components/Modal";
-import { FormStep, SideSheet } from "../components/SideSheet";
-import { SelectField, TextField } from "../components/TextField";
+import { RouteAssignSheet } from "../components/RouteAssignSheet";
+import { SideSheet } from "../components/SideSheet";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
+import { WeekDayStrip } from "../components/WeekDayStrip";
+import { WeekNav } from "../components/WeekNav";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
-  assignVisit,
-  fetchClients,
+  fetchRoute,
+  fetchRoutes,
   fetchSellers,
-  fetchVisits,
   unassignVisit,
 } from "../lib/api";
-import { formatAgendaDay, todayISO } from "../lib/caracasTime";
+import {
+  addDaysISO,
+  formatAgendaDay,
+  formatWeekSpan,
+  todayISO,
+  weekDayISOs,
+  weekStartISO,
+} from "../lib/caracasTime";
 import { sortVisitsRoute } from "../lib/visitOrder";
-import type { Client, User, Visit, VisitStatus } from "../lib/types";
+import type { RouteCard, RouteDetail, User, Visit } from "../lib/types";
 
-function clientLabel(client: Client): string {
-  const id = client.rif ? `RIF ${client.rif}` : client.ci ? `CI ${client.ci}` : "";
-  return id ? `${client.name} · ${id}` : client.name;
+function defaultDayChip(weekStart: string): string | "sin-dia" {
+  const today = todayISO();
+  const days = weekDayISOs(weekStart);
+  return days.includes(today) ? today : weekStart;
 }
 
-/** Equipo en ruta — lista del día (VisitRow) + asignar/quitar. */
+/** Supervisor: una tarjeta por vendedor × semana; tap = L–D + Sin día. */
 export function RouteDayPage() {
   const [sellers, setSellers] = useState<User[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [date, setDate] = useState(todayISO);
-  const [sellerFilter, setSellerFilter] = useState<number | "all">("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | VisitStatus>("all");
-  const [query, setQuery] = useState("");
+  const [weekStart, setWeekStart] = useState(() => weekStartISO());
+  const [cards, setCards] = useState<RouteCard[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<RouteDetail | null>(null);
+  const [dayChip, setDayChip] = useState<string | "sin-dia">(() => defaultDayChip(weekStartISO()));
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okNote, setOkNote] = useState<string | null>(null);
 
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assignSellerId, setAssignSellerId] = useState<number | "">("");
-  const [assignClientId, setAssignClientId] = useState<number | "">("");
-  const [assignNote, setAssignNote] = useState("");
-  const [assignTime, setAssignTime] = useState("09:00");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const routeState = location.state as { openAssign?: boolean; sellerId?: number } | null;
+  const [assignOpen, setAssignOpen] = useState(() => Boolean(routeState?.openAssign));
 
   const [removeVisit, setRemoveVisit] = useState<Visit | null>(null);
   const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
+  const openSellerIdRef = useRef<number | null>(routeState?.sellerId ?? null);
+  const hasLoaded = useRef(false);
+
+  const weekLabel = formatWeekSpan(weekStart);
+  const selectedCard = cards.find((c) => c.id === selectedId) ?? null;
+  const sellerOpen = selectedId != null;
 
   const loadMeta = useCallback(async () => {
-    const [sellerList, clientList] = await Promise.all([fetchSellers(), fetchClients()]);
-    setSellers(sellerList);
-    setClients(clientList);
-    setAssignSellerId((prev) => {
-      if (prev !== "" && sellerList.some((s) => s.id === prev)) return prev;
-      return sellerList[0]?.id ?? "";
-    });
+    setSellers(await fetchSellers());
   }, []);
 
-  const loadDay = useCallback(async (day: string) => {
-    const list = await fetchVisits({ scheduled_date: day });
-    setVisits(list.filter((v) => v.status !== "cancelada"));
+  const loadWeek = useCallback(async (week: string) => {
+    const list = await fetchRoutes(week);
+    setCards(list);
+    return list;
+  }, []);
+
+  const loadDetail = useCallback(async (routeId: number) => {
+    const next = await fetchRoute(routeId);
+    setDetail(next);
+    return next;
   }, []);
 
   const reload = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     setError(null);
     try {
       await loadMeta();
-      await loadDay(date);
+      const list = await loadWeek(weekStart);
+      hasLoaded.current = true;
+      const sellerId = openSellerIdRef.current;
+      if (sellerId != null) {
+        const match = list.find((c) => c.seller_id === sellerId);
+        if (match) setSelectedId(match.id);
+        else {
+          openSellerIdRef.current = null;
+          setSelectedId(null);
+          setDetail(null);
+        }
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar la ruta");
     } finally {
       setLoading(false);
     }
-  }, [date, loadMeta, loadDay]);
+  }, [weekStart, loadMeta, loadWeek]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  const sellerNameById = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const s of sellers) map.set(s.id, s.full_name);
-    return map;
-  }, [sellers]);
+  useEffect(() => {
+    if (!routeState?.openAssign && routeState?.sellerId == null) return;
+    navigate(".", { replace: true, state: null });
+  }, [navigate, routeState]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const next = visits.filter((v) => {
-      if (sellerFilter !== "all" && v.seller_id !== sellerFilter) return false;
-      if (statusFilter !== "all" && v.status !== statusFilter) return false;
-      if (!q) return true;
-      const seller = sellerNameById.get(v.seller_id) ?? "";
-      const client = v.client?.name ?? "";
-      return `${client} ${seller} ${v.description ?? ""}`.toLowerCase().includes(q);
-    });
-    return sortVisitsRoute(next);
-  }, [visits, sellerFilter, statusFilter, query, sellerNameById]);
+  useEffect(() => {
+    if (selectedId == null) {
+      setDetail(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await fetchRoute(selectedId);
+        if (!cancelled) setDetail(next);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : "No se pudo abrir la ruta");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
 
-  const metrics = useMemo(() => {
-    const planned = visits.filter((v) => v.status === "programada").length;
-    const active = visits.filter((v) => v.status === "en_curso").length;
-    const done = visits.filter((v) => v.status === "completada").length;
-    const sellersOnRoute = new Set(visits.map((v) => v.seller_id)).size;
-    return { planned, active, done, sellersOnRoute, total: visits.length };
+  const visits = detail?.visits.filter((v) => v.status !== "cancelada") ?? [];
+
+  const dayVisits = useMemo(() => {
+    const slice =
+      dayChip === "sin-dia"
+        ? visits.filter((v) => !v.scheduled_date)
+        : visits.filter((v) => v.scheduled_date === dayChip);
+    return sortVisitsRoute(slice);
+  }, [visits, dayChip]);
+
+  const occupiedDays = useMemo(() => {
+    const set = new Set<string>();
+    for (const v of visits) {
+      if (v.scheduled_date) set.add(v.scheduled_date);
+    }
+    return set;
   }, [visits]);
 
-  const assignedClientIds = useMemo(() => {
-    if (assignSellerId === "") return new Set<number>();
-    return new Set(
-      visits
-        .filter((v) => v.seller_id === assignSellerId && v.status === "programada")
-        .map((v) => v.client_id),
-    );
-  }, [visits, assignSellerId]);
+  function shiftWeek(delta: number) {
+    const next = addDaysISO(weekStart, delta * 7);
+    setWeekStart(next);
+    setDayChip(defaultDayChip(next));
+    setOkNote(null);
+  }
+
+  function closeSeller() {
+    openSellerIdRef.current = null;
+    setSelectedId(null);
+    setDetail(null);
+    setOkNote(null);
+  }
+
+  function openSeller(card: RouteCard) {
+    setError(null);
+    setOkNote(null);
+    openSellerIdRef.current = card.seller_id;
+    setDayChip(defaultDayChip(card.week_start));
+    setSelectedId(card.id);
+  }
 
   function openAssign() {
     setError(null);
     setOkNote(null);
-    setAssignClientId("");
-    setAssignNote("");
-    setAssignTime("09:00");
-    if (!date) setDate(calendarTodayISO());
-    if (sellerFilter !== "all") setAssignSellerId(sellerFilter);
-    else if (assignSellerId === "" && sellers[0]) setAssignSellerId(sellers[0].id);
     setAssignOpen(true);
   }
 
-  async function onAssign(event: FormEvent) {
-    event.preventDefault();
-    if (assignSellerId === "" || assignClientId === "") return;
-    setBusy(true);
-    setError(null);
-    try {
-      await assignVisit({
-        seller_id: assignSellerId,
-        client_id: assignClientId,
-        scheduled_date: date,
-        scheduled_time: assignTime ? `${assignTime}:00` : null,
-        description: assignNote.trim() || null,
-      });
-      setAssignOpen(false);
-      setOkNote("Visita agregada a la ruta");
-      await loadDay(date);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo asignar");
-    } finally {
-      setBusy(false);
+  async function afterAssigned(sellerId: number, week: string) {
+    openSellerIdRef.current = sellerId;
+    setWeekStart(week);
+    setDayChip(defaultDayChip(week));
+    const list = await loadWeek(week);
+    const card = list.find((c) => c.seller_id === sellerId);
+    if (card) {
+      setSelectedId(card.id);
+      await loadDetail(card.id);
     }
+    setOkNote("Parada en la semana. El vendedor ya tiene el aviso.");
   }
 
   async function onUnassign() {
@@ -161,7 +198,8 @@ export function RouteDayPage() {
       await unassignVisit(removeVisit.id);
       setRemoveVisit(null);
       setOkNote("Visita quitada de la ruta");
-      await loadDay(date);
+      if (selectedId != null) await loadDetail(selectedId);
+      await loadWeek(weekStart);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo desasignar");
     } finally {
@@ -169,58 +207,73 @@ export function RouteDayPage() {
     }
   }
 
+  const teamPlanned = cards.reduce((n, c) => n + c.planned, 0);
+  const teamDone = cards.reduce((n, c) => n + c.done, 0);
+
   return (
     <>
       <WorkspacePage
         eyebrow="Operación"
-        title="Equipo en ruta"
-        blurb="Visitas del día por vendedor. Asigna o quita desde el panel."
+        title="Ruta semanal"
+        blurb="Una tarjeta por vendedor. El día se ejecuta; la semana se planifica aquí."
         asideExtra={
           <section className="card chart-card">
-            <h2>Del día</h2>
+            <h2>{selectedCard ? selectedCard.title : `Semana ${weekLabel}`}</h2>
             <div className="bar-list">
               <div>
                 <div className="bar-item-top">
-                  <span>Programadas</span>
-                  <strong>{metrics.planned}</strong>
+                  <span>Planificadas</span>
+                  <strong>{selectedCard ? selectedCard.planned : teamPlanned}</strong>
                 </div>
               </div>
               <div>
                 <div className="bar-item-top">
-                  <span>En curso</span>
-                  <strong>{metrics.active}</strong>
+                  <span>Hechas</span>
+                  <strong>{selectedCard ? selectedCard.done : teamDone}</strong>
                 </div>
               </div>
-              <div>
-                <div className="bar-item-top">
-                  <span>Completadas</span>
-                  <strong>{metrics.done}</strong>
+              {selectedCard ? (
+                <div>
+                  <div className="bar-item-top">
+                    <span>Sin día</span>
+                    <strong>{selectedCard.unscheduled}</strong>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           </section>
         }
       >
         <header className="page-header">
           <div>
-            <p className="eyebrow">Hoy · {formatAgendaDay(date)}</p>
-            <h1 className="display-title">Ruta</h1>
+            {sellerOpen ? (
+              <button type="button" className="week-back" onClick={closeSeller}>
+                <ChevronLeft size={16} />
+                Equipo
+              </button>
+            ) : (
+              <p className="eyebrow">Semana</p>
+            )}
+            <h1 className="display-title">{detail?.title ?? selectedCard?.title ?? "Ruta"}</h1>
             <p className="muted">
-              {metrics.total} paradas · {metrics.sellersOnRoute} vendedor
-              {metrics.sellersOnRoute === 1 ? "" : "es"}
+              {sellerOpen
+                ? `${(detail ?? selectedCard)?.code ?? ""} · ${(detail ?? selectedCard)?.done ?? 0}/${(detail ?? selectedCard)?.planned ?? 0} hechas`
+                : `${weekLabel} · ${cards.length} vendedor${cards.length === 1 ? "" : "es"}`}
             </p>
           </div>
           <Button
             type="button"
             variant="accent"
             className="header-plus-cta"
-            aria-label="Asignar visita"
+            aria-label="Armar ruta"
             onClick={openAssign}
           >
             <Plus size={18} />
-            <span className="header-plus-label">Asignar</span>
+            <span className="header-plus-label">{sellerOpen ? "Agregar" : "Armar"}</span>
           </Button>
         </header>
+
+        <WeekNav weekStart={weekStart} onShift={shiftWeek} />
 
         {okNote ? <p className="offline-banner is-online">{okNote}</p> : null}
         {error && !assignOpen && !removeVisit ? (
@@ -229,192 +282,96 @@ export function RouteDayPage() {
           </p>
         ) : null}
 
-        <section className="metrics-row-3 chrome-defer-metrics" aria-label="Resumen ruta">
-          <article className="metric-card metric-inline">
-            <div className="metric-inline-copy">
-              <strong>{metrics.planned} programadas</strong>
-              <span>pendientes de salir</span>
-            </div>
-          </article>
-          <article className="metric-card metric-inline">
-            <div className="metric-inline-copy">
-              <strong>{metrics.active} en curso</strong>
-              <span>ahora en calle</span>
-            </div>
-          </article>
-          <article className="metric-card metric-inline">
-            <div className="metric-inline-copy">
-              <strong>{metrics.done} culminadas</strong>
-              <span>del día</span>
-            </div>
-          </article>
-        </section>
+        {loading && !sellerOpen ? <ListSkeleton /> : null}
 
-        <div className="list-page-tools">
-          <div className="list-tools-row">
-            <TextField
-              id="route-date"
-              label="Fecha"
-              type="date"
-              lang="es-VE"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-            <SelectField
-              id="route-seller-filter"
-              label="Vendedor"
-              value={sellerFilter === "all" ? "all" : String(sellerFilter)}
-              onChange={(e) =>
-                setSellerFilter(e.target.value === "all" ? "all" : Number(e.target.value))
-              }
-            >
-              <option value="all">Todo el equipo</option>
-              {sellers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
-                  {s.route_name ? ` · ${s.route_name}` : ""}
-                </option>
-              ))}
-            </SelectField>
-            <ListSearch
-              id="route-search"
-              value={query}
-              onChange={setQuery}
-              placeholder="Cliente o vendedor…"
-            />
-          </div>
-          <div className="filter-chips" role="tablist" aria-label="Estado">
-            {(
-              [
-                ["all", "Todas"],
-                ["programada", "Programadas"],
-                ["en_curso", "En curso"],
-                ["completada", "Culminadas"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                className={statusFilter === id ? "chip active" : "chip"}
-                onClick={() => setStatusFilter(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {loading ? <ListSkeleton /> : null}
-
-        {!loading ? (
-          <ul className="visit-row-list">
-            {filtered.map((v, i) => (
-              <VisitRow
-                key={v.id}
-                visit={{
-                  ...v,
-                  seller: v.seller ?? sellers.find((s) => s.id === v.seller_id) ?? v.seller,
-                }}
-                index={sellerFilter === "all" ? undefined : i + 1}
-                clock="agenda"
-                showSeller={sellerFilter === "all"}
-                pinMissing={
-                  v.client?.latitude == null || v.client?.longitude == null
-                }
-                onClick={() => setDetailVisit(v)}
-              />
-            ))}
+        {!loading && !sellerOpen ? (
+          <ul className="week-seller-list">
+            {cards.map((card) => {
+              const pct = card.planned ? Math.round((card.done / card.planned) * 100) : 0;
+              return (
+                <li key={card.id}>
+                  <button type="button" className="week-seller-card" onClick={() => openSeller(card)}>
+                    <span className="ranking-avatar" aria-hidden>
+                      {card.seller_initials}
+                    </span>
+                    <span className="week-seller-copy">
+                      <strong>{card.seller_name.split(" ")[0]}</strong>
+                      <span>
+                        {card.code ?? "Ruta"}
+                        {card.unscheduled ? ` · ${card.unscheduled} sin día` : ""}
+                      </span>
+                    </span>
+                    <span className="week-seller-metrics">
+                      <strong>
+                        {card.done}/{card.planned}
+                      </strong>
+                      <span>{card.planned ? `${pct}%` : "Vacía"}</span>
+                    </span>
+                    <ChevronRight size={18} className="visit-row-chevron" aria-hidden />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : null}
 
-        {!loading && filtered.length === 0 ? (
-          <p className="muted">Sin visitas con este filtro. Asigna una parada al equipo.</p>
+        {!loading && !sellerOpen && cards.length === 0 ? (
+          <p className="muted">No hay vendedores activos para armar la semana.</p>
+        ) : null}
+
+        {sellerOpen ? (
+          <>
+            <WeekDayStrip
+              weekStart={weekStart}
+              value={dayChip}
+              onChange={setDayChip}
+              occupiedDays={occupiedDays}
+              unscheduled={detail?.unscheduled ?? selectedCard?.unscheduled ?? 0}
+            />
+
+            {!detail ? (
+              <ListSkeleton count={3} />
+            ) : (
+              <>
+                <ul className="visit-row-list">
+                  {dayVisits.map((v, i) => (
+                    <VisitRow
+                      key={v.id}
+                      visit={v}
+                      index={i + 1}
+                      clock="agenda"
+                      pinMissing={v.client?.latitude == null || v.client?.longitude == null}
+                      onClick={() => setDetailVisit(v)}
+                    />
+                  ))}
+                </ul>
+
+                {dayVisits.length === 0 ? (
+                  <p className="muted">
+                    {dayChip === "sin-dia"
+                      ? "Nada sin día. Asigna un PDV a la semana y déjalo sin fecha."
+                      : `Sin paradas el ${formatAgendaDay(dayChip)}.`}
+                  </p>
+                ) : null}
+              </>
+            )}
+          </>
         ) : null}
       </WorkspacePage>
 
-      <Modal
+      <RouteAssignSheet
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
-        size="wide"
-        eyebrow="Ruta"
-        title="Asignar visita"
-        blurb="Calendario, hora, vendedor y cliente. El historial ejecutado no se borra al quitar."
-        footer={
-          <div className="side-sheet-actions">
-            <Button type="button" variant="ghost" disabled={busy} onClick={() => setAssignOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              form="route-assign-form"
-              variant="accent"
-              disabled={busy || assignSellerId === "" || assignClientId === ""}
-            >
-              <Plus size={18} />
-              {busy ? "Guardando…" : "Agregar a la ruta"}
-            </Button>
-          </div>
-        }
-      >
-        <form id="route-assign-form" className="sheet-form-stack" onSubmit={onAssign}>
-          <FormStep step="01" title="Agenda" blurb="Día y hora de la parada.">
-            <MonthCalendar value={date} onChange={setDate} />
-            <TextField
-              id="assign-time"
-              label="Hora"
-              type="time"
-              value={assignTime}
-              onChange={(e) => setAssignTime(e.target.value)}
-              required
-            />
-          </FormStep>
-
-          <FormStep step="02" title="Equipo y PDV" blurb="Quién visita y a qué cliente.">
-            <SelectField
-              id="assign-seller"
-              label="Vendedor"
-              value={assignSellerId === "" ? "" : String(assignSellerId)}
-              onChange={(e) => setAssignSellerId(e.target.value ? Number(e.target.value) : "")}
-              required
-            >
-              {sellers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
-                  {s.route_name ? ` · ${s.route_name}` : ""}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField
-              id="assign-client"
-              label="Cliente"
-              value={assignClientId === "" ? "" : String(assignClientId)}
-              onChange={(e) => setAssignClientId(e.target.value ? Number(e.target.value) : "")}
-              required
-            >
-              <option value="">Elegir cliente…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id} disabled={assignedClientIds.has(c.id)}>
-                  {clientLabel(c)}
-                  {assignedClientIds.has(c.id) ? " (ya en ruta)" : ""}
-                </option>
-              ))}
-            </SelectField>
-            <TextField
-              id="assign-note"
-              label="Nota (opcional)"
-              value={assignNote}
-              onChange={(e) => setAssignNote(e.target.value)}
-              placeholder="Prioridad, referencia…"
-            />
-          </FormStep>
-
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </form>
-      </Modal>
+        weekStart={weekStart}
+        sellers={sellers}
+        sellerId={detail?.seller_id ?? selectedCard?.seller_id ?? ""}
+        initialDay={sellerOpen ? dayChip : defaultDayChip(weekStart)}
+        onAssigned={(sellerId, week) => void afterAssigned(sellerId, week)}
+        onWeekChange={(week) => {
+          setWeekStart(week);
+          setDayChip(defaultDayChip(week));
+        }}
+      />
 
       {detailVisit ? (
         <VisitDetailSheet
@@ -422,7 +379,11 @@ export function RouteDayPage() {
           open
           onClose={() => setDetailVisit(null)}
           onUpdated={(updated) => {
-            setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+            setDetail((prev) =>
+              prev
+                ? { ...prev, visits: prev.visits.map((v) => (v.id === updated.id ? updated : v)) }
+                : prev,
+            );
             setDetailVisit(updated);
           }}
           onRemoveFromRoute={
@@ -462,7 +423,7 @@ export function RouteDayPage() {
               {removeVisit.client?.name ?? `Cliente #${removeVisit.client_id}`}
             </p>
             <p className="ficha-meta">
-              {sellerNameById.get(removeVisit.seller_id) ?? `Vendedor #${removeVisit.seller_id}`}
+              {removeVisit.seller?.full_name ?? `Vendedor #${removeVisit.seller_id}`}
             </p>
             {error ? (
               <p className="form-error" role="alert">

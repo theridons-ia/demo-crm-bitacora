@@ -170,7 +170,7 @@ def resolve_payment_account(
         PaymentMethod.zelle: BankAccountType.zelle,
         PaymentMethod.pago_movil: BankAccountType.pago_movil,
         PaymentMethod.transfer_ves: BankAccountType.bank,
-        PaymentMethod.usdt: BankAccountType.other,
+        PaymentMethod.usdt: BankAccountType.usdt,
     }
     wanted = type_map.get(payment_method)
     if wanted:

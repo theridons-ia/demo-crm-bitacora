@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import {
   AlertTriangle,
@@ -6,6 +7,7 @@ import {
   Check,
   ChevronDown,
   DollarSign,
+  Landmark,
   LogOut,
   Radio,
   Settings,
@@ -38,8 +40,11 @@ export function AppHeader() {
   const [mockGps, setMockGps] = useState(() => isMockGpsEnabled());
   const menuRef = useRef<HTMLDivElement>(null);
   const alertsRef = useRef<HTMLDivElement>(null);
+  const alertsPanelRef = useRef<HTMLDivElement>(null);
   const base = accountBasePath(user?.role);
   const isSupervisor = user?.role === "supervisor" || user?.role === "admin";
+  const inboxPath = isSupervisor ? "/sup/alertas" : "/app/avisos";
+  const inboxLabel = isSupervisor ? "Ver todas las alertas" : "Ver todos los avisos";
 
   useEffect(() => {
     setProfileOpen(false);
@@ -47,10 +52,6 @@ export function AppHeader() {
   }, [pathname]);
 
   async function refreshAlertCount() {
-    if (!isSupervisor) {
-      setAlertCount(0);
-      return;
-    }
     try {
       const list = await fetchAlerts({ unacked_only: true });
       setAlertCount(list.length);
@@ -62,10 +63,6 @@ export function AppHeader() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!isSupervisor) {
-        setAlertCount(0);
-        return;
-      }
       try {
         const list = await fetchAlerts({ unacked_only: true });
         if (!cancelled) setAlertCount(list.length);
@@ -76,7 +73,7 @@ export function AppHeader() {
     return () => {
       cancelled = true;
     };
-  }, [isSupervisor, pathname]);
+  }, [pathname]);
 
   useEffect(() => {
     if (!profileOpen && !alertsOpen) return;
@@ -85,7 +82,11 @@ export function AppHeader() {
       if (profileOpen && menuRef.current && !menuRef.current.contains(t)) {
         setProfileOpen(false);
       }
-      if (alertsOpen && alertsRef.current && !alertsRef.current.contains(t)) {
+      if (
+        alertsOpen &&
+        !alertsRef.current?.contains(t) &&
+        !alertsPanelRef.current?.contains(t)
+      ) {
         setAlertsOpen(false);
       }
     };
@@ -167,98 +168,100 @@ export function AppHeader() {
           </button>
         ) : null}
 
-        {isSupervisor ? (
-          <div className="app-header-alerts" ref={alertsRef}>
-            <button
-              type="button"
-              className="app-header-bell"
-              aria-label={
-                alertCount > 0 ? `Alertas (${alertCount} pendientes)` : "Alertas"
-              }
-              aria-expanded={alertsOpen}
-              aria-haspopup="dialog"
-              title="Alertas"
-              onClick={() => void openAlerts()}
-            >
-              <Bell size={18} strokeWidth={2} />
-              {alertCount > 0 ? (
-                <span className="app-header-bell-badge">
-                  {alertCount > 9 ? "9+" : alertCount}
-                </span>
-              ) : (
-                <span className="app-header-bell-dot" aria-hidden />
-              )}
-            </button>
-
-            {alertsOpen ? (
-              <div className="app-alerts-panel" role="dialog" aria-label="Alertas pendientes">
-                <div className="app-alerts-panel-head">
-                  <div>
-                    <p className="eyebrow">Operación</p>
-                    <h2 className="app-alerts-panel-title">Alertas</h2>
-                  </div>
-                  <span className="muted small">{alertCount} pendientes</span>
-                </div>
-
-                {alertsLoading ? <p className="muted small">Cargando…</p> : null}
-
-                {!alertsLoading && alerts.length === 0 ? (
-                  <p className="muted small">Sin alertas pendientes.</p>
-                ) : null}
-
-                <ul className="app-alerts-list">
-                  {alerts.map((a) => (
-                    <li key={a.id} className="app-alerts-item">
-                      <span className="app-alerts-icon" aria-hidden>
-                        <AlertTriangle size={14} />
-                      </span>
-                      <div className="app-alerts-copy">
-                        <strong>{a.message}</strong>
-                        <span>
-                          {a.seller_name ?? "Vendedor"}
-                          {a.client_name ? ` · ${a.client_name}` : ""}
-                          {` · ${formatAlertWhen(a.created_at)}`}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="app-alerts-ack"
-                        disabled={ackBusy === a.id}
-                        onClick={() => void onAck(a.id)}
-                        title="Marcar vista"
-                      >
-                        <Check size={14} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="app-alerts-panel-foot">
-                  <Link
-                    to="/sup/alertas"
-                    className="link-accent"
-                    onClick={() => {
-                      setAlertsOpen(false);
-                      void refreshAlertCount();
-                    }}
-                  >
-                    Ver todas las alertas
-                  </Link>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : (
+        <div className="app-header-alerts" ref={alertsRef}>
           <button
             type="button"
             className="app-header-bell"
-            aria-label="Notificaciones"
-            title="Notificaciones"
-            disabled
+            aria-label={
+              alertCount > 0
+                ? `${isSupervisor ? "Alertas" : "Avisos"} (${alertCount} pendientes)`
+                : isSupervisor
+                  ? "Alertas"
+                  : "Avisos"
+            }
+            aria-expanded={alertsOpen}
+            aria-haspopup="dialog"
+            title={isSupervisor ? "Alertas" : "Avisos"}
+            onClick={() => void openAlerts()}
           >
             <Bell size={18} strokeWidth={2} />
+            {alertCount > 0 ? (
+              <span className="app-header-bell-badge">
+                {alertCount > 9 ? "9+" : alertCount}
+              </span>
+            ) : null}
           </button>
-        )}
+
+          {alertsOpen && typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  ref={alertsPanelRef}
+                  className="app-alerts-panel"
+                  role="dialog"
+                  aria-label={isSupervisor ? "Alertas pendientes" : "Avisos"}
+                >
+                  <div className="app-alerts-panel-head">
+                    <div>
+                      <p className="eyebrow">Operación</p>
+                      <h2 className="app-alerts-panel-title">{isSupervisor ? "Alertas" : "Avisos"}</h2>
+                    </div>
+                    <span className="muted small">{alertCount} pendientes</span>
+                  </div>
+
+                  {alertsLoading ? <p className="muted small">Cargando…</p> : null}
+
+                  {!alertsLoading && alerts.length === 0 ? (
+                    <p className="muted small">
+                      {isSupervisor
+                        ? "Sin alertas pendientes."
+                        : "Sin avisos. Te avisamos al asignarte una parada."}
+                    </p>
+                  ) : null}
+
+                  <ul className="app-alerts-list">
+                    {alerts.map((a) => (
+                      <li key={a.id} className="app-alerts-item">
+                        <span className="app-alerts-icon" aria-hidden>
+                          <AlertTriangle size={14} />
+                        </span>
+                        <div className="app-alerts-copy">
+                          <strong>{a.message}</strong>
+                          <span>
+                            {isSupervisor ? (a.seller_name ?? "Vendedor") : (a.client_name ?? "Ruta")}
+                            {isSupervisor && a.client_name ? ` · ${a.client_name}` : ""}
+                            {` · ${formatAlertWhen(a.created_at)}`}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="app-alerts-ack"
+                          disabled={ackBusy === a.id}
+                          onClick={() => void onAck(a.id)}
+                          title="Marcar vista"
+                        >
+                          <Check size={14} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="app-alerts-panel-foot">
+                    <Link
+                      to={inboxPath}
+                      className="link-accent"
+                      onClick={() => {
+                        setAlertsOpen(false);
+                        void refreshAlertCount();
+                      }}
+                    >
+                      {inboxLabel}
+                    </Link>
+                  </div>
+                </div>,
+                document.body,
+              )
+            : null}
+        </div>
 
         <div className="app-header-profile" ref={menuRef}>
           <button
@@ -325,6 +328,17 @@ export function AppHeader() {
                 >
                   <DollarSign size={16} aria-hidden />
                   Tasa FX
+                </Link>
+              ) : null}
+              {user?.role === "vendedor" ? (
+                <Link
+                  to="/app/cobro"
+                  className="app-header-menu-link"
+                  role="menuitem"
+                  onClick={() => setProfileOpen(false)}
+                >
+                  <Landmark size={16} aria-hidden />
+                  Cuentas de cobro
                 </Link>
               ) : null}
               {user?.role === "vendedor" ? (

@@ -147,12 +147,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    if (skipDraftSave.current) {
-      skipDraftSave.current = false;
-      return;
-    }
+  function persistDraft() {
     saveVisitSaleDraft({
       visitId: visit.id,
       step,
@@ -164,6 +159,30 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
       notes,
       issuedAt: issuedAt.toISOString(),
     });
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    if (skipDraftSave.current) {
+      skipDraftSave.current = false;
+      return;
+    }
+    persistDraft();
+  }, [open, visit.id, step, lines, currency, isCredit, applyIva, payment, notes, issuedAt]);
+
+  useEffect(() => {
+    if (!open) return;
+    function flush() {
+      persistDraft();
+    }
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", flush);
+      persistDraft();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, visit.id, step, lines, currency, isCredit, applyIva, payment, notes, issuedAt]);
 
   const items = useMemo(() => quoteLinesToItems(lines), [lines]);
@@ -259,7 +278,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
 
   function requestClose() {
     if (shouldIgnoreOverlayClose()) return;
-    clearVisitSaleDraft();
+    persistDraft();
     onClose();
   }
 

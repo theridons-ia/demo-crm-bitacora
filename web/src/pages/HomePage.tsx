@@ -7,12 +7,13 @@ import { ClientForm } from "../components/ClientForm";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
 import { ListSkeleton } from "../components/ListSkeleton";
+import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
 import { PageWorkspace } from "../layout/PageWorkspace";
-import { ApiError, fetchClients, fetchSales, fetchVisits } from "../lib/api";
-import { formatLongDate, isSameCaracasDay, todayISO } from "../lib/caracasTime";
+import { ApiError, fetchClients, fetchCurrentRoute, fetchSales, fetchVisits } from "../lib/api";
+import { formatLongDate, formatWeekSpan, isSameCaracasDay, todayISO, weekStartISO } from "../lib/caracasTime";
 import { getCachedClients } from "../lib/offlineQueue";
 import { isOnDayAgenda, sortVisitsAgenda } from "../lib/visitOrder";
-import type { Client, Sale, Visit } from "../lib/types";
+import type { Client, RouteCard, Sale, Visit } from "../lib/types";
 
 /** Inicio vendedor — una historia del día (SF-4.4). */
 export function HomePage() {
@@ -20,6 +21,7 @@ export function HomePage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [weekRoute, setWeekRoute] = useState<RouteCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -27,6 +29,8 @@ export function HomePage() {
   const [selected, setSelected] = useState<Client | null>(null);
   const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [lens, setLens] = useState<"hoy" | "semana">("hoy");
+  useRestoreVisitSheet(setDetailVisit, visits, loading);
 
   const day = todayISO();
   const firstName = user?.full_name?.split(" ")[0] ?? "";
@@ -44,15 +48,17 @@ export function HomePage() {
     let cancelled = false;
     (async () => {
       try {
-        const [clientData, visitData, saleData] = await Promise.all([
+        const [clientData, visitData, saleData, routeData] = await Promise.all([
           navigator.onLine ? fetchClients() : getCachedClients(),
           navigator.onLine ? fetchVisits({ scheduled_date: day }).catch(() => []) : Promise.resolve([]),
           navigator.onLine ? fetchSales().catch(() => []) : Promise.resolve([]),
+          navigator.onLine ? fetchCurrentRoute().catch(() => null) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setClients(clientData.length ? clientData : await getCachedClients());
         setVisits(visitData);
         setSales(saleData);
+        setWeekRoute(routeData);
       } catch (err) {
         if (cancelled) return;
         const cached = await getCachedClients();
@@ -76,6 +82,11 @@ export function HomePage() {
   const completed = dayVisits.filter((v) => v.status === "completada").length;
   const totalDay = dayVisits.length;
   const coverage = totalDay ? Math.round((completed / totalDay) * 100) : 0;
+  const weekPlanned = weekRoute?.planned ?? 0;
+  const weekDone = weekRoute?.done ?? 0;
+  const weekCoverage = weekPlanned ? Math.round((weekDone / weekPlanned) * 100) : 0;
+  const weekLabel = formatWeekSpan(weekRoute?.week_start ?? weekStartISO());
+  const showingWeek = lens === "semana";
 
   const nextVisit = useMemo(() => {
     const open = dayVisits.find((v) => v.status === "en_curso");
@@ -95,18 +106,28 @@ export function HomePage() {
   );
 
   const routeTitle = loading
-    ? "Tu ruta de hoy"
-    : nextVisit
-      ? (nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`)
-      : totalDay
-        ? "Ruta del día lista"
-        : "Nada agendado hoy";
+    ? showingWeek
+      ? "Tu ruta semanal"
+      : "Tu ruta de hoy"
+    : showingWeek
+      ? weekRoute?.title ?? `Semana ${weekLabel}`
+      : nextVisit
+        ? (nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`)
+        : totalDay
+          ? "Ruta del día lista"
+          : "Nada agendado hoy";
 
   const progressLabel = loading
     ? "Cargando…"
-    : totalDay
-      ? `${completed} de ${totalDay} paradas`
-      : "Sin paradas hoy";
+    : showingWeek
+      ? weekPlanned
+        ? `${weekDone} de ${weekPlanned} paradas`
+        : "Semana vacía"
+      : totalDay
+        ? `${completed} de ${totalDay} paradas`
+        : "Sin paradas hoy";
+
+  const progressPct = showingWeek ? weekCoverage : coverage;
 
   return (
     <>
@@ -119,24 +140,53 @@ export function HomePage() {
           </div>
         </div>
 
-        <section className="route-card" aria-label="Tu ruta de hoy">
-          <p className="label">Tu ruta de hoy</p>
+        <section className="route-card" aria-label={showingWeek ? "Tu ruta semanal" : "Tu ruta de hoy"}>
+          <div className="route-card-lenses" role="tablist" aria-label="Alcance de la ruta">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!showingWeek}
+              className={!showingWeek ? "active" : undefined}
+              onClick={() => setLens("hoy")}
+            >
+              Hoy
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showingWeek}
+              className={showingWeek ? "active" : undefined}
+              onClick={() => setLens("semana")}
+            >
+              Semana
+            </button>
+          </div>
+          <p className="label">{showingWeek ? `Semana ${weekLabel}` : "Tu ruta de hoy"}</p>
           <h2>{routeTitle}</h2>
           {loading ? null : (
             <div className="progress-track" aria-hidden>
-              <div className="progress-fill" style={{ width: `${Math.min(100, coverage)}%` }} />
+              <div className="progress-fill" style={{ width: `${Math.min(100, progressPct)}%` }} />
             </div>
           )}
           <div className="route-meta">
             <span>{progressLabel}</span>
-            {!loading && totalDay ? <strong>{coverage}%</strong> : null}
+            {!loading && (showingWeek ? weekPlanned : totalDay) ? <strong>{progressPct}%</strong> : null}
           </div>
-          {!loading && salesToday > 0 ? (
+          {!loading && showingWeek && weekRoute?.unscheduled ? (
+            <p className="route-sales">{weekRoute.unscheduled} sin día</p>
+          ) : null}
+          {!loading && !showingWeek && weekPlanned > 0 ? (
+            <p className="route-sales">
+              Semana {weekDone} de {weekPlanned}
+              {weekRoute?.unscheduled ? ` · ${weekRoute.unscheduled} sin día` : ""}
+            </p>
+          ) : null}
+          {!loading && !showingWeek && salesToday > 0 ? (
             <p className="route-sales">Ventas hoy ${salesToday.toFixed(0)}</p>
           ) : null}
           <Link to="/app/ruta" className="btn btn-accent route-map-cta">
             <MapPin size={18} />
-            Ver mapa
+            {showingWeek ? "Ver ruta" : "Ver mapa"}
           </Link>
         </section>
 

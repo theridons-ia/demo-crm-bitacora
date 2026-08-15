@@ -582,11 +582,10 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       {!teamView ? (
         <Modal
           open={composing}
-          onClose={() => {
-            if (shouldIgnoreOverlayClose()) return;
-            clearStandaloneSaleDraft();
-            setComposing(false);
-          }}
+            onClose={() => {
+              if (shouldIgnoreOverlayClose()) return;
+              setComposing(false);
+            }}
           size="wide"
           eyebrow="Nueva orden"
           title="Venta sin visita"

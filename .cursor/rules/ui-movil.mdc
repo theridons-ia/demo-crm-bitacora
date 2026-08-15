@@ -14,7 +14,8 @@ Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
 
 - Estado (punto / `LiveLed`) · nombre PDV · hora o estado · chevron.
 - Toda la fila es el tap → ficha. Sin lat/lng, GPS, Ver trail, ni 3 botones en la fila.
-- Programadas: carrusel de fechas en la misma vista (`scheduled_time` ASC). Culminadas: fecha DESC.
+- Programadas: carrusel de **bitácora** (`week-strip` / `day-chip`, con conteo). Culminadas: fecha DESC.
+- Ruta semanal: `WeekNav` + `WeekDayStrip` (punto = hay paradas). No reusar el carrusel de Visitas. Ver `ui-enrutas.mdc` § Fechas.
 
 ## Chrome y FAB
 

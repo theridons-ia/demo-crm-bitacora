@@ -18,6 +18,7 @@ export type Client = {
   rif: string | null;
   ci: string | null;
   state: string | null;
+  city?: string | null;
   address: string | null;
   phone: string | null;
   notes: string | null;
@@ -36,6 +37,7 @@ export type Visit = {
   status: VisitStatus;
   result: SaleResult | null;
   description: string | null;
+  field_notes?: string | null;
   scheduled_date: string | null;
   scheduled_time?: string | null;
   visited_at: string | null;
@@ -54,9 +56,35 @@ export type Visit = {
   end_gps_captured_at?: string | null;
   local_uuid: string | null;
   created_at: string;
+  route_id?: number | null;
+  sequence?: number | null;
+  schedule_locked?: boolean;
+  origin_plan?: "supervisor" | "vendedor" | string | null;
   client: Client | null;
   seller?: User | null;
   sale?: Sale | null;
+};
+
+export type RouteStatus = "borrador" | "publicada" | "en_curso" | "cerrada" | string;
+
+export type RouteCard = {
+  id: number;
+  seller_id: number;
+  seller_name: string;
+  seller_initials: string;
+  week_start: string;
+  week_end: string;
+  code: string | null;
+  title: string;
+  status: RouteStatus;
+  planned: number;
+  done: number;
+  unscheduled: number;
+  in_progress: number;
+};
+
+export type RouteDetail = RouteCard & {
+  visits: Visit[];
 };
 
 export type Product = {
@@ -91,7 +119,7 @@ export type PaymentMethod =
   | "credit"
   | "pago_movil";
 
-export type BankAccountType = "cash" | "bank" | "zelle" | "pago_movil" | "other";
+export type BankAccountType = "cash" | "bank" | "zelle" | "usdt" | "pago_movil" | "other";
 export type BankMovementKind = "income" | "expense";
 export type PayableStatus = "open" | "paid" | "partial";
 
@@ -173,7 +201,8 @@ export type AlertType =
   | "gps_far"
   | "photo_only"
   | "gps_skipped"
-  | "gps_low_accuracy";
+  | "gps_low_accuracy"
+  | "route_assigned";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 

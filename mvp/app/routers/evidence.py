@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
-from ..auth import get_current_user, require_supervisor
+from ..auth import get_current_user
 from ..database import get_db
-from ..models import User, UserRole, Visit, VisitAlert, VisitGpsPoint, VisitStatus
+from ..models import AlertType, User, UserRole, Visit, VisitAlert, VisitGpsPoint, VisitStatus
 from ..schemas import VisitAlertOut, VisitGpsPointCreate, VisitGpsPointOut
 
 router = APIRouter(tags=["visits-evidence"])
@@ -92,10 +92,15 @@ def list_alerts(
     current_user: User = Depends(get_current_user),
     unacked_only: bool = Query(default=False),
 ):
-    """Inbox de alertas (supervisor ve todas; vendedor solo las suyas)."""
+    """Supervisor: GPS/foto. Vendedor: avisos de ruta asignada."""
     query = _alerts_query(db).order_by(VisitAlert.created_at.desc())
     if current_user.role == UserRole.vendedor:
-        query = query.filter(VisitAlert.seller_id == current_user.id)
+        query = query.filter(
+            VisitAlert.seller_id == current_user.id,
+            VisitAlert.alert_type == AlertType.route_assigned,
+        )
+    else:
+        query = query.filter(VisitAlert.alert_type != AlertType.route_assigned)
     if unacked_only:
         query = query.filter(VisitAlert.acknowledged_at.is_(None))
     return [_alert_out(a) for a in query.limit(100).all()]
@@ -105,12 +110,14 @@ def list_alerts(
 def acknowledge_alert(
     alert_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_supervisor),
+    current_user: User = Depends(get_current_user),
 ):
-    """Marca una alerta como vista (SF-2.3)."""
+    """Marca una alerta como vista (supervisor o el vendedor dueño)."""
     alert = _alerts_query(db).filter(VisitAlert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
+    if current_user.role == UserRole.vendedor and alert.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes marcar avisos de otro vendedor")
     if alert.acknowledged_at is None:
         alert.acknowledged_at = datetime.now(timezone.utc)
         db.add(alert)

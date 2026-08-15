@@ -11,7 +11,8 @@ export function WizardSteps({ steps, current, className = "" }: Props) {
   const ref = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
-    const body = ref.current?.closest(".app-modal-body");
+    const body =
+      ref.current?.closest(".app-modal-body") ?? ref.current?.closest(".side-sheet-body");
     if (body instanceof HTMLElement) body.scrollTop = 0;
   }, [current]);
 

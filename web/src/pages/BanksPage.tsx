@@ -17,6 +17,7 @@ const TYPE_LABEL: Record<BankAccountType, string> = {
   cash: "Caja",
   bank: "Banco",
   zelle: "Zelle",
+  usdt: "USDT",
   pago_movil: "Pago móvil",
   other: "Otro",
 };

@@ -148,6 +148,9 @@ export function formatAgendaDay(isoDate: string): string {
   });
 }
 
+/** Lun–Dom, orden ISO (lunes = 0). Carrusel de ruta, no locale suelto. */
+export const WEEKDAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
+
 export function formatWeekdayShort(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00-04:00`);
   if (Number.isNaN(d.getTime())) return isoDate;
@@ -155,6 +158,76 @@ export function formatWeekdayShort(isoDate: string): string {
     timeZone: CARACAS_TZ,
     weekday: "short",
   });
+}
+
+export function addDaysISO(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T12:00:00-04:00`);
+  d.setUTCDate(d.getUTCDate() + days);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Lunes de la semana civil (Caracas) para un YYYY-MM-DD. */
+export function weekStartISO(isoDate: string = todayISO()): string {
+  const d = new Date(`${isoDate}T12:00:00-04:00`);
+  const utcDay = d.getUTCDay();
+  const offset = utcDay === 0 ? 6 : utcDay - 1;
+  return addDaysISO(isoDate, -offset);
+}
+
+export function weekDayISOs(weekStart: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addDaysISO(weekStart, i));
+}
+
+export function planWeekOptions(from: string = todayISO()): {
+  start: string;
+  label: string;
+  span: string;
+}[] {
+  const current = weekStartISO(from);
+  return [0, 1, 2].map((offset) => {
+    const start = addDaysISO(current, offset * 7);
+    const label = offset === 0 ? "Esta" : offset === 1 ? "Próxima" : "+2 sem";
+    return { start, label, span: formatWeekSpan(start) };
+  });
+}
+
+export function clampPlanWeek(weekStart: string, from: string = todayISO()): string {
+  const options = planWeekOptions(from);
+  if (weekStart < options[0].start) return options[0].start;
+  if (weekStart > options[2].start) return options[2].start;
+  return weekStart;
+}
+
+/** Primer día asignable: hoy o el próximo de esa semana. */
+export function firstAssignableDay(
+  weekStart: string,
+  preferred?: string | "sin-dia",
+): string | "sin-dia" {
+  const today = todayISO();
+  const days = weekDayISOs(weekStart);
+  if (preferred === "sin-dia") return "sin-dia";
+  if (preferred && days.includes(preferred) && preferred >= today) return preferred;
+  if (days.includes(today)) return today;
+  return days.find((day) => day >= today) ?? "sin-dia";
+}
+
+export function formatWeekSpan(weekStart: string): string {
+  const end = addDaysISO(weekStart, 6);
+  const a = new Date(`${weekStart}T12:00:00-04:00`);
+  const b = new Date(`${end}T12:00:00-04:00`);
+  const dayA = a.getUTCDate();
+  const dayB = b.getUTCDate();
+  const monA = a
+    .toLocaleDateString(CARACAS_LOCALE, { month: "short", timeZone: CARACAS_TZ })
+    .replace(".", "");
+  const monB = b
+    .toLocaleDateString(CARACAS_LOCALE, { month: "short", timeZone: CARACAS_TZ })
+    .replace(".", "");
+  if (monA === monB) return `${dayA}–${dayB} ${monA}`;
+  return `${dayA} ${monA}–${dayB} ${monB}`;
 }
 
 export function formatDateShort(iso: string | Date | null | undefined): string {

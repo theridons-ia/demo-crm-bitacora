@@ -33,7 +33,7 @@ export type StandaloneSaleDraft = {
 
 function read<T>(key: string): T | null {
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = localStorage.getItem(key) ?? sessionStorage.getItem(key);
     if (!raw) return null;
     return JSON.parse(raw) as T;
   } catch {
@@ -42,14 +42,17 @@ function read<T>(key: string): T | null {
 }
 
 function write(key: string, value: unknown) {
+  const payload = () => JSON.stringify(value);
   try {
-    sessionStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, payload());
+    sessionStorage.removeItem(key);
   } catch {
     /* cuota llena (foto pesada): se intenta sin evidencia */
     try {
       const copy = JSON.parse(JSON.stringify(value)) as { payment?: PaymentCaptureValue };
       if (copy.payment) copy.payment.payment_evidence = null;
-      sessionStorage.setItem(key, JSON.stringify(copy));
+      localStorage.setItem(key, JSON.stringify(copy));
+      sessionStorage.removeItem(key);
     } catch {
       /* ignore */
     }
@@ -66,12 +69,17 @@ export function loadVisitSaleDraft(visitId: number): VisitSaleDraft | null {
   return draft;
 }
 
+export function peekVisitSaleDraft(): VisitSaleDraft | null {
+  return read<VisitSaleDraft>(VISIT_KEY);
+}
+
 export function hasVisitSaleDraft(visitId: number): boolean {
   return loadVisitSaleDraft(visitId) != null;
 }
 
 export function clearVisitSaleDraft() {
   try {
+    localStorage.removeItem(VISIT_KEY);
     sessionStorage.removeItem(VISIT_KEY);
   } catch {
     /* ignore */
@@ -88,6 +96,7 @@ export function loadStandaloneSaleDraft(): StandaloneSaleDraft | null {
 
 export function clearStandaloneSaleDraft() {
   try {
+    localStorage.removeItem(STANDALONE_KEY);
     sessionStorage.removeItem(STANDALONE_KEY);
   } catch {
     /* ignore */

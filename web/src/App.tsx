@@ -17,6 +17,7 @@ import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PayablesPage } from "./pages/PayablesPage";
+import { PayAccountsPage } from "./pages/PayAccountsPage";
 import { ReceivablesPage } from "./pages/ReceivablesPage";
 import { RouteDayPage } from "./pages/RouteDayPage";
 import { SalesPage } from "./pages/SalesPage";
@@ -55,6 +56,8 @@ export default function App() {
             <Route path="inventario" element={<InventoryPage />} />
             <Route path="clientes" element={<ClientsPage />} />
             <Route path="ruta" element={<SellerRouteMapPage />} />
+            <Route path="cobro" element={<PayAccountsPage />} />
+            <Route path="avisos" element={<AlertsInboxPage />} />
             <Route path="desempeno" element={<SellerDashboardPage />} />
             <Route
               path="perfil"

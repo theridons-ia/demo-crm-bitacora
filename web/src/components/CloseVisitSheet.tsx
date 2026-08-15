@@ -15,7 +15,8 @@ import {
 import { removeLocalVisit } from "../lib/offlineDb";
 import { enqueueCloseVisit, enqueueOfflineVisitSync } from "../lib/offlineQueue";
 import { formatDateTime } from "../lib/caracasTime";
-import { saleOrderCode } from "../lib/saleLabels";
+import { saleOrderCode, visitNoteForUi } from "../lib/saleLabels";
+import { resolveVisitLog, writeVisitLog } from "../lib/visitFieldLog";
 import type { Visit } from "../lib/types";
 
 type Props = {
@@ -115,7 +116,13 @@ export function CloseVisitSheet({
     if (!open) return;
     setDraft(visit);
     setPhase(visit.sale ? "close" : "warn");
-    setNotes("");
+    setNotes(
+      resolveVisitLog(
+        visit.id,
+        visit.field_notes || visitNoteForUi(visit.description),
+        visit.local_uuid,
+      ),
+    );
     setSkipGps(false);
     setSkipReason("Sin señal / GPS no disponible");
     setPhotoDataUrl(null);
@@ -242,11 +249,7 @@ export function CloseVisitSheet({
 
       const payload: VisitCloseInput = {
         result,
-        description:
-          notes.trim() ||
-          (existingSale
-            ? `Cierre con ${saleOrderCode(existingSale)}`
-            : "Cerrada sin venta"),
+        field_notes: notes.trim() || null,
         ...gpsFields!,
       };
 
@@ -256,6 +259,7 @@ export function CloseVisitSheet({
         status: "completada",
         result: payload.result,
         description: payload.description ?? visit.description,
+        field_notes: payload.field_notes ?? visit.field_notes,
         closed_at: closedAt,
         end_latitude: payload.latitude != null ? String(payload.latitude) : null,
         end_longitude: payload.longitude != null ? String(payload.longitude) : null,
@@ -275,6 +279,7 @@ export function CloseVisitSheet({
           local_uuid: visit.local_uuid,
           client_id: visit.client_id,
           description: payload.description,
+          field_notes: payload.field_notes,
           result: payload.result,
           latitude: draft.latitude != null ? Number(draft.latitude) : null,
           longitude: draft.longitude != null ? Number(draft.longitude) : null,
@@ -516,12 +521,17 @@ export function CloseVisitSheet({
 
         <TextAreaField
           id="close-notes"
-          label="Nota de campo"
-          hint="Queda en la bitácora de esta visita. Visible para el equipo."
+          label="Bitácora"
+          hint="Sigue anotando hasta cerrar. Cada línea es un punto. Se guarda en el teléfono."
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Ej. PDV cerrado, prometió pedido el sábado, cobrar saldo…"
-          className="input-area is-visit-note"
+          onChange={(e) => {
+            const text = e.target.value;
+            setNotes(text);
+            writeVisitLog(visit.id, text, visit.local_uuid);
+          }}
+          placeholder="Llegué · hablé con… · prometió pedido…"
+          className="input-area is-visit-log"
+          rows={7}
         />
 
         {accuracyWarn ? <p className="gps-ok-note">{accuracyWarn}</p> : null}

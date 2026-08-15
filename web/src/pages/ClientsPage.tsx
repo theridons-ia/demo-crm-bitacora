@@ -64,7 +64,7 @@ export function ClientsPage() {
     const q = query.trim().toLowerCase();
     if (!q) return clients;
     return clients.filter((c) =>
-      `${c.name} ${c.rif ?? ""} ${c.ci ?? ""} ${c.state ?? ""} ${c.address ?? ""}`
+      `${c.name} ${c.rif ?? ""} ${c.ci ?? ""} ${c.city ?? ""} ${c.state ?? ""} ${c.address ?? ""}`
         .toLowerCase()
         .includes(q),
     );

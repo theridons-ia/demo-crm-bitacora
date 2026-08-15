@@ -11,6 +11,26 @@ from sqlalchemy.engine import Engine
 from .database import Base
 
 
+def _backfill_client_cities(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "clients" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("clients")}
+    if "city" not in columns:
+        return
+    from sqlalchemy.orm import Session
+
+    from .models import Client
+    from .services.client_location import infer_client_city
+
+    with Session(engine) as db:
+        rows = db.query(Client).filter((Client.city.is_(None)) | (Client.city == "")).all()
+        for client in rows:
+            client.city = infer_client_city(client.address, client.state)
+        if rows:
+            db.commit()
+
+
 def _add_column_if_missing(engine: Engine, table: str, column: str, ddl_type: str) -> None:
     inspector = inspect(engine)
     if table not in inspector.get_table_names():
@@ -35,6 +55,8 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "suppliers", "ci", "VARCHAR(20)")
     _add_column_if_missing(engine, "clients", "latitude", "NUMERIC(10,7)")
     _add_column_if_missing(engine, "clients", "longitude", "NUMERIC(10,7)")
+    _add_column_if_missing(engine, "clients", "city", "VARCHAR(80)")
+    _backfill_client_cities(engine)
     _add_column_if_missing(engine, "visits", "gps_skipped", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(engine, "visits", "gps_skip_reason", "VARCHAR(255)")
     _add_column_if_missing(engine, "visits", "photo_evidence", "TEXT")
@@ -60,6 +82,11 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "products", "lot", "VARCHAR(40)")
     _add_column_if_missing(engine, "products", "expires_on", "DATE")
     _add_column_if_missing(engine, "products", "notes", "TEXT")
+    _add_column_if_missing(engine, "visits", "route_id", "INTEGER")
+    _add_column_if_missing(engine, "visits", "sequence", "INTEGER")
+    _add_column_if_missing(engine, "visits", "schedule_locked", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(engine, "visits", "origin_plan", "VARCHAR(20)")
+    _add_column_if_missing(engine, "visits", "field_notes", "TEXT")
     _add_column_if_missing(engine, "sale_payments", "bank_account_id", "INTEGER")
     _add_column_if_missing(engine, "sale_payments", "payment_reference", "VARCHAR(64)")
     _add_column_if_missing(engine, "sale_payments", "payment_evidence", "TEXT")

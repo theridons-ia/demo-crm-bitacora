@@ -7,6 +7,7 @@ import { Button } from "../components/Button";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
 import { WorkspacePage } from "../layout/WorkspacePage";
+import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
 import { ApiError, fetchVisits } from "../lib/api";
 import { todayISO } from "../lib/caracasTime";
 import { teamVisitIcon } from "../lib/mapMarkers";
@@ -46,6 +47,7 @@ export function SellerRouteMapPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Visit | null>(null);
   const day = todayISO();
+  useRestoreVisitSheet(setSelected, visits, loading);
 
   const reload = useCallback(async () => {
     setLoading(true);

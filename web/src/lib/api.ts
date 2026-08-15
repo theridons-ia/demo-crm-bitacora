@@ -9,6 +9,8 @@ import type {
   SaleResult,
   TokenResponse,
   User,
+  RouteCard,
+  RouteDetail,
   Visit,
   VisitAlert,
   VisitGpsPoint,
@@ -114,9 +116,13 @@ export function createSeller(payload: SellerCreateInput): Promise<User> {
   });
 }
 
-export function fetchClients(params?: { seller_id?: number }): Promise<Client[]> {
+export function fetchClients(params?: {
+  seller_id?: number;
+  for_seller_id?: number;
+}): Promise<Client[]> {
   const q = new URLSearchParams();
   if (params?.seller_id != null) q.set("seller_id", String(params.seller_id));
+  if (params?.for_seller_id != null) q.set("for_seller_id", String(params.for_seller_id));
   const qs = q.toString();
   return request<Client[]>(`/api/clients${qs ? `?${qs}` : ""}`);
 }
@@ -146,6 +152,7 @@ export type ClientCreateInput = {
   rif?: string | null;
   ci?: string | null;
   state?: string | null;
+  city: string;
   address?: string | null;
   phone?: string | null;
   notes?: string | null;
@@ -174,22 +181,54 @@ export function fetchVisits(params?: {
   day?: string;
   seller_id?: number;
   status?: VisitStatus;
+  route_id?: number;
+  unscheduled?: boolean;
 }): Promise<Visit[]> {
   const q = new URLSearchParams();
   if (params?.scheduled_date) q.set("scheduled_date", params.scheduled_date);
   if (params?.day) q.set("day", params.day);
   if (params?.seller_id != null) q.set("seller_id", String(params.seller_id));
   if (params?.status) q.set("status", params.status);
+  if (params?.route_id != null) q.set("route_id", String(params.route_id));
+  if (params?.unscheduled) q.set("unscheduled", "true");
   const qs = q.toString();
   return request<Visit[]>(`/api/visits${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchVisit(visitId: number): Promise<Visit> {
+  return request<Visit>(`/api/visits/${visitId}`);
+}
+
+export function fetchRoutes(weekStart?: string): Promise<RouteCard[]> {
+  const q = new URLSearchParams();
+  if (weekStart) q.set("week_start", weekStart);
+  const qs = q.toString();
+  return request<RouteCard[]>(`/api/routes${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRoute(routeId: number): Promise<RouteDetail> {
+  return request<RouteDetail>(`/api/routes/${routeId}`);
+}
+
+export function fetchCurrentRoute(params?: {
+  seller_id?: number;
+  week_start?: string;
+}): Promise<RouteDetail> {
+  const q = new URLSearchParams();
+  if (params?.seller_id != null) q.set("seller_id", String(params.seller_id));
+  if (params?.week_start) q.set("week_start", params.week_start);
+  const qs = q.toString();
+  return request<RouteDetail>(`/api/routes/current${qs ? `?${qs}` : ""}`);
 }
 
 export type VisitAssignInput = {
   seller_id: number;
   client_id: number;
-  scheduled_date: string;
+  scheduled_date?: string | null;
   scheduled_time?: string | null;
   description?: string | null;
+  schedule_locked?: boolean | null;
+  week_start?: string | null;
 };
 
 export function assignVisit(payload: VisitAssignInput): Promise<Visit> {
@@ -250,6 +289,14 @@ export function pinVisitGps(visitId: number, payload: VisitStartInput): Promise<
   });
 }
 
+export function patchVisitNotes(visitId: number, fieldNotes: string): Promise<Visit> {
+  return request<Visit>(`/api/visits/${visitId}/notes`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ field_notes: fieldNotes }),
+  });
+}
+
 export function cancelVisit(
   visitId: number,
   payload: { description?: string | null } = {},
@@ -264,6 +311,7 @@ export function cancelVisit(
 export type VisitCloseInput = {
   result: SaleResult;
   description?: string | null;
+  field_notes?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   gps_accuracy_m?: number | null;
@@ -458,6 +506,7 @@ export type OfflineVisitSyncPayload = {
   local_uuid: string;
   client_id: number;
   description?: string | null;
+  field_notes?: string | null;
   result: SaleResult;
   latitude?: number | null;
   longitude?: number | null;

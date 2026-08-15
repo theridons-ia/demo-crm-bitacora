@@ -10,6 +10,7 @@ import { SelectField, TextAreaField, TextField } from "../components/TextField";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
 import { ListSkeleton } from "../components/ListSkeleton";
+import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
@@ -69,6 +70,7 @@ function localVisitToVisit(local: LocalPendingVisit): Visit {
       rif: null,
       ci: null,
       state: null,
+      city: null,
       address: null,
       phone: null,
       notes: null,
@@ -93,6 +95,7 @@ export function VisitsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<VisitFilter>("open");
+  useRestoreVisitSheet(setDetailVisit, visits, loading);
 
   useEffect(() => {
     if (searchParams.get("nueva") !== "1") return;

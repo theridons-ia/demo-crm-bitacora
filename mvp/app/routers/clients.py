@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import exists, or_
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_supervisor
 from ..database import get_db
-from ..models import Client, User, UserRole
+from ..models import Client, SellerClientAssignment, User, UserRole
 from ..schemas import (
     ClientAssignmentsOut,
     ClientAssignmentsUpdate,
@@ -27,6 +28,10 @@ def list_clients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     seller_id: int | None = Query(default=None, description="Solo supervisor: filtrar por vendedor"),
+    for_seller_id: int | None = Query(
+        default=None,
+        description="Supervisor: cartera de ese vendedor + PDVs sin asignar",
+    ),
 ):
     query = db.query(Client).filter(Client.is_active.is_(True))
 
@@ -35,6 +40,13 @@ def list_clients(
         if not ids:
             return []
         query = query.filter(Client.id.in_(ids))
+    elif for_seller_id is not None:
+        assigned = assigned_client_ids_for_seller(db, for_seller_id)
+        unassigned = ~exists().where(SellerClientAssignment.client_id == Client.id)
+        if assigned:
+            query = query.filter(or_(Client.id.in_(assigned), unassigned))
+        else:
+            query = query.filter(unassigned)
     elif seller_id is not None:
         ids = assigned_client_ids_for_seller(db, seller_id)
         if not ids:

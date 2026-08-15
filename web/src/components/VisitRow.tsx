@@ -61,6 +61,8 @@ function metaLabel(visit: Visit, pinMissing?: boolean, showSeller?: boolean): st
   if (showSeller && visit.seller?.full_name) {
     base = `${visit.seller.full_name} · ${base}`;
   }
+  if (visit.schedule_locked) base = `${base} · Fija`;
+  else if (visit.origin_plan === "vendedor") base = `${base} · Extra`;
   return pinMissing ? `${base} · Sin pin` : base;
 }
 

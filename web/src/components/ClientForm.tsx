@@ -31,6 +31,7 @@ const empty = {
   name: "",
   idValue: "",
   state: "",
+  city: "",
   address: "",
   phone: "",
   notes: "",
@@ -51,6 +52,7 @@ function hydrate(client: Client | null | undefined) {
       name: client.name,
       idValue: (idType === "rif" ? client.rif : client.ci) || "",
       state: client.state || "",
+      city: client.city || "",
       address: client.address || "",
       phone: client.phone || "",
       notes: client.notes || "",
@@ -188,11 +190,17 @@ export function ClientForm({
       return;
     }
 
+    if (form.city.trim().length < 2) {
+      setError("Indica la ciudad del PDV");
+      return;
+    }
+
     const payload: ClientCreateInput = {
       name: form.name.trim(),
       rif: idType === "rif" ? idValue : null,
       ci: idType === "ci" ? idValue : null,
       state: form.state.trim() || null,
+      city: form.city.trim(),
       address: form.address.trim() || null,
       phone: form.phone.trim() || null,
       notes: form.notes.trim() || null,
@@ -297,6 +305,14 @@ export function ClientForm({
                 onChange={(e) => setField("state", e.target.value)}
               />
             </div>
+            <TextField
+              id="client-city"
+              label="Ciudad"
+              placeholder="Barquisimeto"
+              value={form.city}
+              onChange={(e) => setField("city", e.target.value)}
+              required
+            />
 
             <TextField
               id="client-address"
@@ -395,7 +411,9 @@ export function ClientForm({
               </div>
             </div>
             <p className="muted small" style={{ marginBottom: 0 }}>
-              {[form.state.trim() || null, form.address.trim() || null].filter(Boolean).join(" · ") ||
+              {[form.city.trim() || null, form.state.trim() || null, form.address.trim() || null]
+                .filter(Boolean)
+                .join(" · ") ||
                 "Sin dirección aún"}
             </p>
             {latitude != null && longitude != null ? (

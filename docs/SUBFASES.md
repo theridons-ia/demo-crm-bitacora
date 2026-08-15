@@ -124,16 +124,29 @@ No mezclar con 4.3–4.8. Decisiones 4 / 17 / 18 / 21.
 | ID | Objetivo | Entregable | Estado |
 |----|----------|------------|--------|
 | **SF-5.0** | Brújula ruta semanal | [`implementacion/FASE-5-RUTA-SEMANAL.md`](implementacion/FASE-5-RUTA-SEMANAL.md) + §2.1 del roadmap | hecho (docs) |
+| **SF-5.1** | Modelo + API + tarjetas supervisor | `Route`, `visits.route_id`, `/api/routes`, `/sup/ruta` por vendedor | hecho |
+| **SF-5.1b** | Armar semana + avisos vendedor | Planificador por día; campanita `/app/avisos`; calendario y panel caben en 400px | hecho |
 
-Siguientes SF se abren al cerrar Fase 4: modelo `Route`, UI supervisor (tarjeta por vendedor), UI vendedor (L–S + Sin día).
+Siguiente: SF-5.2 UI vendedor (L–S + Sin día). Candado/extras se pulen ahí.
 
 ---
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-4.8** supervisor móvil (misma fila, mapa del día, catálogo compacto).
+**Listo para commit / tu push:** **SF-5.1 + 5.1b** (ruta semanal, armar semana, avisos vendedor).
 
-**Siguiente:** Fase 5 — ruta semanal. Excel (SF-3.4) y Alembic (SF-3.5) siguen aparte.
+**Siguiente:** SF-5.2 — semana del vendedor. Excel (SF-3.4) y Alembic (SF-3.5) siguen aparte.
+
+### Cómo verificar SF-5.1
+
+1. `supervisor@` → **Ruta**: una tarjeta por vendedor (p. ej. Marina 8/12), no lista mezclada.
+2. Tap → L–D + **Sin día**. `+` asigna a esa semana (día/hora/candado opcionales).
+3. `marina@` Inicio: “Semana N de M” debajo del progreso de hoy.
+
+### Cómo verificar SF-5.1b
+
+1. Supervisor Ruta → **Armar**: vendedor + día + PDV. Hora/nota opcionales. El calendario mensual ya no se corta.
+2. `marina@` campanita: aviso de parada nueva. Panel entero en pantalla. **Avisos** para ver todos.
 
 ### Cómo verificar SF-4.8
 

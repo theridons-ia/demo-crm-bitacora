@@ -1,18 +1,33 @@
-import { Calendar, Crosshair, MapPin, Play, ShieldCheck, ShoppingCart, Square, StickyNote, Trash2, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Calendar, ChevronDown, Crosshair, MapPin, Play, ShieldCheck, ShoppingCart, Square, StickyNote, Trash2, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
+import { ClientDetailSheet } from "./ClientDetailSheet";
 import { CloseVisitSheet } from "./CloseVisitSheet";
 import { LiveLed } from "./LiveLed";
 import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
+import { TextAreaField } from "./TextField";
 import { VisitMapSheet } from "./VisitMapSheet";
 import { VisitSaleWizard } from "./VisitSaleWizard";
 import { formatDateTime, formatPillParts, todayISO } from "../lib/caracasTime";
 import { rewriteCloseNote, saleOrderCode } from "../lib/saleLabels";
-import { hasVisitSaleDraft } from "../lib/saleWizardDraft";
+import {
+  clearVisitSaleDraft,
+  hasVisitSaleDraft,
+} from "../lib/saleWizardDraft";
+import {
+  clearVisitWork,
+  loadVisitWork,
+  saveVisitWork,
+} from "../lib/visitWorkSession";
+import {
+  resolveVisitLog,
+  visitLogLines,
+  writeVisitLog,
+} from "../lib/visitFieldLog";
 import { isVisitOverdue } from "../lib/visitOrder";
-import { ApiError, cancelVisit, pinVisitGps, startVisit } from "../lib/api";
+import { ApiError, cancelVisit, patchVisitNotes, pinVisitGps, startVisit } from "../lib/api";
 import { coordsFromClient, distanceMeters, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
 import {
   GPS_FAR_M,
@@ -149,8 +164,8 @@ function VisitGpsEvidence({
   const farEndPdv = endPdvM != null && endPdvM > GPS_FAR_M;
   const proof = visitGpsProof(visit);
 
-  return (
-    <section className={`visit-gps-card ${hasGps || hasEnd ? "has-fix" : "needs-fix"}`.trim()}>
+  const body = (
+    <>
       <div className="visit-gps-copy">
         <p className="eyebrow">Ubicación GPS</p>
         {hasGps || hasEnd ? (
@@ -199,7 +214,7 @@ function VisitGpsEvidence({
             <span className="muted small">
               {isMockGpsEnabled()
                 ? "GPS de prueba activo en el header. Pulsa guardar para fijar el punto."
-                : "Al iniciar se toma fecha, hora y GPS. También puedes capturar ahora."}
+                : "Si el GPS de inicio falló, puedes actualizarlo aquí."}
             </span>
           </>
         )}
@@ -254,7 +269,23 @@ function VisitGpsEvidence({
           </Button>
         ) : null}
       </div>
-    </section>
+    </>
+  );
+
+  const cardClass = `visit-gps-card ${hasGps || hasEnd ? "has-fix" : "needs-fix"}`.trim();
+
+  return (
+    <details className={`${cardClass} visit-gps-fold`}>
+      <summary className="visit-gps-summary">
+        <MapPin size={16} aria-hidden />
+        <span>GPS</span>
+        <span className="muted small">
+          {hasGps || hasEnd ? "Registrado · tocar para ver" : "Oculto · tocar para ver"}
+        </span>
+        <ChevronDown size={16} aria-hidden className="visit-gps-chevron" />
+      </summary>
+      {body}
+    </details>
   );
 }
 
@@ -274,27 +305,92 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
   const [saleJustConfirmed, setSaleJustConfirmed] = useState(false);
   const [gpsConfirm, setGpsConfirm] = useState(false);
   const [gpsConfirmNote, setGpsConfirmNote] = useState<string | null>(null);
+  const [showClient, setShowClient] = useState(false);
+  const [fieldLog, setFieldLog] = useState(() =>
+    resolveVisitLog(visit.id, visit.field_notes, visit.local_uuid),
+  );
+  const fieldLogRef = useRef(fieldLog);
+  const currentRef = useRef(visit);
+  const logTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
+
+  useEffect(() => {
+    fieldLogRef.current = fieldLog;
+  }, [fieldLog]);
 
   useEffect(() => {
     if (!open) return;
-    setCurrent(visit);
+    setCurrent((prev) => {
+      if (prev.id !== visit.id) return visit;
+      return {
+        ...visit,
+        field_notes: visit.field_notes ?? prev.field_notes,
+        sale: visit.sale ?? prev.sale,
+      };
+    });
   }, [open, visit]);
 
   useEffect(() => {
     if (!open) {
       setGpsConfirm(false);
+      setShowClient(false);
       return;
     }
+    const initial = resolveVisitLog(visit.id, visit.field_notes, visit.local_uuid);
+    setFieldLog(initial);
+    fieldLogRef.current = initial;
     setError(null);
     setGpsOk(null);
     setClosing(false);
-    setSelling((prev) => prev || hasVisitSaleDraft(visit.id));
+    setSelling((prev) => {
+      const work = loadVisitWork();
+      const resumeWizard = work?.visitId === visit.id && work.selling;
+      return prev || resumeWizard || hasVisitSaleDraft(visit.id);
+    });
     setShowMap(false);
     setGpsConfirm(false);
     setGpsConfirmNote(null);
     setViewSaleDoc(false);
     setConfirmCancel(false);
     setSaleJustConfirmed(false);
+    setShowClient(false);
+    if (visit.status === "en_curso") {
+      saveVisitWork({
+        visitId: visit.id,
+        selling: hasVisitSaleDraft(visit.id),
+        clientName: visit.client?.name ?? "",
+      });
+    }
+  }, [open, visit.id]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function flushToPhone() {
+      const row = currentRef.current;
+      writeVisitLog(row.id, fieldLogRef.current, row.local_uuid);
+    }
+
+    function onHide() {
+      if (document.visibilityState === "hidden") flushToPhone();
+    }
+
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flushToPhone);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flushToPhone);
+      if (logTimer.current) window.clearTimeout(logTimer.current);
+      const row = currentRef.current;
+      const text = fieldLogRef.current;
+      writeVisitLog(row.id, text, row.local_uuid);
+      if (row.id > 0 && (row.status === "en_curso" || row.status === "programada")) {
+        void patchVisitNotes(row.id, text).catch(() => undefined);
+      }
+    };
   }, [open, visit.id]);
 
   const clientName = current.client?.name ?? `Cliente #${current.client_id}`;
@@ -308,9 +404,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
   const sale = current.sale ?? null;
   const itemCount = sale?.items?.length ?? 0;
   const hasGps = current.latitude != null && current.longitude != null;
-  const canPinGps =
-    current.id > 0 &&
-    (current.status === "programada" || current.status === "en_curso");
+  const canPinGps = current.id > 0 && current.status === "en_curso";
   const heroClass =
     current.status === "en_curso"
       ? ""
@@ -334,8 +428,13 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
         gps_accuracy_m: geo.ok ? (geo.fix.accuracy_m ?? null) : null,
         gps_offline: !geo.ok,
       });
-      setCurrent(updated);
-      onUpdated(updated);
+      setCurrent({ ...updated, field_notes: fieldLogRef.current || updated.field_notes });
+      onUpdated({ ...updated, field_notes: fieldLogRef.current || updated.field_notes });
+      saveVisitWork({
+        visitId: updated.id,
+        selling: false,
+        clientName: updated.client?.name ?? visit.client?.name ?? "",
+      });
       setGpsConfirmNote(gpsConfirmMessage(updated, geo.ok ? null : geo.reason));
       setGpsConfirm(true);
     } catch (err) {
@@ -382,6 +481,38 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
     }
   }
 
+  async function pushFieldLog(text: string) {
+    const row = currentRef.current;
+    writeVisitLog(row.id, text, row.local_uuid);
+    if (row.id <= 0) return;
+    if (row.status !== "en_curso" && row.status !== "programada") return;
+    try {
+      const updated = await patchVisitNotes(row.id, text);
+      setCurrent((prev) => {
+        const next = { ...prev, field_notes: updated.field_notes };
+        onUpdated(next);
+        return next;
+      });
+    } catch {
+      /* queda en el teléfono */
+    }
+  }
+
+  function onFieldLogChange(text: string) {
+    setFieldLog(text);
+    fieldLogRef.current = text;
+    writeVisitLog(current.id, text, current.local_uuid);
+    if (logTimer.current) window.clearTimeout(logTimer.current);
+    logTimer.current = window.setTimeout(() => {
+      void pushFieldLog(text);
+    }, 700);
+  }
+
+  async function flushFieldLog() {
+    if (logTimer.current) window.clearTimeout(logTimer.current);
+    await pushFieldLog(fieldLogRef.current);
+  }
+
   async function onCancel() {
     if (!confirmCancel) {
       setConfirmCancel(true);
@@ -391,10 +522,13 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
     setBusy(true);
     setError(null);
     try {
+      await flushFieldLog();
       const updated = await cancelVisit(current.id, { description: "Cancelada" });
-      setCurrent(updated);
+      setCurrent({ ...updated, field_notes: fieldLogRef.current || updated.field_notes });
       setConfirmCancel(false);
-      onUpdated(updated);
+      clearVisitWork();
+      clearVisitSaleDraft();
+      onUpdated({ ...updated, field_notes: fieldLogRef.current || updated.field_notes });
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cancelar la visita");
@@ -406,19 +540,32 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
   const canCancel =
     !sale && (current.status === "programada" || current.status === "en_curso");
 
-  const overlayOpen = closing || selling || showMap || viewSaleDoc || gpsConfirm;
-  const note = rewriteCloseNote(current.description, sale);
+  function dismissFicha() {
+    if (current.status === "en_curso") {
+      saveVisitWork({
+        visitId: current.id,
+        selling: selling || hasVisitSaleDraft(current.id),
+        clientName: clientName,
+      });
+    }
+    onClose();
+  }
+
+  const overlayOpen = closing || selling || showMap || viewSaleDoc || gpsConfirm || showClient;
+  const routeNote = rewriteCloseNote(current.description, sale);
+  const logLines = visitLogLines(fieldLog);
+  const showLiveLog = current.status === "en_curso";
 
   return (
     <>
       <Modal
         open={open && !overlayOpen}
-        onClose={onClose}
+        onClose={dismissFicha}
         eyebrow="Visita"
         title={statusTitle}
         footer={
           <div className="side-sheet-actions visit-ficha-actions">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={dismissFicha}>
               Cerrar ficha
             </Button>
             {onRemoveFromRoute && current.status === "programada" ? (
@@ -445,7 +592,19 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
               </Button>
             ) : null}
             {current.status === "en_curso" && !sale ? (
-              <Button type="button" variant="accent" onClick={() => setSelling(true)}>
+              <Button
+                type="button"
+                variant="accent"
+                onClick={() => {
+                  void flushFieldLog();
+                  saveVisitWork({
+                    visitId: current.id,
+                    selling: true,
+                    clientName,
+                  });
+                  setSelling(true);
+                }}
+              >
                 <ShoppingCart size={16} />
                 Registrar venta
               </Button>
@@ -454,7 +613,11 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
               <Button
                 type="button"
                 variant={sale ? "accent" : "secondary"}
-                onClick={() => setClosing(true)}
+                onClick={() => {
+                  void flushFieldLog();
+                  setCurrent((prev) => ({ ...prev, field_notes: fieldLogRef.current }));
+                  setClosing(true);
+                }}
               >
                 <Square size={16} />
                 Cerrar visita
@@ -465,18 +628,28 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
       >
         <div className="visit-detail">
           <div className="visit-ficha-id">
-            <span className="visit-ficha-avatar" aria-hidden>
-              {initials(clientName)}
-            </span>
-            <div className="visit-ficha-id-copy">
-              <p className="eyebrow">Punto de venta</p>
-              <strong>{clientName}</strong>
-              <span className="muted small">
-                {clientId ?? "Sin RIF/CI"}
-                {current.client?.state ? ` · ${current.client.state}` : ""}
-                {current.seller?.full_name ? ` · ${current.seller.full_name}` : ""}
+            <button
+              type="button"
+              className="visit-ficha-hit"
+              onClick={() => current.client && setShowClient(true)}
+              disabled={!current.client}
+            >
+              <span className="visit-ficha-avatar" aria-hidden>
+                {initials(clientName)}
               </span>
-            </div>
+              <div className="visit-ficha-id-copy">
+                <p className="eyebrow">Punto de venta</p>
+                <strong>{clientName}</strong>
+                <span className="muted small">
+                  {clientId ?? "Sin RIF/CI"}
+                  {current.client?.city ? ` · ${current.client.city}` : ""}
+                  {current.seller?.full_name ? ` · ${current.seller.full_name}` : ""}
+                </span>
+                {current.client ? (
+                  <span className="visit-ficha-open muted small">Tocar para ficha y dirección</span>
+                ) : null}
+              </div>
+            </button>
             {live ? <LiveLed size="sm" /> : overdue ? (
               <span className="badge badge-programada">Sin asistir</span>
             ) : (
@@ -549,14 +722,8 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
 
           <VisitRangePills visit={current} />
 
-          <div className="visit-ficha-facts">
-            {current.client?.address ? (
-              <article className="visit-ficha-fact">
-                <span className="muted small">Dirección</span>
-                <strong>{current.client.address}</strong>
-              </article>
-            ) : null}
-            {current.scheduled_date ? (
+          {current.scheduled_date ? (
+            <div className="visit-ficha-facts">
               <article className="visit-ficha-fact">
                 <span className="muted small">
                   <Calendar size={12} /> Agenda
@@ -566,27 +733,60 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
                   {timeLabel ? ` · ${timeLabel}` : ""}
                 </strong>
               </article>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
-          {note ? (
+          {showLiveLog ? (
+            <section className="visit-log-live" aria-label="Bitácora de la visita">
+              <TextAreaField
+                id={`visit-log-${current.id}`}
+                label="Bitácora"
+                hint="Anota lo que vas capturando. Cada línea se vuelve un punto. Queda en el teléfono aunque se cierre la ficha."
+                value={fieldLog}
+                onChange={(e) => onFieldLogChange(e.target.value)}
+                placeholder="Llegué · hablé con… · revisó inventario… · pidió cotización…"
+                className="input-area is-visit-log"
+                rows={8}
+              />
+              {logLines.length ? (
+                <ul className="visit-log-bullets">
+                  {logLines.map((line, i) => (
+                    <li key={`${i}-${line.slice(0, 24)}`}>{line}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : logLines.length ? (
+            <section className="visit-note-card" aria-label="Bitácora de la visita">
+              <p className="eyebrow">
+                <StickyNote size={12} aria-hidden /> Bitácora
+              </p>
+              <ul className="visit-log-bullets">
+                {logLines.map((line, i) => (
+                  <li key={`${i}-${line.slice(0, 24)}`}>{line}</li>
+                ))}
+              </ul>
+            </section>
+          ) : routeNote ? (
             <section className="visit-note-card" aria-label="Nota de la visita">
               <p className="eyebrow">
-                <StickyNote size={12} aria-hidden /> Nota de campo
+                <StickyNote size={12} aria-hidden /> Nota de ruta
               </p>
-              <p>{note}</p>
+              <p>{routeNote}</p>
             </section>
           ) : null}
 
-          <VisitGpsEvidence
-            visit={current}
-            hasGps={hasGps}
-            canPinGps={canPinGps}
-            gpsBusy={gpsBusy}
-            gpsOk={gpsOk}
-            onPinGps={() => void onPinGps()}
-            onShowMap={() => setShowMap(true)}
-          />
+          {current.status !== "programada" ? (
+            <VisitGpsEvidence
+              visit={current}
+              hasGps={hasGps}
+              canPinGps={canPinGps}
+              gpsBusy={gpsBusy}
+              gpsOk={gpsOk}
+              onPinGps={() => void onPinGps()}
+              onShowMap={() => setShowMap(true)}
+            />
+          ) : null}
 
           {error ? (
             <p className="form-error" role="alert">
@@ -596,16 +796,37 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
         </div>
       </Modal>
 
+      {current.client && showClient ? (
+        <ClientDetailSheet
+          client={current.client}
+          open
+          sellerLabel={current.seller?.full_name ?? user?.full_name ?? undefined}
+          onClose={() => setShowClient(false)}
+        />
+      ) : null}
+
       {selling ? (
         <VisitSaleWizard
           visit={current}
           open
-          onClose={() => setSelling(false)}
+          onClose={() => {
+            saveVisitWork({
+              visitId: current.id,
+              selling: hasVisitSaleDraft(current.id),
+              clientName,
+            });
+            setSelling(false);
+          }}
           onSold={(saleOut) => {
-            const updated: Visit = { ...current, sale: saleOut };
+            const updated: Visit = { ...current, sale: saleOut, field_notes: fieldLogRef.current };
             setCurrent(updated);
             setSaleJustConfirmed(true);
             setSelling(false);
+            saveVisitWork({
+              visitId: current.id,
+              selling: false,
+              clientName,
+            });
             onUpdated(updated);
           }}
         />
@@ -613,7 +834,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
 
       {closing ? (
         <CloseVisitSheet
-          visit={current}
+          visit={{ ...current, field_notes: fieldLog }}
           open
           onClose={() => setClosing(false)}
           onGoRegisterSale={() => {
@@ -621,9 +842,13 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
             setSelling(true);
           }}
           onClosed={(updated) => {
-            setCurrent(updated);
+            const next = { ...updated, field_notes: updated.field_notes ?? fieldLogRef.current };
+            setCurrent(next);
+            setFieldLog(next.field_notes ?? fieldLogRef.current);
             setClosing(false);
-            onUpdated(updated);
+            clearVisitWork();
+            clearVisitSaleDraft();
+            onUpdated(next);
             onClose();
           }}
         />

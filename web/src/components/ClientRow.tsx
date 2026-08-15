@@ -20,7 +20,7 @@ function idLabel(client: Client): string {
  * Toda la fila abre la ficha. Sin pin, coords ni botones.
  */
 export function ClientRow({ client, onClick, extra, warn }: Props) {
-  const meta = [idLabel(client), client.state, extra].filter(Boolean).join(" · ");
+  const meta = [idLabel(client), client.city || client.state, extra].filter(Boolean).join(" · ");
 
   return (
     <li>

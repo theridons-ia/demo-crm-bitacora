@@ -34,6 +34,13 @@ class VisitStatus(str, enum.Enum):
     cancelada = "cancelada"
 
 
+class RouteStatus(str, enum.Enum):
+    borrador = "borrador"
+    publicada = "publicada"
+    en_curso = "en_curso"
+    cerrada = "cerrada"
+
+
 class SaleResult(str, enum.Enum):
     sin_venta = "sin_venta"
     venta_parcial = "venta_parcial"
@@ -61,6 +68,7 @@ class BankAccountType(str, enum.Enum):
     cash = "cash"
     bank = "bank"
     zelle = "zelle"
+    usdt = "usdt"
     pago_movil = "pago_movil"
     other = "other"
 
@@ -96,6 +104,7 @@ class AlertType(str, enum.Enum):
     photo_only = "photo_only"
     gps_skipped = "gps_skipped"
     gps_low_accuracy = "gps_low_accuracy"
+    route_assigned = "route_assigned"
 
 
 class AlertSeverity(str, enum.Enum):
@@ -126,6 +135,7 @@ class User(Base):
 
     visits: Mapped[list["Visit"]] = relationship(back_populates="seller")
     sales: Mapped[list["Sale"]] = relationship(back_populates="seller")
+    routes: Mapped[list["Route"]] = relationship(back_populates="seller")
 
 
 class Client(Base):
@@ -136,6 +146,7 @@ class Client(Base):
     rif: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     ci: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(80), nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -225,15 +236,38 @@ class SellerClientAssignment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class Route(Base):
+    """Contenedor semanal: 1 vendedor × 1 lunes Caracas (SF-5.1)."""
+
+    __tablename__ = "routes"
+    __table_args__ = (UniqueConstraint("seller_id", "week_start", name="uq_route_seller_week"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    week_start: Mapped[date] = mapped_column(Date, index=True)
+    name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    code: Mapped[str | None] = mapped_column(String(20), nullable=True, unique=True)
+    status: Mapped[RouteStatus] = mapped_column(Enum(RouteStatus), default=RouteStatus.publicada)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    seller: Mapped["User"] = relationship(back_populates="routes")
+    visits: Mapped[list["Visit"]] = relationship(back_populates="route")
+
+
 class Visit(Base):
     __tablename__ = "visits"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    route_id: Mapped[int | None] = mapped_column(ForeignKey("routes.id"), nullable=True, index=True)
+    sequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schedule_locked: Mapped[bool] = mapped_column(Boolean, default=False)
+    origin_plan: Mapped[str | None] = mapped_column(String(20), nullable=True)
     status: Mapped[VisitStatus] = mapped_column(Enum(VisitStatus), default=VisitStatus.en_curso)
     result: Mapped[SaleResult | None] = mapped_column(Enum(SaleResult), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    field_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     scheduled_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     scheduled_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     visited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -259,6 +293,7 @@ class Visit(Base):
 
     seller: Mapped[User] = relationship(back_populates="visits")
     client: Mapped[Client] = relationship(back_populates="visits")
+    route: Mapped["Route | None"] = relationship(back_populates="visits")
     sale: Mapped["Sale | None"] = relationship(back_populates="visit", uselist=False)
     gps_points: Mapped[list["VisitGpsPoint"]] = relationship(
         back_populates="visit", cascade="all, delete-orphan"
