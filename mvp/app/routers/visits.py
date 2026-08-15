@@ -38,6 +38,7 @@ def _ensure_single_open_visit(
     if query.first():
         raise HTTPException(status_code=400, detail=ACTIVE_VISIT_MSG)
 from ..services.routes import attach_visit_to_week_route, notify_route_assigned
+from ..services.route_insert import resequence_day
 from ..services.sales import create_sale_for_open_visit
 from ..services.visits import close_visit_with_optional_sale, maybe_alert_gps_vs_pdv
 from ..timeutil import now_utc, today_caracas
@@ -130,6 +131,13 @@ def assign_visit(
         origin="supervisor",
         locked=locked,
         week_start=payload.week_start,
+    )
+    resequence_day(
+        db,
+        seller=seller,
+        scheduled_date=payload.scheduled_date,
+        new_visit=visit,
+        place=payload.place or "auto",
     )
     notify_route_assigned(db, visit, client.name, assigned_by=current_user.full_name)
     db.commit()

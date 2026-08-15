@@ -12,6 +12,12 @@ import {
   WEEKDAY_SHORT,
 } from "../lib/caracasTime";
 import { sortVisitsRoute } from "../lib/visitOrder";
+import {
+  depotCity,
+  placeDayStops,
+  placePreviewNote,
+  type RoutePlace,
+} from "../lib/routeInsert";
 import type { Client, User, Visit } from "../lib/types";
 import { Button } from "./Button";
 import { SearchPickField } from "./SearchPickField";
@@ -44,7 +50,11 @@ function clientPlace(client: Client): string {
   return client.city || client.state || "";
 }
 
-function stopLine(visit: Visit): string {
+function stopLine(visit: {
+  client?: { city?: string | null; state?: string | null } | null;
+  scheduled_time?: string | null;
+  description?: string | null;
+}): string {
   return [
     visit.client?.city || visit.client?.state,
     visit.scheduled_time ? String(visit.scheduled_time).slice(0, 5) : "Sin hora",
@@ -77,6 +87,7 @@ export function RouteAssignSheet({
   const [clientId, setClientId] = useState<number | null>(null);
   const [time, setTime] = useState("");
   const [note, setNote] = useState("");
+  const [place, setPlace] = useState<RoutePlace>("auto");
   const [visits, setVisits] = useState<Visit[]>([]);
   const [pool, setPool] = useState<Client[]>([]);
   const [addedIds, setAddedIds] = useState<number[]>([]);
@@ -95,6 +106,7 @@ export function RouteAssignSheet({
       setClientId(null);
       setTime("");
       setNote("");
+      setPlace("auto");
       setError(null);
       setOkNote(null);
       setAddedIds([]);
@@ -158,9 +170,9 @@ export function RouteAssignSheet({
   const pickOptions = useMemo(
     () =>
       pool.map((c) => {
-        const place = clientPlace(c);
+        const where = clientPlace(c);
         const id = c.rif ? `RIF ${c.rif}` : c.ci ? `CI ${c.ci}` : "";
-        const bits = [place, id, taken.has(c.id) ? "Ya en la semana" : null].filter(Boolean);
+        const bits = [where, id, taken.has(c.id) ? "Ya en la semana" : null].filter(Boolean);
         return {
           id: c.id,
           title: c.name,
@@ -170,8 +182,26 @@ export function RouteAssignSheet({
     [pool, taken],
   );
 
-  const sellerName = sellers.find((s) => s.id === seller)?.full_name ?? "";
+  const sellerRow = sellers.find((s) => s.id === seller);
+  const sellerName = sellerRow?.full_name ?? "";
+  const depot = useMemo(() => depotCity(sellerRow?.route_name), [sellerRow?.route_name]);
   const weekSpan = formatWeekSpan(planWeek);
+
+  const preview = useMemo(() => {
+    if (clientId == null) return null;
+    const client = pool.find((c) => c.id === clientId);
+    if (!client) return null;
+    const draft = {
+      id: -1,
+      status: "programada",
+      sequence: 9_999,
+      scheduled_time: dayChip === "sin-dia" || !time ? null : `${time}:00`,
+      client,
+    };
+    const ordered = placeDayStops([...dayVisits, draft], -1, place, depot);
+    const note = placePreviewNote(ordered, -1);
+    return { ordered, note };
+  }, [clientId, pool, dayVisits, dayChip, time, place, depot]);
   const summaryGroups = useMemo(() => {
     const groups = weekDays.map((iso, i) => ({
       key: iso,
@@ -207,12 +237,15 @@ export function RouteAssignSheet({
         description: note.trim() || null,
         schedule_locked: false,
         week_start: planWeek,
+        place,
       });
-      setVisits((prev) => [...prev, created]);
+      const route = await fetchCurrentRoute({ seller_id: seller, week_start: planWeek });
+      setVisits(route.visits.filter((v) => v.status !== "cancelada"));
       setAddedIds((prev) => [...prev, created.id]);
       setClientId(null);
       setTime("");
       setNote("");
+      setPlace("auto");
       setAdding(false);
       setOkNote("Agregada");
       onAssigned(seller, planWeek);
@@ -228,6 +261,7 @@ export function RouteAssignSheet({
     setClientId(null);
     setTime("");
     setNote("");
+    setPlace("auto");
     setError(null);
   }
 
@@ -323,12 +357,15 @@ export function RouteAssignSheet({
               disablePast
             />
 
-            {dayVisits.length ? (
+            {adding && preview ? null : dayVisits.length ? (
               <ul className="route-plan-stops">
-                {dayVisits.map((v) => (
+                {dayVisits.map((v, i) => (
                   <li key={v.id} className={addedIds.includes(v.id) ? "is-new" : undefined}>
-                    <strong>{v.client?.name ?? `Cliente #${v.client_id}`}</strong>
-                    <span>{stopLine(v)}</span>
+                    <span className="route-plan-idx">{i + 1}</span>
+                    <div>
+                      <strong>{v.client?.name ?? `Cliente #${v.client_id}`}</strong>
+                      <span>{stopLine(v)}</span>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -369,6 +406,46 @@ export function RouteAssignSheet({
                     placeholder="Prioridad…"
                   />
                 </div>
+                <div className="field">
+                  <span className="field-label">Colocar</span>
+                  <div className="choice-group" role="group" aria-label="Posición en el día">
+                    {(
+                      [
+                        ["start", "Al inicio"],
+                        ["auto", "Auto"],
+                        ["end", "Al final"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={place === id ? "chip active" : "chip"}
+                        onClick={() => setPlace(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {preview?.note ? (
+                  <p className="route-plan-preview-note">{preview.note.text}</p>
+                ) : null}
+                {preview ? (
+                  <ul className="route-plan-stops is-preview" aria-label="Orden previsto">
+                    {preview.ordered.map((v, i) => (
+                      <li key={v.id} className={v.id < 0 ? "is-preview-row" : undefined}>
+                        <span className="route-plan-idx">{i + 1}</span>
+                        <div>
+                          <strong>
+                            {v.client?.name ?? `Cliente #${v.id}`}
+                            {v.id < 0 ? <em className="route-plan-new">Nuevo</em> : null}
+                          </strong>
+                          <span>{stopLine(v)}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <div className="route-plan-add-actions">
                   <Button type="button" variant="ghost" disabled={busy} onClick={closeAddForm}>
                     Cancelar
@@ -413,7 +490,12 @@ export function RouteAssignSheet({
               {visits.length} parada{visits.length === 1 ? "" : "s"} · {weekSpan}
               {addedIds.length ? ` · ${addedIds.length} nueva${addedIds.length === 1 ? "" : "s"}` : ""}
             </p>
-            {visits.length ? <StopsMiniMap visits={visits} highlightIds={addedIds} /> : null}
+            {summaryGroups.length ? (
+              <StopsMiniMap
+                visits={summaryGroups.flatMap((group) => group.visits)}
+                highlightIds={addedIds}
+              />
+            ) : null}
             {summaryGroups.length === 0 ? (
               <p className="muted">Esta semana está vacía. Vuelve y suma un PDV.</p>
             ) : (
@@ -424,15 +506,18 @@ export function RouteAssignSheet({
                     <em>{group.visits.length}</em>
                   </h3>
                   <ul className="route-plan-stops">
-                    {group.visits.map((v) => {
+                    {group.visits.map((v, i) => {
                       const isNew = addedIds.includes(v.id);
                       return (
                         <li key={v.id} className={isNew ? "is-new" : undefined}>
-                          <strong>
-                            {v.client?.name ?? `Cliente #${v.client_id}`}
-                            {isNew ? <em className="route-plan-new">Nuevo</em> : null}
-                          </strong>
-                          <span>{stopLine(v)}</span>
+                          <span className="route-plan-idx">{i + 1}</span>
+                          <div>
+                            <strong>
+                              {v.client?.name ?? `Cliente #${v.client_id}`}
+                              {isNew ? <em className="route-plan-new">Nuevo</em> : null}
+                            </strong>
+                            <span>{stopLine(v)}</span>
+                          </div>
                         </li>
                       );
                     })}

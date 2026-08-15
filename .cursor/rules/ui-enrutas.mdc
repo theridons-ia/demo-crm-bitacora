@@ -74,6 +74,8 @@ Reglas del strip de ruta:
 - Pasado: `.is-past` (gris). En el planificador, disabled.
 - Sin día entra en el mismo strip. Mismo punto si hay paradas sueltas.
 - Hoy se selecciona por defecto si cae en esa semana.
+- Armar: al agregar, **hora** manda. Sin hora, clúster de ciudad (base = primera ciudad de `route_name`). Chips **Al inicio · Auto · Al final** y vista previa numerada en el paso 2, no un combo “paso N” en el resumen.
+- Ruta vendedor y mapa del día: el mismo trazo (hora + ciudad). No usar el `sequence` semanal de “siempre al final”.
 
 ## Inicio (vendedor)
 

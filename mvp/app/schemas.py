@@ -490,6 +490,7 @@ class VisitAssign(BaseModel):
     description: str | None = None
     schedule_locked: bool | None = None
     week_start: date | None = None
+    place: str | None = Field(default="auto", pattern="^(auto|start|end)$")
 
 
 class VisitOut(ORMModel):

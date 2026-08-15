@@ -229,6 +229,7 @@ export type VisitAssignInput = {
   description?: string | null;
   schedule_locked?: boolean | null;
   week_start?: string | null;
+  place?: "auto" | "start" | "end";
 };
 
 export function assignVisit(payload: VisitAssignInput): Promise<Visit> {

@@ -8758,9 +8758,36 @@ body.has-overlay .fab-root {
 }
 
 .route-plan-stops li {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
   background: var(--secondary);
   border-radius: 10px;
   padding: 0.55rem 0.7rem;
+}
+
+.route-plan-idx {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--muted-foreground);
+  padding-top: 0.15rem;
+}
+
+.route-plan-preview-note {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 750;
+  color: var(--primary);
+}
+
+.route-plan-stops.is-preview {
+  margin-top: 0;
+}
+
+.route-plan-stops .is-preview-row {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .route-plan-stops strong {

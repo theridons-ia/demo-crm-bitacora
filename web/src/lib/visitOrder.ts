@@ -1,3 +1,4 @@
+import { depotCity, orderDayPlan } from "./routeInsert";
 import type { Visit } from "./types";
 
 /** Instante de agenda en Caracas (fecha + hora programada). */
@@ -43,13 +44,21 @@ export function isOnDayAgenda(visit: Visit, day: string): boolean {
   return visit.status !== "cancelada" && visit.scheduled_date === day;
 }
 
-/** Trazo oficial del día: `scheduled_time` ASC, desempate id. Incluye culminadas. */
+/** Trazo oficial del día: hora, ciudad (base del vendedor) y luego secuencia. */
 export function sortVisitsRoute(list: Visit[]): Visit[] {
-  return [...list].sort((a, b) => {
-    const d = scheduledStamp(a) - scheduledStamp(b);
-    if (d !== 0) return d;
-    return a.id - b.id;
-  });
+  if (!list.length) return [];
+  const groups = new Map<number, Visit[]>();
+  for (const visit of list) {
+    const arr = groups.get(visit.seller_id) ?? [];
+    arr.push(visit);
+    groups.set(visit.seller_id, arr);
+  }
+  const out: Visit[] = [];
+  for (const group of groups.values()) {
+    const depot = depotCity(group[0]?.seller?.route_name);
+    out.push(...orderDayPlan(group, depot));
+  }
+  return out;
 }
 
 /** Hechas / canceladas: más reciente primero. */

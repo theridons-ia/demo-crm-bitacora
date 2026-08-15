@@ -49,7 +49,7 @@ export function orderByNearest<T>(
 
 /**
  * Recorrido greedy (vecino más cercano). No es el trazo oficial.
- * El mapa del día usa `sortVisitsRoute` (`scheduled_time` ASC).
+ * El mapa del día usa `sortVisitsRoute` (sequence del día, o hora).
  */
 export function orderDayRoute<T>(
   items: T[],

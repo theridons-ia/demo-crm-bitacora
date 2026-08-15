@@ -115,7 +115,8 @@ export function SellerRouteMapPage() {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap",
       }).addTo(map);
-      map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 12);
+      const first = dayVisits.map(stopCoords).find(Boolean) ?? DEFAULT_CENTER;
+      map.setView([first.lat, first.lng], 12);
       mapRef.current = map;
       layerRef.current = L.layerGroup().addTo(map);
     }

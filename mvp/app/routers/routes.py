@@ -7,6 +7,7 @@ from ..auth import get_current_user, require_supervisor
 from ..database import get_db
 from ..models import Route, Sale, User, UserRole, Visit
 from ..schemas import RouteCardOut, RouteCreate, RouteDetailOut, VisitOut
+from ..services.route_insert import resequence_route_days
 from ..services.routes import (
     attach_week_orphans,
     backfill_week_routes,
@@ -59,8 +60,8 @@ def _to_detail(db: Session, route: Route) -> RouteDetailOut:
         .filter(Visit.route_id == route.id)
         .order_by(
             Visit.scheduled_date.asc().nullslast(),
-            Visit.scheduled_time.asc().nullslast(),
             Visit.sequence.asc().nullslast(),
+            Visit.scheduled_time.asc().nullslast(),
             Visit.created_at.asc(),
         )
         .all()
@@ -113,6 +114,9 @@ def current_route(
             raise HTTPException(status_code=400, detail="seller_id requerido")
         sid = seller_id
     route = attach_week_orphans(db, sid, week)
+    seller = db.query(User).filter(User.id == sid).first()
+    if seller:
+        resequence_route_days(db, seller, route.id)
     db.commit()
     route = db.query(Route).options(joinedload(Route.seller)).filter(Route.id == route.id).one()
     if not _can_see_route(current_user, route):
