@@ -22,6 +22,8 @@ type Props = {
   clock?: "agenda";
   /** PDV sin lat/lng: la fila se queda; el polyline salta el hueco. */
   pinMissing?: boolean;
+  /** Equipo: quién visita este PDV. */
+  showSeller?: boolean;
 };
 
 function whenLabel(visit: Visit, clock?: "agenda"): string {
@@ -43,7 +45,7 @@ function whenLabel(visit: Visit, clock?: "agenda"): string {
   return "Sin hora";
 }
 
-function metaLabel(visit: Visit, pinMissing?: boolean): string {
+function metaLabel(visit: Visit, pinMissing?: boolean, showSeller?: boolean): string {
   let base = STATUS_LABEL[visit.status];
   if (visit.status === "completada") {
     if (visit.result === "sin_venta") base = "Sin venta";
@@ -56,6 +58,9 @@ function metaLabel(visit: Visit, pinMissing?: boolean): string {
   } else if (visit.status === "programada") {
     base = isVisitOverdue(visit, todayISO()) ? "Sin asistir" : "Programada";
   }
+  if (showSeller && visit.seller?.full_name) {
+    base = `${visit.seller.full_name} · ${base}`;
+  }
   return pinMissing ? `${base} · Sin pin` : base;
 }
 
@@ -63,7 +68,7 @@ function metaLabel(visit: Visit, pinMissing?: boolean): string {
  * Fila única de visita (SF-4.3): LED/punto · PDV · hora o estado · chevron.
  * Toda la fila abre la ficha. Sin GPS, coords ni botones.
  */
-export function VisitRow({ visit, onClick, index, clock, pinMissing }: Props) {
+export function VisitRow({ visit, onClick, index, clock, pinMissing, showSeller }: Props) {
   const name = visit.client?.name ?? `Cliente #${visit.client_id}`;
   const live = visit.status === "en_curso";
   const overdue = isVisitOverdue(visit, todayISO());
@@ -88,7 +93,7 @@ export function VisitRow({ visit, onClick, index, clock, pinMissing }: Props) {
         </span>
         <span className="visit-row-copy">
           <span className="visit-row-name">{title}</span>
-          <span className="visit-row-meta">{metaLabel(visit, pinMissing)}</span>
+          <span className="visit-row-meta">{metaLabel(visit, pinMissing, showSeller)}</span>
           {note ? <span className="visit-row-note">{note}</span> : null}
         </span>
         <span className="visit-row-when">{whenLabel(visit, clock)}</span>

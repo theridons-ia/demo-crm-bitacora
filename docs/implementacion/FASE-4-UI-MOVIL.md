@@ -1,6 +1,6 @@
 # Fase 4 — Homogeneizar UI móvil
 
-**Estado:** SF-4.0–4.7 hechas. Siguiente: SF-4.8 supervisor móvil.  
+**Estado:** SF-4.0–4.8 hechas. Siguiente: Fase 5 ruta semanal.  
 **Fecha de arranque:** 2026-08-13  
 **No toca:** `startVisit`, `createVisitSale`, paleta EnRutas, Overlay Modal vs SideSheet.
 
@@ -334,23 +334,33 @@ Más de 2 productos por pantalla; cliente = una acción.
 
 ## SF-4.8 — Supervisor móvil (mismas piezas)
 
-**Estado:** pendiente  
-**Modelo:** GPT-5.6 Terra  
+**Estado:** hecho (2026-08-14)  
+**Modelo:** Grok 4.6  
 **Video:** 12-17
 
 ### Objetivo
 Supervisor usa la fila, el chrome y el mapa de 4.3–4.5. No un tercer diseño.
 
-### Qué hacer
-- Ruta = lista de **hoy** (filas SF-4.3) + asignar. Sin 3 metric cards que empujan la lista. (La ruta **semanal** por vendedor es Fase 5.)
-- Visitas = bitácora (mismo row). Default no sea “Todas” con cerradas viejas.
-- Mapa equipo = mapa del día, no lista duplicada debajo. Sin labels PDV permanentes.
-- `Más`: Mapa no enterrado; Vendedores/Mapa no pelean con tabs Ruta/Visitas.
-- Fecha `es-VE`. Native `<select>` fuera de filtros encima del mapa.
-- Catálogo: Permitir todos + seller no comen 40% del fold.
+### Qué se hizo
+- **Ruta:** lista del día con `VisitRow` + ficha al tap. Sin 3 metric cards en el teléfono. Asignar en el `+`. Quitar de la ruta sale de la ficha.
+- **Visitas:** bitácora con la misma fila. Default **Programadas** (no “Todas” con historial viejo).
+- **Mapa:** mapa del día a todo el ancho; sin lista duplicada ni nombres PDV fijos. `SelectField` + fecha `es-VE`. Tap al pin = ficha.
+- **Más:** Mapa primero, no enterrado. No es un sexto tab contra Ruta/Visitas.
+- **Catálogo:** vendedor + búsqueda + chip Permitir todos en una barra; Guardar en el header en móvil.
+
+### Cómo
+| Pieza | Ruta |
+|-------|------|
+| Ruta | `web/src/pages/RouteDayPage.tsx` |
+| Visitas equipo | `web/src/pages/TeamVisitsPage.tsx` |
+| Mapa equipo | `web/src/pages/TeamMapPage.tsx` |
+| Más | `web/src/layout/supervisorNav.ts` |
+| Catálogo | `web/src/pages/CatalogVisibilityPage.tsx` |
 
 ### Cómo probarlo
-Repetir el walk 12-17: Inicio → Ruta (se ve la lista) → Visitas (bitácora) → Mapa (mapa, no párrafo + filtros + lista).
+1. `supervisor@` en ~400 px: Inicio → Ruta (se ve la lista de hoy) → Visitas (Programadas, no historial) → Más → Mapa (mapa, no párrafo + filtros + lista).
+2. Ruta: tap fila = ficha. Quitar no está en la fila.
+3. Catálogo: Permitir todos y el combo vendedor no empujan la lista fuera del fold.
 
 ---
 

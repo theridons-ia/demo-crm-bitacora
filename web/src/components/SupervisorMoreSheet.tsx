@@ -16,7 +16,7 @@ export function SupervisorMoreSheet({ open, onClose, pathname }: Props) {
       onClose={onClose}
       eyebrow="Supervisor"
       title="Más"
-      blurb="Ventas, finanzas, equipo, stock y mapa."
+      blurb="Ventas, mapa, finanzas, equipo y stock."
     >
       <ul className="more-nav-list">
         {SUPERVISOR_MORE_ITEMS.map(({ to, label, icon: Icon, blurb }) => {

@@ -7005,11 +7005,30 @@ button.ficha:focus-visible {
   flex-shrink: 0;
 }
 
-.metrics-row-3 {
+.catalog-toolbar {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.65rem;
-  margin-bottom: 1rem;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+  align-items: end;
+}
+
+.catalog-toolbar .chip {
+  justify-self: start;
+  min-height: 44px;
+}
+
+.team-map-tools {
+  margin-bottom: 0.65rem;
+}
+
+.header-plus-label {
+  margin-left: 0.15rem;
+}
+
+@media (min-width: 560px) {
+  .catalog-toolbar {
+    grid-template-columns: minmax(0, 16rem) 1fr auto;
+  }
 }
 
 @media (min-width: 720px) {
@@ -7829,6 +7848,17 @@ body.has-overlay .fab-root {
     height: calc(100svh - 15.25rem);
     min-height: 280px;
     border-radius: 0;
+  }
+
+  .app-frame-supervisor .map-stage.is-bleed .map-stage-canvas {
+    height: calc(100vh - 17.5rem);
+    height: calc(100svh - 17.5rem);
+  }
+
+  .team-map-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
   }
 
   .chips-row,

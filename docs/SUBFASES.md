@@ -111,7 +111,7 @@ Detalle y videos: [`implementacion/FASE-4-UI-MOVIL.md`](implementacion/FASE-4-UI
 | **SF-4.5** | Mapa = agendado | Trazo y números = `scheduled_time`; seed del día limpio | hecho |
 | **SF-4.6** | Wizard 1-2-3 | Nombres, footer, teclado, cuenta una vez | hecho |
 | **SF-4.7** | Densidad catálogo | Inventario compacto; cliente una acción | hecho |
-| **SF-4.8** | Supervisor móvil | Mismas piezas 4.3–4.5; Ruta/Visitas/Mapa = lentes | pendiente |
+| **SF-4.8** | Supervisor móvil | Mismas piezas 4.3–4.5; Ruta/Visitas/Mapa = lentes | hecho |
 
 **Criterio “Fase 4 lista”:** vendedor y supervisor en ~400px usan la misma fila, el mapa coincide con la agenda, y cotizar no se pierde al cancelar una foto.
 
@@ -131,9 +131,16 @@ Siguientes SF se abren al cerrar Fase 4: modelo `Route`, UI supervisor (tarjeta 
 
 ## SF actual
 
-**Listo para commit / tu push:** **SF-4.7** inventario y clientes densos.
+**Listo para commit / tu push:** **SF-4.8** supervisor móvil (misma fila, mapa del día, catálogo compacto).
 
-**Siguiente:** **SF-4.8** supervisor móvil. Luego Fase 5 (ruta semanal, solo docs hasta cerrar 4).
+**Siguiente:** Fase 5 — ruta semanal. Excel (SF-3.4) y Alembic (SF-3.5) siguen aparte.
+
+### Cómo verificar SF-4.8
+
+1. `supervisor@` ~400 px: Inicio → **Ruta** (lista de hoy, sin 3 tarjetas). Tap = ficha. `+` asigna.
+2. **Visitas:** arranca en Programadas, no en historial cerrado. Misma fila que el vendedor.
+3. **Más → Mapa** (primero en el menú): mapa a todo el ancho, sin lista debajo ni nombres PDV fijos. Tap pin = ficha.
+4. Catálogo: vendedor + Permitir todos no se comen la lista.
 
 ### Cómo verificar SF-4.7
 

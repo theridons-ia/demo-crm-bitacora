@@ -37,6 +37,7 @@ export const SUPERVISOR_PRIMARY_TABS: SupervisorNavTab[] = [
 /** Destinos del menú Más (móvil). Alertas/FX → header. */
 export const SUPERVISOR_MORE_ITEMS: { to: string; label: string; icon: LucideIcon; blurb: string }[] =
   [
+    { to: "/sup/mapa", label: "Mapa", icon: MapIcon, blurb: "Visitas del día en mapa" },
     { to: "/sup/finanzas", label: "Finanzas", icon: Wallet, blurb: "Hub cobranza, bancos y CxP" },
     { to: "/sup/ventas", label: "Ventas", icon: ShoppingCart, blurb: "Órdenes del equipo" },
     { to: "/sup/cobranza", label: "Cobranza", icon: Banknote, blurb: "Créditos y abonos" },
@@ -46,7 +47,6 @@ export const SUPERVISOR_MORE_ITEMS: { to: string; label: string; icon: LucideIco
     { to: "/sup/proveedores", label: "Proveedores", icon: Truck, blurb: "Alta y fichas de compra" },
     { to: "/sup/catalogo", label: "Catálogo", icon: Package, blurb: "Visibilidad por vendedor" },
     { to: "/sup/inventario", label: "Inventario", icon: PackagePlus, blurb: "Stock e ingresos" },
-    { to: "/sup/mapa", label: "Mapa equipo", icon: MapIcon, blurb: "Visitas del día en mapa" },
   ];
 
 export function isSupervisorMorePath(pathname: string): boolean {

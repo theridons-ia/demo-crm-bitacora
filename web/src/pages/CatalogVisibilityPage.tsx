@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
 import { ProductThumb } from "../components/ProductThumb";
+import { SelectField } from "../components/TextField";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
@@ -179,7 +180,7 @@ export function CatalogVisibilityPage() {
         </section>
       }
     >
-      <header className="page-header page-header-stack">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Supervisor · catálogo</p>
           <h1 className="display-title">Catálogo</h1>
@@ -188,8 +189,15 @@ export function CatalogVisibilityPage() {
             {products.length} productos
           </p>
         </div>
-        <Button type="button" variant="secondary" onClick={selectAllVisible} disabled={busy}>
-          Permitir todos
+        <Button
+          type="button"
+          variant="accent"
+          className="mobile-only-save"
+          disabled={busy || sellerId === ""}
+          onClick={() => void onSave()}
+        >
+          <Check size={18} />
+          Guardar
         </Button>
       </header>
 
@@ -200,31 +208,35 @@ export function CatalogVisibilityPage() {
       ) : null}
       {savedNote ? <p className="offline-banner is-online">{savedNote}</p> : null}
 
-      <div className="list-page-tools">
-        <label className="field" htmlFor="vis-seller">
-          <span className="field-label">Vendedor</span>
-          <select
-            id="vis-seller"
-            className="input"
-            value={sellerId === "" ? "" : String(sellerId)}
-            onChange={(e) => setSellerId(e.target.value ? Number(e.target.value) : "")}
-            disabled={loading || sellers.length === 0}
-          >
-            {sellers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name}
-                {s.route_name ? ` · ${s.route_name}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-
+      <div className="catalog-toolbar">
+        <SelectField
+          id="vis-seller"
+          label="Vendedor"
+          value={sellerId === "" ? "" : String(sellerId)}
+          onChange={(e) => setSellerId(e.target.value ? Number(e.target.value) : "")}
+          disabled={loading || sellers.length === 0}
+        >
+          {sellers.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.full_name}
+              {s.route_name ? ` · ${s.route_name}` : ""}
+            </option>
+          ))}
+        </SelectField>
         <ListSearch
           id="catalog-search"
           value={query}
           onChange={setQuery}
           placeholder="Buscar producto o SKU…"
         />
+        <button
+          type="button"
+          className={unrestricted ? "chip active" : "chip"}
+          disabled={busy}
+          onClick={selectAllVisible}
+        >
+          Permitir todos
+        </button>
       </div>
 
       {loading ? <p className="muted">Cargando…</p> : null}
@@ -269,19 +281,6 @@ export function CatalogVisibilityPage() {
       {!loading && filtered.length === 0 ? (
         <p className="muted">Sin coincidencias en el catálogo.</p>
       ) : null}
-
-      <div className="mobile-only-save" style={{ marginTop: "1rem" }}>
-        <Button
-          type="button"
-          variant="accent"
-          block
-          disabled={busy || sellerId === ""}
-          onClick={() => void onSave()}
-        >
-          <Check size={18} />
-          Guardar visibilidad
-        </Button>
-      </div>
     </WorkspacePage>
   );
 }

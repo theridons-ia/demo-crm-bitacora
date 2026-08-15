@@ -1,4 +1,4 @@
-import { Calendar, Crosshair, MapPin, Play, ShieldCheck, ShoppingCart, Square, StickyNote, XCircle } from "lucide-react";
+import { Calendar, Crosshair, MapPin, Play, ShieldCheck, ShoppingCart, Square, StickyNote, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
@@ -26,6 +26,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onUpdated: (visit: Visit) => void;
+  /** Supervisor: quitar una programada de la ruta del día. */
+  onRemoveFromRoute?: () => void;
 };
 
 const STATUS_LABEL: Record<VisitStatus, string> = {
@@ -257,7 +259,7 @@ function VisitGpsEvidence({
 }
 
 /** Ficha de visita: identidad, GPS accionable, OV y cierre. */
-export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
+export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFromRoute }: Props) {
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
@@ -419,6 +421,12 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
             <Button type="button" variant="ghost" onClick={onClose}>
               Cerrar ficha
             </Button>
+            {onRemoveFromRoute && current.status === "programada" ? (
+              <Button type="button" variant="ghost" onClick={onRemoveFromRoute}>
+                <Trash2 size={16} />
+                Quitar de la ruta
+              </Button>
+            ) : null}
             {canCancel ? (
               <Button
                 type="button"
@@ -466,6 +474,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated }: Props) {
               <span className="muted small">
                 {clientId ?? "Sin RIF/CI"}
                 {current.client?.state ? ` · ${current.client.state}` : ""}
+                {current.seller?.full_name ? ` · ${current.seller.full_name}` : ""}
               </span>
             </div>
             {live ? <LiveLed size="sm" /> : overdue ? (
