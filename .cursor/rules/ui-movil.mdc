@@ -23,7 +23,7 @@ Todas las listas táctiles (visitas, clientes, ventas, inventario) comparten la 
 
 Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
 
-- Estado (punto / `LiveLed`) · nombre PDV · hora o estado · chevron. En culminadas, el **pin GPS** va **antes de** «En el PDV / Dudosa / Sin evidencia» en la meta (no sustituye el punto). Leyenda `GpsProofLegend` en **1 fila**, items juntos; tap/hover muestra hint humano.
+- Estado (punto / `LiveLed`) · nombre PDV · hora o estado · chevron. En culminadas, la meta lleva **En el PDV / Dudosa / Sin evidencia** en color, **sin pin**. Leyenda `GpsProofLegend` en **1 fila**, solo letras y color; tap/hover muestra hint humano. El pin GPS queda en la ficha de visita.
 - Toda la fila es el tap → ficha. Sin lat/lng, GPS, Ver trail, ni 3 botones en la fila.
 - Programadas **y Culminadas:** carrusel de **bitácora** (`week-strip` / `day-chip`, con conteo). Chip **Todas** = lista completa de ese estado. Culminadas: días hacia atrás; orden fecha DESC dentro del día. Canceladas: sin carrusel.
 - Ruta semanal: `WeekNav` + `WeekDayStrip` (punto = hay paradas). No reusar el carrusel de Visitas. Ver `ui-enrutas.mdc` § Fechas.

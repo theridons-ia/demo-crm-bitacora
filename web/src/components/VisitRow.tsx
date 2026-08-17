@@ -1,5 +1,4 @@
 import { AlertTriangle, ChevronRight } from "lucide-react";
-import { GpsProofPin } from "./GpsProofLegend";
 import { LiveLed } from "./LiveLed";
 import { formatAgendaDay, formatTime, todayISO } from "../lib/caracasTime";
 import { isVisitOverdue } from "../lib/visitOrder";
@@ -124,7 +123,6 @@ export function VisitRow({ visit, onClick, index, clock, pinMissing, showSeller 
                 className={`visit-row-proof is-${meta.proof}`}
                 title={visitGpsProofHint(meta.proof) ?? undefined}
               >
-                <GpsProofPin kind={meta.proof} size={12} />
                 {meta.proofLabel}
               </span>
             ) : null}

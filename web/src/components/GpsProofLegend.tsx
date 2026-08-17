@@ -71,7 +71,6 @@ export function GpsProofLegend({ counts }: LegendProps) {
               onPointerDown={(event) => event.stopPropagation()}
               onClick={() => setOpen((prev) => (prev === key ? null : key))}
             >
-              <GpsProofPin kind={key} size={12} />
               <span>
                 {counts != null ? `${counts[key]} · ` : null}
                 {label}

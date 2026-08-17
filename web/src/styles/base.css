@@ -8842,10 +8842,6 @@ body.has-overlay .fab-root {
   color: var(--partial-text);
 }
 
-.visit-row-proof.is-parcial .gps-proof-pin {
-  color: var(--progress);
-}
-
 .visit-row-proof.is-deficiente {
   color: var(--destructive);
 }
@@ -9058,10 +9054,6 @@ body.has-overlay .fab-root {
 
 .proof-legend-item.is-parcial {
   color: var(--partial-text);
-}
-
-.proof-legend-item.is-parcial .gps-proof-pin {
-  color: var(--progress);
 }
 
 .proof-legend-item.is-deficiente {
