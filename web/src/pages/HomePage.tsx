@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
 import { HomeRouteCard } from "../components/HomeRouteCard";
+import { LiveLed } from "../components/LiveLed";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
 import { ListSkeleton } from "../components/ListSkeleton";
@@ -134,6 +135,7 @@ export function HomePage() {
     if (open) return open;
     return dayVisits.find((v) => v.status === "programada") ?? null;
   }, [dayVisits]);
+  const liveVisit = nextVisit?.status === "en_curso" ? nextVisit : null;
 
   const salesToday = useMemo(() => {
     return sales
@@ -185,9 +187,24 @@ export function HomePage() {
             <p className="eyebrow">{formatLongDate()}</p>
             <h1>Hola{firstName ? `, ${firstName}` : ""}</h1>
             <p className="greeting-sub">
-              {routeComplete ? (showingWeek ? "Semana cerrada" : "Día cerrado") : "Listo para la ruta"}
+              {liveVisit
+                ? "Hay una visita en curso"
+                : routeComplete
+                  ? showingWeek
+                    ? "Semana cerrada"
+                    : "Día cerrado"
+                  : "Listo para la ruta"}
             </p>
           </div>
+          {liveVisit ? (
+            <button
+              type="button"
+              className="home-live-chip"
+              onClick={() => setDetailVisit(liveVisit)}
+            >
+              <LiveLed size="sm" />
+            </button>
+          ) : null}
         </div>
 
         <HomeRouteCard

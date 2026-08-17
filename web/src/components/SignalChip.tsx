@@ -111,10 +111,10 @@ export function SignalChip() {
               ref={tipRef}
               id={tipId}
               role="tooltip"
-              className="signal-chip-tip"
+              className={`signal-chip-tip is-${kind}`}
               style={{ top: box.top, left: box.left, width: box.width }}
             >
-              <strong>{copy.label}</strong>
+              <strong className="signal-chip-tip-title">{copy.label}</strong>
               <p>{copy.hint}</p>
               <p className="signal-chip-tip-meta">{checkedLabel(checkedAt)}</p>
             </div>,

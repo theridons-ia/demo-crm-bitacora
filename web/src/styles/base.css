@@ -3832,10 +3832,25 @@ a {
   box-sizing: border-box;
 }
 
+.signal-chip-tip-title,
 .signal-chip-tip strong {
   display: block;
   margin-bottom: 0.25rem;
   font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.signal-chip-tip.is-online .signal-chip-tip-title {
+  color: #9eecc4;
+}
+
+.signal-chip-tip.is-degraded .signal-chip-tip-title {
+  color: #ffd789;
+}
+
+.signal-chip-tip.is-offline .signal-chip-tip-title {
+  color: #ffb4a8;
 }
 
 .signal-chip-tip p {
@@ -3852,6 +3867,74 @@ a {
 
 @media (max-width: 520px) {
   .signal-chip-label {
+    display: none;
+  }
+}
+
+.live-visit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 36px;
+  max-width: 11.5rem;
+  padding: 0 0.5rem 0 0.4rem;
+  border: 0;
+  border-radius: 10px;
+  background: #fff7f5;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.live-visit-chip-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.live-visit-chip-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.live-visit-chip-name {
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--primary);
+}
+
+.home-live-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 0.7rem;
+  border: 1px solid #f5b5ae;
+  border-radius: 999px;
+  background: #fff7f5;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .live-visit-chip {
+    width: 40px;
+    max-width: 40px;
+    padding: 0;
+    justify-content: center;
+    background: transparent;
+  }
+
+  .live-visit-chip-copy {
     display: none;
   }
 }

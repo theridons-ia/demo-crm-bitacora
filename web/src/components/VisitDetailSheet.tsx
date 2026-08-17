@@ -1,5 +1,5 @@
 import { Calendar, ChevronDown, Crosshair, MapPin, Play, ShieldCheck, ShoppingCart, Square, StickyNote, Trash2, XCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
 import { ClientDetailSheet } from "./ClientDetailSheet";
@@ -332,7 +332,9 @@ export function VisitDetailSheet({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [current, setCurrent] = useState(visit);
   const [saleJustConfirmed, setSaleJustConfirmed] = useState(false);
-  const [gpsConfirm, setGpsConfirm] = useState(false);
+  const [gpsConfirm, setGpsConfirm] = useState(
+    () => Boolean(confirmHereOnOpen && visit.status === "en_curso"),
+  );
   const [gpsConfirmNote, setGpsConfirmNote] = useState<string | null>(null);
   const [showClient, setShowClient] = useState(false);
   const [fieldLog, setFieldLog] = useState(() =>
@@ -341,6 +343,7 @@ export function VisitDetailSheet({
   const fieldLogRef = useRef(fieldLog);
   const currentRef = useRef(visit);
   const logTimer = useRef<number | null>(null);
+  const hereAcked = useRef(false);
 
   useEffect(() => {
     currentRef.current = current;
@@ -362,8 +365,9 @@ export function VisitDetailSheet({
     });
   }, [open, visit]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) {
+      hereAcked.current = false;
       setGpsConfirm(false);
       setShowClient(false);
       return;
@@ -380,7 +384,8 @@ export function VisitDetailSheet({
       return prev || resumeWizard || hasVisitSaleDraft(visit.id);
     });
     setShowMap(false);
-    const shouldConfirm = confirmHereOnOpen && visit.status === "en_curso";
+    const shouldConfirm =
+      confirmHereOnOpen && visit.status === "en_curso" && !hereAcked.current;
     setGpsConfirm(shouldConfirm);
     setGpsConfirmNote(
       shouldConfirm ? gpsConfirmMessage(visit, confirmHereFailReason ?? null) : null,
@@ -396,7 +401,7 @@ export function VisitDetailSheet({
         clientName: visit.client?.name ?? "",
       });
     }
-  }, [open, visit.id, visit.status, confirmHereOnOpen, confirmHereFailReason]);
+  }, [open, visit.id, confirmHereOnOpen, confirmHereFailReason]);
 
   useEffect(() => {
     if (!open) return;
@@ -453,29 +458,53 @@ export function VisitDetailSheet({
         )
       : null;
 
-  async function onStart() {
+  function onAskHere() {
+    setError(null);
+    setGpsConfirmNote(null);
+    setGpsConfirm(true);
+  }
+
+  function dismissHerePrompt() {
+    hereAcked.current = true;
+    setGpsConfirm(false);
+  }
+
+  async function onStart(opts?: { skipGps?: boolean }) {
     setBusy(true);
     setError(null);
     setGpsConfirmNote(null);
     try {
-      const geo = await getCurrentPosition(15_000, coordsFromClient(current.client), {
-        maximumAge: 0,
-      });
+      const geo = opts?.skipGps
+        ? ({ ok: false, skipped: true, reason: "Sin GPS" } as const)
+        : await getCurrentPosition(15_000, coordsFromClient(current.client), {
+            maximumAge: 0,
+          });
       const updated = await startVisit(current.id, {
         latitude: geo.ok ? geo.fix.latitude : null,
         longitude: geo.ok ? geo.fix.longitude : null,
         gps_accuracy_m: geo.ok ? (geo.fix.accuracy_m ?? null) : null,
         gps_offline: !geo.ok,
       });
-      setCurrent({ ...updated, field_notes: fieldLogRef.current || updated.field_notes });
-      onUpdated({ ...updated, field_notes: fieldLogRef.current || updated.field_notes });
+      const next = { ...updated, field_notes: fieldLogRef.current || updated.field_notes };
+      setCurrent(next);
+      onUpdated(next);
       saveVisitWork({
         visitId: updated.id,
         selling: false,
         clientName: updated.client?.name ?? visit.client?.name ?? "",
       });
-      setGpsConfirmNote(gpsConfirmMessage(updated, geo.ok ? null : geo.reason));
-      setGpsConfirm(true);
+      hereAcked.current = true;
+      setGpsConfirm(false);
+      if (!geo.ok) {
+        setGpsOk(
+          opts?.skipGps
+            ? "Visita iniciada sin GPS. Puedes actualizarlo en la ficha."
+            : `${geo.reason}. Visita iniciada sin GPS (temporal).`,
+        );
+      } else {
+        const warn = gpsConfirmMessage(updated, null);
+        if (warn) setGpsOk(warn);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar la visita");
     } finally {
@@ -625,9 +654,9 @@ export function VisitDetailSheet({
               </Button>
             ) : null}
             {current.status === "programada" ? (
-              <Button type="button" variant="accent" disabled={busy} onClick={() => void onStart()}>
+              <Button type="button" variant="accent" disabled={busy} onClick={onAskHere}>
                 <Play size={16} />
-                {busy ? "Iniciando…" : "Iniciar"}
+                Iniciar
               </Button>
             ) : null}
             {current.status === "en_curso" && !sale ? (
@@ -913,46 +942,67 @@ export function VisitDetailSheet({
           visit={current}
           open
           eyebrow={gpsConfirm ? "Confirmar posición" : undefined}
-          blurb={
-            gpsConfirm
-              ? hasGps
-                ? `¿Estás en ${clientName}?`
-                : "No hay GPS aún. Reintenta o continúa sin conexión (temporal)."
-              : undefined
-          }
+          blurb={gpsConfirm ? `¿Estás en ${clientName}?` : undefined}
           notice={
-            gpsConfirm && gpsConfirmNote ? (
+            gpsConfirm && (gpsConfirmNote || error) ? (
               <p className="visit-gps-span is-warn" role="status">
-                {gpsConfirmNote}
+                {error ?? gpsConfirmNote}
               </p>
             ) : null
           }
           footer={
             gpsConfirm ? (
-              <div className="side-sheet-actions">
-                <Button
-                  type="button"
-                  variant={hasGps ? "accent" : "ghost"}
-                  disabled={gpsBusy}
-                  onClick={() => setGpsConfirm(false)}
-                >
-                  {hasGps ? "Sí, estoy aquí" : "Continuar sin GPS"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={gpsBusy}
-                  onClick={() => void onPinGps()}
-                >
-                  <Crosshair size={16} />
-                  {gpsBusy ? "Actualizando…" : "Actualizar GPS"}
-                </Button>
-              </div>
+              current.status === "programada" ? (
+                <div className="side-sheet-actions">
+                  <Button
+                    type="button"
+                    variant="accent"
+                    disabled={busy}
+                    onClick={() => void onStart()}
+                  >
+                    {busy ? "Iniciando…" : "Sí, estoy aquí"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => void onStart({ skipGps: true })}
+                  >
+                    Continuar sin GPS
+                  </Button>
+                </div>
+              ) : (
+                <div className="side-sheet-actions">
+                  <Button
+                    type="button"
+                    variant={hasGps ? "accent" : "ghost"}
+                    disabled={gpsBusy}
+                    onClick={dismissHerePrompt}
+                  >
+                    {hasGps ? "Sí, estoy aquí" : "Continuar sin GPS"}
+                  </Button>
+                  {canPinGps ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={gpsBusy}
+                      onClick={() => void onPinGps()}
+                    >
+                      <Crosshair size={16} />
+                      {gpsBusy ? "Actualizando…" : "Actualizar GPS"}
+                    </Button>
+                  ) : null}
+                </div>
+              )
             ) : undefined
           }
           onClose={() => {
             setShowMap(false);
-            setGpsConfirm(false);
+            if (gpsConfirm && current.status === "en_curso") {
+              dismissHerePrompt();
+            } else {
+              setGpsConfirm(false);
+            }
           }}
         />
       ) : null}

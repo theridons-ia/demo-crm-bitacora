@@ -11,6 +11,7 @@ export default defineConfig({
     ...(useHttps ? [basicSsl()] : []),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: "auto",
       includeAssets: ["brand/enrutas-logo.png"],
       manifest: {
         name: "EnRutas",
