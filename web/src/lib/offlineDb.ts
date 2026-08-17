@@ -70,11 +70,23 @@ export async function saveCatalogCache(clients: unknown[], products: unknown[]):
 }
 
 export async function loadCatalogCache(): Promise<CatalogCache | null> {
+  return loadMeta<CatalogCache>("catalog");
+}
+
+export async function saveMeta<T>(key: string, value: T): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction("meta", "readwrite");
+  tx.objectStore("meta").put(value, key);
+  await txDone(tx);
+  db.close();
+}
+
+export async function loadMeta<T>(key: string): Promise<T | null> {
   const db = await openDb();
   const tx = db.transaction("meta", "readonly");
-  const req = tx.objectStore("meta").get("catalog");
-  const value = await new Promise<CatalogCache | null>((resolve, reject) => {
-    req.onsuccess = () => resolve((req.result as CatalogCache | undefined) ?? null);
+  const req = tx.objectStore("meta").get(key);
+  const value = await new Promise<T | null>((resolve, reject) => {
+    req.onsuccess = () => resolve((req.result as T | undefined) ?? null);
     req.onerror = () => reject(req.error);
   });
   await txDone(tx);

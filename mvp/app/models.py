@@ -185,6 +185,7 @@ class Product(Base):
     price_usd_2: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     price_ves: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     price_usd_auto: Mapped[bool] = mapped_column(Boolean, default=False)
+    price_usd_margin_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
     price_usd_2_auto: Mapped[bool] = mapped_column(Boolean, default=True)
     price_ves_auto: Mapped[bool] = mapped_column(Boolean, default=True)
     stock: Mapped[int] = mapped_column(Integer, default=0)

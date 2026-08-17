@@ -6,10 +6,10 @@ import type { ReactNode } from "react";
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) {
+  if (!user && loading) {
     return (
       <div className="app-shell">
-        <p style={{ color: "var(--muted-foreground)" }}>Cargando sesión…</p>
+        <p className="muted">Cargando sesión…</p>
       </div>
     );
   }

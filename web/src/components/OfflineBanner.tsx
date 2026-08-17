@@ -1,6 +1,6 @@
 import { CloudOff, RefreshCw, Wifi } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { useNetworkStatus } from "../network/NetworkStatus";
 import {
   flushOfflineQueue,
   queueCount,
@@ -11,7 +11,8 @@ import { Button } from "./Button";
 
 /** Banner de estado offline + botón sincronizar (SF-1.9). */
 export function OfflineBanner() {
-  const online = useOnlineStatus();
+  const { kind } = useNetworkStatus();
+  const online = kind === "online";
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -71,24 +72,24 @@ export function OfflineBanner() {
     }
   }
 
-  if (online && pending === 0 && !note) return null;
+  if (pending === 0 && !note) return null;
 
   return (
     <div className={`offline-banner ${online ? "is-online" : "is-offline"}`} role="status">
       <div className="offline-banner-main">
         {online ? <Wifi size={16} aria-hidden /> : <CloudOff size={16} aria-hidden />}
         <span>
-          {online
-            ? pending
+          {kind === "offline"
+            ? `Sin conexión${pending ? ` · ${pending} en cola` : ""}`
+            : pending
               ? `${pending} pendiente(s) por sincronizar`
-              : "En línea"
-            : `Sin conexión${pending ? ` · ${pending} en cola` : ""}`}
+              : "En línea"}
         </span>
       </div>
       <Button
         type="button"
         variant="secondary"
-        disabled={busy || (!online && pending === 0)}
+        disabled={busy || (kind === "offline" && pending === 0)}
         onClick={onSync}
       >
         <RefreshCw size={16} aria-hidden />

@@ -9,6 +9,7 @@ import { VisitRow } from "../components/VisitRow";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchSellers, fetchVisits } from "../lib/api";
 import { todayISO } from "../lib/caracasTime";
+import { loadTeamVisitsCache, saveTeamVisitsCache } from "../lib/offlineQueue";
 import { visitGpsProof, visitHasSale } from "../lib/visitEvidence";
 import { sortVisitsAgenda, sortVisitsHistory } from "../lib/visitOrder";
 import type { User, Visit } from "../lib/types";
@@ -44,8 +45,13 @@ export function TeamVisitsPage() {
   const today = todayISO();
 
   const reload = useCallback(async () => {
-    setLoading(true);
     setError(null);
+    const cached = await loadTeamVisitsCache(sellerId).catch(() => null);
+    if (cached) {
+      setVisits(cached.visits);
+      setSellers(cached.sellers);
+      setLoading(false);
+    }
     try {
       const [v, s] = await Promise.all([
         fetchVisits(sellerId === "all" ? undefined : { seller_id: sellerId }),
@@ -53,8 +59,12 @@ export function TeamVisitsPage() {
       ]);
       setVisits(v);
       setSellers(s);
+      setError(null);
+      await saveTeamVisitsCache({ sellerId, visits: v, sellers: s }).catch(() => undefined);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron cargar las visitas");
+      if (!cached) {
+        setError(err instanceof ApiError ? err.message : "No se pudieron cargar las visitas");
+      }
     } finally {
       setLoading(false);
     }
@@ -225,10 +235,10 @@ export function TeamVisitsPage() {
         </>
       ) : null}
 
-      {loading ? <ListSkeleton /> : null}
+      {loading && visits.length === 0 ? <ListSkeleton /> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
-      {!loading ? (
+      {visits.length > 0 || !loading ? (
         <ul className="visit-row-list">
           {filtered.map((visit) => (
             <VisitRow

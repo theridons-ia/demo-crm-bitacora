@@ -77,6 +77,8 @@ def _sanitize_product_payload(data: dict) -> dict:
         raise HTTPException(status_code=400, detail="Stock mínimo inválido")
     if "cost_usd" in data and data["cost_usd"] is not None and data["cost_usd"] < 0:
         raise HTTPException(status_code=400, detail="Costo inválido")
+    if "price_usd_margin_pct" in data and data["price_usd_margin_pct"] is not None and data["price_usd_margin_pct"] < 0:
+        raise HTTPException(status_code=400, detail="El margen de Precio 1 no puede ser negativo")
     if "price_usd_2" in data and data["price_usd_2"] is not None and data["price_usd_2"] < 0:
         raise HTTPException(status_code=400, detail="Precio 2 inválido")
     if "price_ves" in data and data["price_ves"] is not None and data["price_ves"] < 0:
@@ -137,8 +139,10 @@ def update_product(
         "price_usd_2": product.price_usd_2,
         "price_ves": product.price_ves,
         "price_usd_auto": product.price_usd_auto,
+        "price_usd_margin_pct": product.price_usd_margin_pct,
         "price_usd_2_auto": product.price_usd_2_auto,
         "price_ves_auto": product.price_ves_auto,
+        "cost_usd": product.cost_usd,
     }
     apply_auto_prices(snapshot, bcv=bcv, usdt=usdt)
     product.price_usd = snapshot.get("price_usd")

@@ -96,6 +96,7 @@ export type Product = {
   price_usd_2?: string | null;
   price_ves?: string | null;
   price_usd_auto?: boolean;
+  price_usd_margin_pct?: string | null;
   price_usd_2_auto?: boolean;
   price_ves_auto?: boolean;
   stock: number;

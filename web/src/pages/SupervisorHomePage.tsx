@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Map as MapIcon,
+  Route,
   Users,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
@@ -12,6 +13,7 @@ import { HomeRouteCard, type HomeRouteLens } from "../components/HomeRouteCard";
 import { PageWorkspace } from "../layout/PageWorkspace";
 import { ApiError, fetchAlerts, fetchRoutes, fetchSellers, fetchVisits } from "../lib/api";
 import { caracasHour, formatLongDate, formatWeekSpan, todayISO, weekStartISO } from "../lib/caracasTime";
+import { loadSupervisorHomeCache, saveSupervisorHomeCache } from "../lib/offlineQueue";
 import type { RouteCard, User, Visit, VisitAlert } from "../lib/types";
 
 function buildRanking(visits: Visit[], sellers: User[]): RankingRow[] {
@@ -79,6 +81,15 @@ export function SupervisorHomePage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const cached = await loadSupervisorHomeCache(day, weekStart).catch(() => null);
+      if (cancelled) return;
+      if (cached) {
+        setAlerts(cached.alerts);
+        setVisits(cached.visits);
+        setSellers(cached.sellers);
+        setWeekRoutes(cached.weekRoutes);
+        setLoading(false);
+      }
       try {
         const [alertList, visitList, sellerList, routeList] = await Promise.all([
           fetchAlerts({ unacked_only: true }),
@@ -91,8 +102,17 @@ export function SupervisorHomePage() {
         setVisits(visitList);
         setSellers(sellerList);
         setWeekRoutes(routeList);
+        setError(null);
+        await saveSupervisorHomeCache({
+          day,
+          weekStart,
+          alerts: alertList.slice(0, 6),
+          visits: visitList,
+          sellers: sellerList,
+          weekRoutes: routeList,
+        }).catch(() => undefined);
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && !cached) {
           setError(err instanceof ApiError ? err.message : "No se pudo cargar el resumen");
         }
       } finally {

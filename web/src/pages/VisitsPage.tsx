@@ -26,7 +26,12 @@ import {
   saveLocalVisit,
   type LocalPendingVisit,
 } from "../lib/offlineDb";
-import { getCachedClients } from "../lib/offlineQueue";
+import {
+  getCachedClients,
+  loadVisitsCache,
+  mergeCatalogClients,
+  saveVisitsCache,
+} from "../lib/offlineQueue";
 import { dateISOInCaracas, formatAgendaDay, formatWeekdayShort } from "../lib/caracasTime";
 import { isVisitOverdue, sortVisitsAgenda, sortVisitsHistory } from "../lib/visitOrder";
 import type { Client, Visit } from "../lib/types";
@@ -119,27 +124,34 @@ export function VisitsPage() {
 
   const reload = useCallback(async () => {
     const locals = (await listLocalVisits()).map(localVisitToVisit);
-    if (!navigator.onLine) {
-      const cached = await getCachedClients();
-      setClients(cached);
-      setVisits(locals);
-      return;
+    const cachedVisits = (await loadVisitsCache().catch(() => null)) ?? [];
+    const cachedClients = await getCachedClients();
+    if (locals.length || cachedVisits.length || cachedClients.length) {
+      setVisits([
+        ...locals,
+        ...cachedVisits.filter((x) => !locals.some((l) => l.local_uuid && l.local_uuid === x.local_uuid)),
+      ]);
+      if (cachedClients.length) setClients(cachedClients);
+      setLoading(false);
     }
     try {
       const [v, c] = await Promise.all([fetchVisits(), fetchClients()]);
       setVisits([...locals, ...v.filter((x) => !locals.some((l) => l.local_uuid && l.local_uuid === x.local_uuid))]);
       setClients(c);
+      setError(null);
+      await saveVisitsCache(v).catch(() => undefined);
+      await mergeCatalogClients(c).catch(() => undefined);
     } catch (err) {
-      const cached = await getCachedClients();
-      setClients(cached);
-      setVisits(locals);
-      throw err;
+      if (!locals.length && !cachedVisits.length) {
+        setVisits(locals);
+        setClients(cachedClients);
+        throw err;
+      }
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     reload()
       .catch((err) => {
         if (!cancelled) {
@@ -419,9 +431,9 @@ export function VisitsPage() {
         </p>
       ) : null}
 
-      {loading ? <ListSkeleton /> : null}
+      {loading && visits.length === 0 ? <ListSkeleton /> : null}
 
-      {!loading ? (
+      {visits.length > 0 || !loading ? (
       <ul className="visit-row-list">
         {filtered.map((visit) => (
           <VisitRow key={visit.id} visit={visit} onClick={() => setDetailVisit(visit)} />

@@ -18,6 +18,7 @@ import { canUseMockGps, isMockGpsEnabled, setMockGpsEnabled } from "../lib/gps";
 import type { VisitAlert } from "../lib/types";
 import { AlertNoticeItem } from "../components/AlertNoticeItem";
 import { HeaderQuickRegister } from "../components/HeaderQuickRegister";
+import { SignalChip } from "../components/SignalChip";
 import { accountBasePath, crumbForPath, roleLabel } from "./appNav";
 
 /** Header superior: breadcrumb + campana (dropdown alertas) + perfil. */
@@ -139,6 +140,7 @@ export function AppHeader() {
       </nav>
 
       <div className="app-header-actions">
+        <SignalChip />
         {user?.role === "vendedor" ? <HeaderQuickRegister /> : null}
 
         {canUseMockGps() ? (

@@ -174,6 +174,7 @@ class ProductCreate(BaseModel):
     price_usd_2: Decimal | None = None
     price_ves: Decimal | None = None
     price_usd_auto: bool = False
+    price_usd_margin_pct: Decimal | None = None
     price_usd_2_auto: bool = True
     price_ves_auto: bool = True
     stock: int = 0
@@ -197,6 +198,7 @@ class ProductUpdate(BaseModel):
     price_usd_2: Decimal | None = None
     price_ves: Decimal | None = None
     price_usd_auto: bool | None = None
+    price_usd_margin_pct: Decimal | None = None
     price_usd_2_auto: bool | None = None
     price_ves_auto: bool | None = None
     image_url: str | None = None
@@ -222,6 +224,7 @@ class ProductOut(ORMModel):
     price_usd_2: Decimal | None = None
     price_ves: Decimal | None = None
     price_usd_auto: bool = False
+    price_usd_margin_pct: Decimal | None = None
     price_usd_2_auto: bool = True
     price_ves_auto: bool = True
     stock: int

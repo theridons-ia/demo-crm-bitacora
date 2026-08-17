@@ -79,6 +79,7 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "products", "price_usd_2", "NUMERIC(12,2)")
     _add_column_if_missing(engine, "products", "price_ves", "NUMERIC(14,2)")
     _add_column_if_missing(engine, "products", "price_usd_auto", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(engine, "products", "price_usd_margin_pct", "NUMERIC(8,2)")
     _add_column_if_missing(engine, "products", "price_usd_2_auto", "BOOLEAN NOT NULL DEFAULT TRUE")
     _add_column_if_missing(engine, "products", "price_ves_auto", "BOOLEAN NOT NULL DEFAULT TRUE")
     _add_column_if_missing(engine, "products", "pack_units", "INTEGER")

@@ -9,7 +9,8 @@ import { ListSearch } from "../components/ListSearch";
 import { ListSkeleton } from "../components/ListSkeleton";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchClients } from "../lib/api";
-import { getCachedClients } from "../lib/offlineQueue";
+import { getCachedClients, mergeCatalogClients } from "../lib/offlineQueue";
+import { hydrateThenRefresh } from "../lib/staleCache";
 import type { Client } from "../lib/types";
 
 function hasPdvPin(client: Client): boolean {
@@ -40,20 +41,21 @@ export function ClientsPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const data = navigator.onLine ? await fetchClients() : await getCachedClients();
-        if (!cancelled) setClients(data);
-      } catch (err) {
-        if (!cancelled) {
-          const cached = await getCachedClients();
-          setClients(cached);
-          if (!cached.length) {
-            setError(err instanceof ApiError ? err.message : "Error al cargar clientes");
-          }
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+      const result = await hydrateThenRefresh({
+        cancelled: () => cancelled,
+        readCache: getCachedClients,
+        fetchFresh: fetchClients,
+        writeCache: mergeCatalogClients,
+        apply: setClients,
+        isUsable: (rows) => rows.length > 0,
+      });
+      if (cancelled) return;
+      if (!result.shown && result.error) {
+        setError(result.error instanceof ApiError ? result.error.message : "Error al cargar clientes");
+      } else {
+        setError(null);
       }
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -128,7 +130,8 @@ export function ClientsPage() {
           />
         </div>
 
-        {loading ? <ListSkeleton /> : (
+        {error ? <p className="form-error">{error}</p> : null}
+        {loading && clients.length === 0 ? <ListSkeleton /> : (
         <ul className="client-row-list">
           {filtered.map((client) => (
             <ClientRow

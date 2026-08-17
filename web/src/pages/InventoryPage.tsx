@@ -5,8 +5,9 @@ import { ListSkeleton } from "../components/ListSkeleton";
 import { StockTable, stockState, type StockState } from "../components/StockTable";
 import { WorkspacePage } from "../layout/WorkspacePage";
 import { ApiError, fetchProducts } from "../lib/api";
-import { getCachedProducts } from "../lib/offlineQueue";
+import { getCachedProducts, mergeCatalogProducts } from "../lib/offlineQueue";
 import { productSearchHay } from "../lib/productFields";
+import { hydrateThenRefresh } from "../lib/staleCache";
 import type { Product } from "../lib/types";
 
 /** Inventario vendedor — tabla de existencias (sin ajuste rápido). */
@@ -20,19 +21,21 @@ export function InventoryPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const data = navigator.onLine ? await fetchProducts() : await getCachedProducts();
-        if (!cancelled) setProducts(data.length ? data : await getCachedProducts());
-      } catch (err) {
-        if (cancelled) return;
-        const cached = await getCachedProducts();
-        setProducts(cached);
-        if (!cached.length) {
-          setError(err instanceof ApiError ? err.message : "Error al cargar inventario");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+      const result = await hydrateThenRefresh({
+        cancelled: () => cancelled,
+        readCache: getCachedProducts,
+        fetchFresh: fetchProducts,
+        writeCache: mergeCatalogProducts,
+        apply: setProducts,
+        isUsable: (rows) => rows.length > 0,
+      });
+      if (cancelled) return;
+      if (!result.shown && result.error) {
+        setError(result.error instanceof ApiError ? result.error.message : "Error al cargar inventario");
+      } else {
+        setError(null);
       }
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -108,10 +111,10 @@ export function InventoryPage() {
         </div>
       </div>
 
-      {loading ? <ListSkeleton kind="stock" /> : null}
+      {loading && products.length === 0 ? <ListSkeleton kind="stock" /> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
-      {!loading && filtered.length ? <StockTable products={filtered} /> : null}
+      {(products.length > 0 || !loading) && filtered.length ? <StockTable products={filtered} /> : null}
 
       {!loading && filtered.length === 0 ? (
         <p className="muted">Sin productos con este filtro.</p>

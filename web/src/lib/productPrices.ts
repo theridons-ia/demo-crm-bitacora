@@ -24,11 +24,10 @@ export function derivePriceUsd2(price1: number, fx: Pick<FxRate, "usd_to_ves" | 
   return Math.round(price1 * spread * 100) / 100;
 }
 
-/** Precio 1 = Precio 2 ÷ diferencial USDT/BCV */
-export function derivePriceUsd1(price2: number, fx: Pick<FxRate, "usd_to_ves" | "usdt_to_ves"> | null): number | null {
-  const spread = usdtBcvSpread(fx);
-  if (spread == null || !(spread > 0) || !(price2 >= 0) || !Number.isFinite(price2)) return null;
-  return Math.round((price2 / spread) * 100) / 100;
+/** Precio 1 = costo × (1 + margen%). Costo $1 y 55% → $1.55. */
+export function derivePriceUsdFromCost(cost: number, marginPct: number): number | null {
+  if (!(cost > 0) || !Number.isFinite(marginPct) || marginPct < 0) return null;
+  return Math.round(cost * (1 + marginPct / 100) * 100) / 100;
 }
 
 export function derivePriceVes(price2: number | null, fx: Pick<FxRate, "usd_to_ves"> | null): number | null {
@@ -42,10 +41,12 @@ export function moneyInput(n: number | null): string {
   return n.toFixed(2);
 }
 
-export function priceUsd1MarginHint(fx: Pick<FxRate, "usd_to_ves" | "usdt_to_ves"> | null): string {
-  const ratio = spreadRatioLabel(fx);
-  if (!ratio) return "Falta tasa USDT o BCV";
-  return `Precio 2 ÷ ${ratio} (USDT/BCV)`;
+export function priceUsd1CostHint(cost: number | null, marginPct: number | null, derived: number | null): string {
+  if (cost == null || !(cost > 0)) return "Indica el costo USD para calcular Precio 1";
+  if (marginPct == null || !Number.isFinite(marginPct)) return "Indica el % de ganancia sobre el costo";
+  if (derived == null) return "No se pudo calcular Precio 1";
+  const pct = marginPct.toLocaleString("es-VE", { maximumFractionDigits: 2 });
+  return `Precio 1 = $ ${derived.toFixed(2)} (costo + ${pct}%)`;
 }
 
 export function priceUsd2AutoHint(fx: Pick<FxRate, "usd_to_ves" | "usdt_to_ves"> | null): string {

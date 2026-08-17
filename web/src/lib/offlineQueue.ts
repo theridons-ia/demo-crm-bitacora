@@ -11,12 +11,14 @@ import {
   enqueueItem,
   listQueue,
   loadCatalogCache,
+  loadMeta,
   newLocalUuid,
   removeQueueItems,
   saveCatalogCache,
+  saveMeta,
   type QueueItem,
 } from "./offlineDb";
-import type { Client, Product } from "./types";
+import type { Client, Product, RouteCard, RouteDetail, Sale, User, Visit, VisitAlert } from "./types";
 
 const listeners = new Set<() => void>();
 
@@ -43,6 +45,94 @@ export async function getCachedClients(): Promise<Client[]> {
 export async function getCachedProducts(): Promise<Product[]> {
   const cache = await loadCatalogCache();
   return (cache?.products as Product[] | undefined) ?? [];
+}
+
+export async function mergeCatalogClients(clients: Client[]): Promise<void> {
+  const prev = await loadCatalogCache();
+  await saveCatalogCache(clients, prev?.products ?? []);
+}
+
+export async function mergeCatalogProducts(products: Product[]): Promise<void> {
+  const prev = await loadCatalogCache();
+  await saveCatalogCache((prev?.clients as Client[] | undefined) ?? [], products);
+}
+
+export type HomeDayCache = {
+  day: string;
+  clients: Client[];
+  visits: Visit[];
+  sales: Sale[];
+  route: RouteCard | null;
+};
+
+export async function loadHomeDayCache(day: string): Promise<HomeDayCache | null> {
+  const row = await loadMeta<HomeDayCache>(`home:${day}`);
+  return row?.day === day ? row : null;
+}
+
+export async function saveHomeDayCache(row: HomeDayCache): Promise<void> {
+  await saveMeta(`home:${row.day}`, row);
+}
+
+export async function loadVisitsCache(): Promise<Visit[] | null> {
+  return loadMeta<Visit[]>("visits:list");
+}
+
+export async function saveVisitsCache(visits: Visit[]): Promise<void> {
+  await saveMeta("visits:list", visits);
+}
+
+export async function loadSalesCache(): Promise<Sale[] | null> {
+  return loadMeta<Sale[]>("sales:list");
+}
+
+export async function saveSalesCache(sales: Sale[]): Promise<void> {
+  await saveMeta("sales:list", sales);
+}
+
+export async function loadRouteCache(weekStart: string): Promise<RouteDetail | null> {
+  const row = await loadMeta<{ weekStart: string; route: RouteDetail }>(`route:${weekStart}`);
+  return row?.weekStart === weekStart ? row.route : null;
+}
+
+export async function saveRouteCache(weekStart: string, route: RouteDetail): Promise<void> {
+  await saveMeta(`route:${weekStart}`, { weekStart, route });
+}
+
+export type SupervisorHomeCache = {
+  day: string;
+  weekStart: string;
+  alerts: VisitAlert[];
+  visits: Visit[];
+  sellers: User[];
+  weekRoutes: RouteCard[];
+};
+
+export async function loadSupervisorHomeCache(
+  day: string,
+  weekStart: string,
+): Promise<SupervisorHomeCache | null> {
+  const row = await loadMeta<SupervisorHomeCache>(`sup-home:${day}`);
+  return row?.day === day && row.weekStart === weekStart ? row : null;
+}
+
+export async function saveSupervisorHomeCache(row: SupervisorHomeCache): Promise<void> {
+  await saveMeta(`sup-home:${row.day}`, row);
+}
+
+export type TeamVisitsCache = {
+  sellerId: number | "all";
+  visits: Visit[];
+  sellers: User[];
+};
+
+export async function loadTeamVisitsCache(sellerId: number | "all"): Promise<TeamVisitsCache | null> {
+  const row = await loadMeta<TeamVisitsCache>(`team-visits:${sellerId}`);
+  return row?.sellerId === sellerId ? row : null;
+}
+
+export async function saveTeamVisitsCache(row: TeamVisitsCache): Promise<void> {
+  await saveMeta(`team-visits:${row.sellerId}`, row);
 }
 
 export async function queueCount(): Promise<number> {
