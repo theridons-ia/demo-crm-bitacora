@@ -3817,11 +3817,8 @@ a {
 }
 
 .signal-chip-tip {
-  position: absolute;
-  z-index: 24;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  width: min(17.5rem, 78vw);
+  position: fixed;
+  z-index: 80;
   padding: 0.55rem 0.7rem;
   border-radius: var(--radius-sm);
   background: var(--primary);
@@ -3831,6 +3828,8 @@ a {
   line-height: 1.4;
   text-align: left;
   box-shadow: 0 10px 24px rgb(24 49 47 / 0.18);
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
 }
 
 .signal-chip-tip strong {
