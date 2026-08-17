@@ -23,6 +23,7 @@ export type ProductFormState = {
   price_usd_2: string;
   price_ves: string;
   price_usd_auto: boolean;
+  price_usd_margin_pct: string;
   price_usd_2_auto: boolean;
   price_ves_auto: boolean;
   cost_usd: string;
@@ -47,6 +48,7 @@ export const emptyProductForm: ProductFormState = {
   price_usd_2: "",
   price_ves: "",
   price_usd_auto: false,
+  price_usd_margin_pct: "",
   price_usd_2_auto: true,
   price_ves_auto: true,
   cost_usd: "",
@@ -76,6 +78,7 @@ export function productToForm(product: Product): ProductFormState {
     price_usd_2: product.price_usd_2 ?? "",
     price_ves: product.price_ves ?? "",
     price_usd_auto: product.price_usd_auto === true,
+    price_usd_margin_pct: product.price_usd_margin_pct ?? "",
     price_usd_2_auto: product.price_usd_2_auto !== false,
     price_ves_auto: product.price_ves_auto !== false,
     cost_usd: product.cost_usd ?? "",
@@ -108,6 +111,7 @@ export type ProductPayload = {
   price_usd_2: number | null;
   price_ves: number | null;
   price_usd_auto: boolean;
+  price_usd_margin_pct: number | null;
   price_usd_2_auto: boolean;
   price_ves_auto: boolean;
   stock?: number;
@@ -131,11 +135,13 @@ export function parseProductForm(form: ProductFormState): { error: string } | { 
   const price2 = optionalNumber(form.price_usd_2);
   const price3 = optionalNumber(form.price_ves);
   const cost = optionalNumber(form.cost_usd);
+  const marginPct = optionalNumber(form.price_usd_margin_pct);
   const minStock = Number(form.min_stock.trim() || "40");
   const packUnits = optionalNumber(form.pack_units);
   if (!name) return { error: "El nombre es obligatorio" };
   if (form.price_usd_auto) {
-    if (price2 == null) return { error: "Precio 2 es obligatorio para calcular Precio 1 por margen" };
+    if (cost == null || !(cost > 0)) return { error: "Indica el costo USD para calcular Precio 1 por margen" };
+    if (marginPct == null || marginPct < 0) return { error: "Indica el % de ganancia sobre el costo" };
   } else if (!Number.isFinite(price) || price < 0) {
     return { error: "Precio 1 inválido" };
   }
@@ -154,6 +160,7 @@ export function parseProductForm(form: ProductFormState): { error: string } | { 
       price_usd_2: price2,
       price_ves: price3,
       price_usd_auto: form.price_usd_auto,
+      price_usd_margin_pct: form.price_usd_auto ? marginPct : null,
       price_usd_2_auto: form.price_usd_2_auto,
       price_ves_auto: form.price_ves_auto,
       image_url: form.image_url,
@@ -186,9 +193,10 @@ export function productSearchHay(product: Product): string {
     .toLowerCase();
 }
 
-export function productMarginPct(price: number, cost: number | null): number | null {
-  if (cost == null || !(price > 0)) return null;
-  return Math.round(((price - cost) / price) * 100);
+/** % de ganancia sobre el costo: $1.50 con costo $1 → 50. */
+export function productMarkupPct(price: number, cost: number | null): number | null {
+  if (cost == null || !(cost > 0) || !Number.isFinite(price) || price < 0) return null;
+  return Math.round((price / cost - 1) * 10000) / 100;
 }
 
 export type ExpiryTone = "ok" | "warn" | "bad";

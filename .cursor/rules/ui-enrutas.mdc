@@ -87,6 +87,13 @@ Reglas del strip de ruta:
 
 - Misma casilla oscura `HomeRouteCard` (Hoy = visitas del equipo hoy; Semana = suma de rutas de la semana). CTA a `/sup/ruta`. Completado con el mismo check y barra verde.
 
+## PWA y señal
+
+- Cascarón PWA (`vite-plugin-pwa`): JS/CSS/HTML/fuentes en el service worker. Recargar sin red **no** deja `#root` vacío. Fondo cream en `index.html` desde el primer paint.
+- Sesión: un fallo de **red** en `/me` no desloguea; se conserva el último usuario. Solo 401 limpia token.
+- Listas (Inicio, Visitas, Clientes, Inventario, Ventas, Ruta): mostrar **lo último guardado** y refrescar atrás. Skeleton solo si no hay cache. Nunca vaciar la pantalla porque el fetch falló.
+- Header: chip `SignalChip` **En línea / Señal débil / Sin señal** (sondeo `/api/health`). No fingir barras de celular. El banner gordo solo aparece si hay **cola** por sincronizar.
+
 ## Ficha de visita + LED en curso
 
 - Detalle: `VisitDetailSheet` — identidad PDV + hero de estado + hechos en tiles + **tarjeta GPS** (guardar/actualizar coordenada).
@@ -172,7 +179,7 @@ Gramática de fila: ver `ui-movil.mdc` § Fila de lista. No es una tabla Excel r
 - UI: 4 tiles — **USD BCV** (logo BCV), **USDT** (logo Binance), **USDT / BCV** (ratio ~1,13 y % sobre BCV), **EUR BCV**. CTA **Actualizar ahora** (`POST /api/fx/refresh`).
 - BS ya no duplica el BCV: el diferencial es `USDT ÷ BCV` (1,13 ≈ +13 %).
 - Ajuste manual solo para BCV si fallan las fuentes. Ventas VES leen `usd_to_ves`; no mezclar USDT en el total de la OV todavía.
-- Inventario (ficha producto): **Precio 1 (USD)** Manual o **Margen** (= Precio 2 ÷ diferencial USDT/BCV). **Precio 2 (USD)** Auto = Precio 1 x diferencial (USDT/BCV) o Manual. **Precio 3 (Bs)** Auto = Precio 2 x USD BCV o Manual. P1 Margen y P2 Auto son excluyentes. Prefijos `$` / `Bs.` en los campos. GET lista recalcula Auto con la tasa viva.
+- Inventario (ficha producto): **Precio 1 (USD)** Manual (escribes el $) o **Margen** (% de ganancia sobre el **costo**: costo $1 y 55% → $1.55). **Precio 2 (USD)** Auto = Precio 1 x diferencial (USDT/BCV) o Manual. **Precio 3 (Bs)** Auto = Precio 2 x USD BCV o Manual. P1 Margen y P2 Auto pueden ir juntos. Prefijos `$` / `%` / `Bs.` GET lista recalcula Auto con costo/% y tasas vivas.
 - Cotizador: **USD usa Precio 1**; **Bs usa Precio 3**. No convertir Precio 1 × BCV al cotizar en bolívares. Totales `$ 0.00` / `Bs. 0.00`.
 
 ## Acciones rápidas (vendedor)

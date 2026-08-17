@@ -230,12 +230,13 @@ Orden ligada a visita; descontar stock; ver inventario.
 Trabajar sin red: cache catálogo; encolar visita/cierre/venta; sync al volver.
 
 ### Qué se hizo
-- IndexedDB: cache clientes/productos + cola + visitas locales.
-- Banner sync en el shell.
+- IndexedDB: cache clientes/productos + cola + visitas locales + snapshot de Inicio (visitas de hoy y ruta) + listas.
+- Banner sync en el shell **solo si hay pendientes**. Chip de señal en el header.
 - Visita local offline → al cerrar va a `POST /api/sync/offline-visits`.
 - Cierre de visita ya sincronizada → cola `close_visit`.
 - Venta standalone → cola `create_sale`.
 - Sync ampliado con foto / skip GPS.
+- PWA: `vite-plugin-pwa` precachea el cascarón. `/me` por red no borra la sesión.
 
 ### Cómo
 | Pieza | Ruta |
@@ -243,6 +244,8 @@ Trabajar sin red: cache catálogo; encolar visita/cierre/venta; sync al volver.
 | IDB | `web/src/lib/offlineDb.ts` |
 | Cola | `web/src/lib/offlineQueue.ts` |
 | Banner | `web/src/components/OfflineBanner.tsx` |
+| Señal | `web/src/components/SignalChip.tsx` |
+| PWA | `web/vite.config.ts` (`VitePWA`) |
 | Sync API | `mvp/app/routers/sync.py` |
 
 ```mermaid

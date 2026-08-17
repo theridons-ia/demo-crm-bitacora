@@ -10,9 +10,11 @@ type Props = {
   step?: string;
   autoLabel?: string;
   prefix?: string;
+  /** Si false, el valor se puede editar también en modo Auto/Margen (ej. el %). */
+  readOnlyWhenAuto?: boolean;
 };
 
-/** Precio con switch Auto/Manual (o Margen). Auto deja el input bloqueado. */
+/** Precio con switch Auto/Manual (o Margen). Auto deja el input bloqueado, salvo el %. */
 export function PriceAutoField({
   id,
   label,
@@ -25,7 +27,9 @@ export function PriceAutoField({
   step = "0.01",
   autoLabel = "Auto",
   prefix,
+  readOnlyWhenAuto = true,
 }: Props) {
+  const locked = auto && readOnlyWhenAuto;
   return (
     <div className="field price-auto-field">
       <div className="price-auto-head">
@@ -61,7 +65,7 @@ export function PriceAutoField({
           min="0"
           value={value}
           placeholder={placeholder}
-          disabled={auto}
+          disabled={locked}
           onChange={(e) => onChange(e.target.value)}
         />
       </div>

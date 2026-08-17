@@ -20,7 +20,8 @@ function historyStamp(visit: Visit): number {
 
 /** Programada con fecha Caracas ya pasada (no se inició ni se canceló). */
 export function isVisitOverdue(visit: Visit, today: string): boolean {
-  return visit.status === "programada" && Boolean(visit.scheduled_date) && visit.scheduled_date < today;
+  const day = visit.scheduled_date;
+  return visit.status === "programada" && day != null && day < today;
 }
 
 /** Abiertas / agenda: en curso, luego sin asistir (más reciente primero), luego mañana → tarde. */

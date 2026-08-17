@@ -10,9 +10,14 @@ import { VisitRow } from "../components/VisitRow";
 import { ListSkeleton } from "../components/ListSkeleton";
 import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
 import { PageWorkspace } from "../layout/PageWorkspace";
-import { ApiError, fetchClients, fetchCurrentRoute, fetchSales, fetchVisits } from "../lib/api";
+import { fetchClients, fetchCurrentRoute, fetchSales, fetchVisits } from "../lib/api";
 import { formatLongDate, formatWeekSpan, isSameCaracasDay, todayISO, weekStartISO } from "../lib/caracasTime";
-import { getCachedClients } from "../lib/offlineQueue";
+import {
+  getCachedClients,
+  loadHomeDayCache,
+  mergeCatalogClients,
+  saveHomeDayCache,
+} from "../lib/offlineQueue";
 import { isOnDayAgenda, sortVisitsAgenda } from "../lib/visitOrder";
 import type { Client, RouteCard, Sale, Visit } from "../lib/types";
 
@@ -48,27 +53,62 @@ export function HomePage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [clientData, visitData, saleData, routeData] = await Promise.all([
-          navigator.onLine ? fetchClients() : getCachedClients(),
-          navigator.onLine ? fetchVisits({ scheduled_date: day }).catch(() => []) : Promise.resolve([]),
-          navigator.onLine ? fetchSales().catch(() => []) : Promise.resolve([]),
-          navigator.onLine ? fetchCurrentRoute().catch(() => null) : Promise.resolve(null),
-        ]);
-        if (cancelled) return;
-        setClients(clientData.length ? clientData : await getCachedClients());
-        setVisits(visitData);
-        setSales(saleData);
-        setWeekRoute(routeData);
-      } catch (err) {
-        if (cancelled) return;
-        const cached = await getCachedClients();
-        setClients(cached);
-        if (!cached.length) {
-          setError(err instanceof ApiError ? err.message : "Error al cargar clientes");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+      const cached = await loadHomeDayCache(day).catch(() => null);
+      if (cancelled) return;
+      if (cached) {
+        setClients(cached.clients);
+        setVisits(cached.visits);
+        setSales(cached.sales);
+        setWeekRoute(cached.route);
+        setLoading(false);
+      }
+
+      const [clientRes, visitRes, saleRes, routeRes] = await Promise.all([
+        fetchClients()
+          .then((v) => ({ ok: true as const, v }))
+          .catch((e: unknown) => ({ ok: false as const, e })),
+        fetchVisits({ scheduled_date: day })
+          .then((v) => ({ ok: true as const, v }))
+          .catch((e: unknown) => ({ ok: false as const, e })),
+        fetchSales()
+          .then((v) => ({ ok: true as const, v }))
+          .catch((e: unknown) => ({ ok: false as const, e })),
+        fetchCurrentRoute()
+          .then((v) => ({ ok: true as const, v }))
+          .catch((e: unknown) => ({ ok: false as const, e })),
+      ]);
+      if (cancelled) return;
+
+      const catalogClients = clientRes.ok
+        ? clientRes.v
+        : cached?.clients.length
+          ? cached.clients
+          : await getCachedClients();
+      const nextClients = catalogClients.length
+        ? catalogClients
+        : cached?.clients ?? [];
+      const nextVisits = visitRes.ok ? visitRes.v : (cached?.visits ?? []);
+      const nextSales = saleRes.ok ? saleRes.v : (cached?.sales ?? []);
+      const nextRoute = routeRes.ok ? routeRes.v : (cached?.route ?? null);
+
+      setClients(nextClients);
+      setVisits(nextVisits);
+      setSales(nextSales);
+      setWeekRoute(nextRoute);
+      setLoading(false);
+
+      if (clientRes.ok || visitRes.ok || saleRes.ok || routeRes.ok) {
+        await saveHomeDayCache({
+          day,
+          clients: nextClients,
+          visits: nextVisits,
+          sales: nextSales,
+          route: nextRoute,
+        }).catch(() => undefined);
+        if (clientRes.ok) await mergeCatalogClients(nextClients).catch(() => undefined);
+        setError(null);
+      } else if (!cached && !nextClients.length && !nextVisits.length) {
+        setError("Sin datos guardados. Conéctate una vez para cargar la ruta.");
       }
     })();
     return () => {
@@ -196,7 +236,7 @@ export function HomePage() {
           </div>
 
           {error ? <p className="form-error">{error}</p> : null}
-          {loading ? (
+          {loading && upcoming.length === 0 ? (
             <ListSkeleton count={4} />
           ) : upcoming.length === 0 ? (
             <p className="muted">No hay visitas abiertas para hoy.</p>

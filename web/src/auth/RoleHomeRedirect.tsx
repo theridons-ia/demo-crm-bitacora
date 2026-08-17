@@ -5,7 +5,7 @@ import { useAuth } from "./AuthContext";
 export function RoleHomeRedirect() {
   const { user, loading } = useAuth();
 
-  if (loading) {
+  if (!user && loading) {
     return (
       <div className="app-shell">
         <p className="muted">Cargando…</p>

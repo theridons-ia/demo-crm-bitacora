@@ -1,4 +1,4 @@
-import { clearToken, getToken } from "./authStorage";
+import { clearSession, getToken } from "./authStorage";
 import type {
   Client,
   CurrencyCode,
@@ -43,7 +43,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
   if (response.status === 401) {
-    clearToken();
+    clearSession();
   }
 
   if (!response.ok) {
@@ -94,6 +94,37 @@ export async function loginRequest(email: string, password: string): Promise<Tok
 
 export function fetchMe(): Promise<User> {
   return request<User>("/api/auth/me");
+}
+
+/** Fallo de red (sin HTTP). Un 401/500 es `ApiError`, no esto. */
+export function isNetworkError(err: unknown): boolean {
+  if (err instanceof ApiError) return false;
+  if (err instanceof DOMException && err.name === "AbortError") return true;
+  return err instanceof TypeError;
+}
+
+/** Sondeo corto para el chip de señal. Sin auth.
+ * `reachable` = hubo respuesta HTTP (aunque sea 500). Fallo de red / abort = no reachable. */
+export async function fetchHealth(
+  timeoutMs = 3500,
+): Promise<{ ok: boolean; ms: number; reachable: boolean }> {
+  const started = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${API_BASE}/api/health`, {
+      method: "GET",
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - started;
+    return { ok: response.ok, ms, reachable: true };
+  } catch {
+    const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - started;
+    return { ok: false, ms, reachable: false };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function fetchSellers(): Promise<User[]> {
@@ -382,6 +413,7 @@ export type ProductCreateInput = {
   price_usd_2?: number | null;
   price_ves?: number | null;
   price_usd_auto?: boolean;
+  price_usd_margin_pct?: number | null;
   price_usd_2_auto?: boolean;
   price_ves_auto?: boolean;
   stock?: number;
@@ -413,6 +445,7 @@ export type ProductUpdateInput = {
   price_usd_2?: number | null;
   price_ves?: number | null;
   price_usd_auto?: boolean;
+  price_usd_margin_pct?: number | null;
   price_usd_2_auto?: boolean;
   price_ves_auto?: boolean;
   image_url?: string | null;

@@ -45,6 +45,8 @@ import {
   enqueueCreateSale,
   getCachedClients,
   getCachedProducts,
+  loadSalesCache,
+  saveSalesCache,
 } from "../lib/offlineQueue";
 import { sortSalesNewestFirst, saleOrderCode } from "../lib/saleLabels";
 import {
@@ -124,20 +126,26 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   ] as const;
 
   function reload() {
-    setLoading(true);
     setError(null);
-    if (!navigator.onLine) {
-      setSales([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-    fetchSales()
-      .then(setSales)
-      .catch((err) => {
-        setError(err instanceof ApiError ? err.message : "Error al cargar ventas");
-      })
-      .finally(() => setLoading(false));
+    void (async () => {
+      const cached = (await loadSalesCache().catch(() => null)) ?? [];
+      if (cached.length) {
+        setSales(cached);
+        setLoading(false);
+      }
+      try {
+        const next = await fetchSales();
+        setSales(next);
+        setError(null);
+        await saveSalesCache(next).catch(() => undefined);
+      } catch (err) {
+        if (!cached.length) {
+          setError(err instanceof ApiError ? err.message : "Error al cargar ventas");
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
   }
 
   useEffect(() => {
@@ -554,7 +562,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           />
         </div>
 
-        {loading ? <ListSkeleton /> : null}
+        {loading && sales.length === 0 ? <ListSkeleton /> : null}
         {error ? <p className="form-error">{error}</p> : null}
         {!loading && !filteredSales.length ? (
           <p className="muted">
@@ -564,7 +572,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           </p>
         ) : null}
 
-        {!loading && filteredSales.length ? (
+        {(sales.length > 0 || !loading) && filteredSales.length ? (
           <SalesTable
             sales={filteredSales}
             showSeller={teamView}

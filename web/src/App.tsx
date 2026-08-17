@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
+import { NetworkStatusProvider } from "./network/NetworkStatus";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireRole } from "./auth/RequireRole";
 import { RoleHomeRedirect } from "./auth/RoleHomeRedirect";
@@ -33,8 +34,9 @@ import { VisitsPage } from "./pages/VisitsPage";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <NetworkStatusProvider>
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<RoleHomeRedirect />} />
@@ -123,6 +125,7 @@ export default function App() {
           <Route path="*" element={<RoleHomeRedirect />} />
         </Routes>
       </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </NetworkStatusProvider>
   );
 }

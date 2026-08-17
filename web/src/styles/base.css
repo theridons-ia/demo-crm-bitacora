@@ -3782,6 +3782,81 @@ a {
   flex-shrink: 0;
 }
 
+.signal-chip-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.signal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 36px;
+  padding: 0 0.4rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.signal-chip.is-online {
+  color: var(--success);
+}
+
+.signal-chip.is-degraded {
+  color: var(--partial-text);
+}
+
+.signal-chip.is-offline {
+  color: var(--destructive);
+}
+
+.signal-chip-tip {
+  position: absolute;
+  z-index: 24;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  width: min(17.5rem, 78vw);
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  box-shadow: 0 10px 24px rgb(24 49 47 / 0.18);
+}
+
+.signal-chip-tip strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.signal-chip-tip p {
+  margin: 0;
+  font-weight: 550;
+  opacity: 0.92;
+}
+
+.signal-chip-tip-meta {
+  margin-top: 0.4rem !important;
+  font-size: 0.7rem;
+  opacity: 0.72;
+}
+
+@media (max-width: 520px) {
+  .signal-chip-label {
+    display: none;
+  }
+}
+
 .app-header-gps {
   display: inline-flex;
   align-items: center;

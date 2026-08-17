@@ -7,8 +7,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { fetchMe, loginRequest } from "../lib/api";
-import { clearToken, getToken, setToken } from "../lib/authStorage";
+import { ApiError, fetchMe, isNetworkError, loginRequest } from "../lib/api";
+import {
+  clearSession,
+  getCachedUser,
+  getToken,
+  setCachedUser,
+  setToken,
+} from "../lib/authStorage";
 import type { User } from "../lib/types";
 
 type AuthState = {
@@ -20,13 +26,21 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function bootAuth(): { user: User | null; loading: boolean } {
+  const token = getToken();
+  if (!token) return { user: null, loading: false };
+  const cached = getCachedUser();
+  return { user: cached, loading: !cached };
+}
+
 /**
  * AuthProvider: "caja" de React que guarda el usuario logueado
  * y lo comparte con cualquier página hija (sin pasar props a mano).
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const boot = bootAuth();
+  const [user, setUser] = useState<User | null>(boot.user);
+  const [loading, setLoading] = useState(boot.loading);
 
   useEffect(() => {
     const token = getToken();
@@ -37,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     fetchMe()
       .then(async (me) => {
+        setCachedUser(me);
         setUser(me);
         try {
           const { refreshCatalogCache } = await import("../lib/offlineQueue");
@@ -45,9 +60,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           /* cache best-effort */
         }
       })
-      .catch(() => {
-        clearToken();
-        setUser(null);
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          setUser(null);
+          return;
+        }
+        if (isNetworkError(err) || err instanceof ApiError) {
+          const cached = getCachedUser();
+          if (cached) {
+            setUser(cached);
+            return;
+          }
+        }
+        if (!getCachedUser()) {
+          clearSession();
+          setUser(null);
+        }
       })
       .finally(() => setLoading(false));
   }, []);
@@ -56,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { access_token } = await loginRequest(email, password);
     setToken(access_token);
     const me = await fetchMe();
+    setCachedUser(me);
     setUser(me);
     try {
       const { refreshCatalogCache } = await import("../lib/offlineQueue");
@@ -66,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    clearToken();
+    clearSession();
     setUser(null);
   }, []);
 

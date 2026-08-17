@@ -15,7 +15,7 @@ import {
   emptyProductForm,
   parseProductForm,
   PRODUCT_CATEGORIES,
-  productMarginPct,
+  productMarkupPct,
   productSearchHay,
   productToForm,
 } from "../lib/productFields";
@@ -33,11 +33,11 @@ import {
   type Supplier,
 } from "../lib/api";
 import {
-  derivePriceUsd1,
+  derivePriceUsdFromCost,
   derivePriceUsd2,
   derivePriceVes,
   moneyInput,
-  priceUsd1MarginHint,
+  priceUsd1CostHint,
   priceUsd2AutoHint,
   priceVesAutoHint,
 } from "../lib/productPrices";
@@ -112,16 +112,16 @@ export function SupervisorStockPage() {
       let price_usd = prev.price_usd;
       let price_usd_2 = prev.price_usd_2;
       let price_ves = prev.price_ves;
-      const p1Auto = prev.price_usd_auto;
-      const p2Auto = prev.price_usd_2_auto && !p1Auto;
-      if (p2Auto && prev.price_usd.trim()) {
-        const p1 = Number(prev.price_usd);
+      if (prev.price_usd_auto) {
+        const cost = Number(prev.cost_usd);
+        const pct = Number(prev.price_usd_margin_pct);
+        const derived = derivePriceUsdFromCost(cost, pct);
+        if (derived != null) price_usd = moneyInput(derived);
+      }
+      if (prev.price_usd_2_auto && price_usd.trim()) {
+        const p1 = Number(price_usd);
         const derived = derivePriceUsd2(Number.isFinite(p1) ? p1 : 0, fx);
         if (derived != null) price_usd_2 = moneyInput(derived);
-      } else if (p1Auto && prev.price_usd_2.trim()) {
-        const p2 = Number(prev.price_usd_2);
-        const derived = derivePriceUsd1(Number.isFinite(p2) ? p2 : 0, fx);
-        if (derived != null) price_usd = moneyInput(derived);
       }
       if (prev.price_ves_auto && price_usd_2.trim()) {
         const p2 = Number(price_usd_2);
@@ -142,6 +142,8 @@ export function SupervisorStockPage() {
     fx,
     createForm.price_usd,
     createForm.price_usd_2,
+    createForm.cost_usd,
+    createForm.price_usd_margin_pct,
     createForm.price_usd_auto,
     createForm.price_usd_2_auto,
     createForm.price_ves_auto,
@@ -241,7 +243,7 @@ export function SupervisorStockPage() {
   async function onSaveProduct(event: FormEvent) {
     event.preventDefault();
     const parsed = parseProductForm(createForm);
-    if (parsed.error) {
+    if (parsed.error !== null) {
       setError(parsed.error);
       return;
     }
@@ -289,9 +291,17 @@ export function SupervisorStockPage() {
     }
   }
 
-  const marginPct = productMarginPct(
+  const costNum = createForm.cost_usd.trim() ? Number(createForm.cost_usd) : null;
+  const marginPctInput = createForm.price_usd_margin_pct.trim()
+    ? Number(createForm.price_usd_margin_pct)
+    : null;
+  const p1FromCost =
+    createForm.price_usd_auto && costNum != null && marginPctInput != null
+      ? derivePriceUsdFromCost(costNum, marginPctInput)
+      : null;
+  const markupPct = productMarkupPct(
     Number(createForm.price_usd),
-    createForm.cost_usd.trim() ? Number(createForm.cost_usd) : null,
+    costNum,
   );
 
   return (
@@ -647,24 +657,37 @@ export function SupervisorStockPage() {
               <PriceAutoField
                 id="product-price"
                 label="Precio 1 (USD)"
-                value={createForm.price_usd}
+                value={createForm.price_usd_auto ? createForm.price_usd_margin_pct : createForm.price_usd}
                 auto={createForm.price_usd_auto}
                 autoLabel="Margen"
-                prefix="$"
-                placeholder="0.00"
+                prefix={createForm.price_usd_auto ? "%" : "$"}
+                placeholder={createForm.price_usd_auto ? "55" : "0.00"}
+                readOnlyWhenAuto={false}
                 onAutoChange={(price_usd_auto) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    price_usd_auto,
-                    price_usd_2_auto: price_usd_auto ? false : prev.price_usd_2_auto,
-                  }))
+                  setCreateForm((prev) => {
+                    let price_usd_margin_pct = prev.price_usd_margin_pct;
+                    if (price_usd_auto && !price_usd_margin_pct.trim()) {
+                      const implied = productMarkupPct(
+                        Number(prev.price_usd),
+                        prev.cost_usd.trim() ? Number(prev.cost_usd) : null,
+                      );
+                      if (implied != null) price_usd_margin_pct = moneyInput(implied);
+                    }
+                    return { ...prev, price_usd_auto, price_usd_margin_pct };
+                  })
                 }
-                onChange={(price_usd) => setCreateForm((prev) => ({ ...prev, price_usd }))}
+                onChange={(value) =>
+                  setCreateForm((prev) =>
+                    prev.price_usd_auto
+                      ? { ...prev, price_usd_margin_pct: value }
+                      : { ...prev, price_usd: value },
+                  )
+                }
                 hint={
                   createForm.price_usd_auto
-                    ? priceUsd1MarginHint(fx)
-                    : marginPct != null && Number.isFinite(marginPct)
-                      ? `Margen ${marginPct}% vs costo`
+                    ? priceUsd1CostHint(costNum, marginPctInput, p1FromCost)
+                    : markupPct != null && Number.isFinite(markupPct)
+                      ? `Margen ${markupPct.toLocaleString("es-VE", { maximumFractionDigits: 2 })}% vs costo`
                       : undefined
                 }
               />
@@ -674,22 +697,17 @@ export function SupervisorStockPage() {
                 id="product-price-2"
                 label="Precio 2 (USD)"
                 value={createForm.price_usd_2}
-                auto={createForm.price_usd_2_auto && !createForm.price_usd_auto}
+                auto={createForm.price_usd_2_auto}
                 prefix="$"
                 onAutoChange={(price_usd_2_auto) =>
                   setCreateForm((prev) => ({
                     ...prev,
                     price_usd_2_auto,
-                    price_usd_auto: price_usd_2_auto ? false : prev.price_usd_auto,
                   }))
                 }
                 onChange={(price_usd_2) => setCreateForm((prev) => ({ ...prev, price_usd_2 }))}
                 placeholder="0.00"
-                hint={
-                  createForm.price_usd_2_auto && !createForm.price_usd_auto
-                    ? priceUsd2AutoHint(fx)
-                    : undefined
-                }
+                hint={createForm.price_usd_2_auto ? priceUsd2AutoHint(fx) : undefined}
               />
               <PriceAutoField
                 id="product-price-3"

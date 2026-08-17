@@ -13,6 +13,7 @@ import { useBodyScrollLock, useEscapeKey } from "../hooks/useOverlay";
 import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
 import { ApiError, fetchCurrentRoute } from "../lib/api";
 import { addDaysISO, formatAgendaDay, todayISO, weekDayISOs, weekStartISO } from "../lib/caracasTime";
+import { loadRouteCache, saveRouteCache } from "../lib/offlineQueue";
 import { teamVisitIcon } from "../lib/mapMarkers";
 import type { LatLng } from "../lib/routeOrder";
 import { sortVisitsRoute } from "../lib/visitOrder";
@@ -94,14 +95,24 @@ export function SellerRouteMapPage() {
   useRestoreVisitSheet(setSelected, visits, loading);
 
   const reload = useCallback(async () => {
-    setLoading(true);
     setError(null);
+    const cached = await loadRouteCache(weekStart).catch(() => null);
+    if (cached) {
+      setRoute(cached);
+      setLoading(false);
+    } else {
+      setRoute(null);
+      setLoading(true);
+    }
     try {
       const next = await fetchCurrentRoute({ week_start: weekStart });
       setRoute(next);
+      setError(null);
+      await saveRouteCache(weekStart, next).catch(() => undefined);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cargar la ruta");
-      setRoute(null);
+      if (!cached) {
+        setError(err instanceof ApiError ? err.message : "No se pudo cargar la ruta");
+      }
     } finally {
       setLoading(false);
     }
@@ -337,7 +348,7 @@ export function SellerRouteMapPage() {
               ? `${dayDone} de ${dayVisits.length} en este día`
               : "Nada en este día"}
         </p>
-        {loading ? <ListSkeleton count={4} /> : null}
+        {loading && dayVisits.length === 0 ? <ListSkeleton count={4} /> : null}
         {!loading && dayVisits.length === 0 ? (
           <p className="muted">
             {dayChip === "sin-dia"
@@ -345,7 +356,7 @@ export function SellerRouteMapPage() {
               : "Sin paradas este día."}
           </p>
         ) : null}
-        {!loading && dayVisits.length ? (
+        {(dayVisits.length > 0 || !loading) && dayVisits.length ? (
           <ul className="visit-row-list">
             {dayVisits.map((v, i) => (
               <VisitRow
