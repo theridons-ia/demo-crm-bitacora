@@ -1,9 +1,10 @@
-import { ChevronRight, MapPin } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ClientDetailSheet } from "../components/ClientDetailSheet";
 import { ClientForm } from "../components/ClientForm";
+import { HomeRouteCard } from "../components/HomeRouteCard";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
 import { ListSkeleton } from "../components/ListSkeleton";
@@ -105,18 +106,6 @@ export function HomePage() {
     [dayVisits, day],
   );
 
-  const routeTitle = loading
-    ? showingWeek
-      ? "Tu ruta semanal"
-      : "Tu ruta de hoy"
-    : showingWeek
-      ? weekRoute?.title ?? `Semana ${weekLabel}`
-      : nextVisit
-        ? (nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`)
-        : totalDay
-          ? "Ruta del día lista"
-          : "Nada agendado hoy";
-
   const progressLabel = loading
     ? "Cargando…"
     : showingWeek
@@ -128,6 +117,25 @@ export function HomePage() {
         : "Sin paradas hoy";
 
   const progressPct = showingWeek ? weekCoverage : coverage;
+  const dayComplete = totalDay > 0 && completed === totalDay;
+  const weekComplete = weekPlanned > 0 && weekDone === weekPlanned;
+  const routeComplete = showingWeek ? weekComplete : dayComplete;
+
+  const routeTitle = loading
+    ? showingWeek
+      ? "Tu ruta semanal"
+      : "Tu ruta de hoy"
+    : showingWeek
+      ? weekComplete
+        ? "Ruta de la semana lista"
+        : (weekRoute?.title ?? `Semana ${weekLabel}`)
+      : dayComplete
+        ? "Ruta del día completada"
+        : nextVisit
+          ? (nextVisit.client?.name ?? `Cliente #${nextVisit.client_id}`)
+          : totalDay
+            ? "Ruta del día lista"
+            : "Nada agendado hoy";
 
   return (
     <>
@@ -136,59 +144,43 @@ export function HomePage() {
           <div>
             <p className="eyebrow">{formatLongDate()}</p>
             <h1>Hola{firstName ? `, ${firstName}` : ""}</h1>
-            <p className="greeting-sub">Listo para la ruta</p>
+            <p className="greeting-sub">
+              {routeComplete ? (showingWeek ? "Semana cerrada" : "Día cerrado") : "Listo para la ruta"}
+            </p>
           </div>
         </div>
 
-        <section className="route-card" aria-label={showingWeek ? "Tu ruta semanal" : "Tu ruta de hoy"}>
-          <div className="route-card-lenses" role="tablist" aria-label="Alcance de la ruta">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={!showingWeek}
-              className={!showingWeek ? "active" : undefined}
-              onClick={() => setLens("hoy")}
-            >
-              Hoy
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={showingWeek}
-              className={showingWeek ? "active" : undefined}
-              onClick={() => setLens("semana")}
-            >
-              Semana
-            </button>
-          </div>
-          <p className="label">{showingWeek ? `Semana ${weekLabel}` : "Tu ruta de hoy"}</p>
-          <h2>{routeTitle}</h2>
-          {loading ? null : (
-            <div className="progress-track" aria-hidden>
-              <div className="progress-fill" style={{ width: `${Math.min(100, progressPct)}%` }} />
-            </div>
-          )}
-          <div className="route-meta">
-            <span>{progressLabel}</span>
-            {!loading && (showingWeek ? weekPlanned : totalDay) ? <strong>{progressPct}%</strong> : null}
-          </div>
-          {!loading && showingWeek && weekRoute?.unscheduled ? (
-            <p className="route-sales">{weekRoute.unscheduled} sin día</p>
-          ) : null}
-          {!loading && !showingWeek && weekPlanned > 0 ? (
-            <p className="route-sales">
-              Semana {weekDone} de {weekPlanned}
-              {weekRoute?.unscheduled ? ` · ${weekRoute.unscheduled} sin día` : ""}
-            </p>
-          ) : null}
-          {!loading && !showingWeek && salesToday > 0 ? (
-            <p className="route-sales">Ventas hoy ${salesToday.toFixed(0)}</p>
-          ) : null}
-          <Link to="/app/ruta" className="btn btn-accent route-map-cta">
-            <MapPin size={18} />
-            {showingWeek ? "Ver ruta" : "Ver mapa"}
-          </Link>
-        </section>
+        <HomeRouteCard
+          lens={lens}
+          onLensChange={setLens}
+          loading={loading}
+          eyebrow={showingWeek ? `Semana ${weekLabel}` : "Tu ruta de hoy"}
+          title={routeTitle}
+          progressLabel={progressLabel}
+          progressPct={progressPct}
+          hasStops={showingWeek ? weekPlanned > 0 : totalDay > 0}
+          complete={routeComplete}
+          extra={
+            loading ? null : (
+              <>
+                {showingWeek && weekRoute?.unscheduled ? (
+                  <p className="route-sales">{weekRoute.unscheduled} sin día</p>
+                ) : null}
+                {!showingWeek && weekPlanned > 0 ? (
+                  <p className="route-sales">
+                    Semana {weekDone} de {weekPlanned}
+                    {weekRoute?.unscheduled ? ` · ${weekRoute.unscheduled} sin día` : ""}
+                  </p>
+                ) : null}
+                {!showingWeek && salesToday > 0 ? (
+                  <p className="route-sales">Ventas hoy ${salesToday.toFixed(0)}</p>
+                ) : null}
+              </>
+            )
+          }
+          ctaTo="/app/ruta"
+          ctaLabel={showingWeek ? "Ver ruta" : "Ver mapa"}
+        />
 
         <section className="card seller-panel home-agenda">
           <div className="seller-panel-head">

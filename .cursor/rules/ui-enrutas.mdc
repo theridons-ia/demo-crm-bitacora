@@ -81,6 +81,11 @@ Reglas del strip de ruta:
 
 - Orden: tarjeta de ruta → **4 KPIs en una fila** (`.home-kpis`, desktop) → **agenda a ancho completo** (lista vertical `.home-agenda`, hasta 3 paradas; no 3 columnas a medio ancho).
 - Móvil: KPIs en 2×2. No meter KPIs y agenda en una sola fila apretada.
+- Casilla oscura `HomeRouteCard`: chips **Hoy · Semana**. Al completar todas las paradas: check verde arriba a la derecha, barra verde claro y «Ruta del día completada» / «Ruta de la semana lista».
+
+## Inicio (supervisor)
+
+- Misma casilla oscura `HomeRouteCard` (Hoy = visitas del equipo hoy; Semana = suma de rutas de la semana). CTA a `/sup/ruta`. Completado con el mismo check y barra verde.
 
 ## Ficha de visita + LED en curso
 

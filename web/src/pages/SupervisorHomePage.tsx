@@ -4,15 +4,15 @@ import {
   AlertTriangle,
   CheckCircle2,
   Map as MapIcon,
-  Route,
   Users,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { DayRankingCard, rankingInitials, type RankingRow } from "../components/DayRankingCard";
+import { HomeRouteCard, type HomeRouteLens } from "../components/HomeRouteCard";
 import { PageWorkspace } from "../layout/PageWorkspace";
-import { ApiError, fetchAlerts, fetchSellers, fetchVisits } from "../lib/api";
-import { caracasHour, formatLongDate, todayISO } from "../lib/caracasTime";
-import type { User, Visit, VisitAlert } from "../lib/types";
+import { ApiError, fetchAlerts, fetchRoutes, fetchSellers, fetchVisits } from "../lib/api";
+import { caracasHour, formatLongDate, formatWeekSpan, todayISO, weekStartISO } from "../lib/caracasTime";
+import type { RouteCard, User, Visit, VisitAlert } from "../lib/types";
 
 function buildRanking(visits: Visit[], sellers: User[]): RankingRow[] {
   const byId = new Map(sellers.map((s) => [s.id, s]));
@@ -68,33 +68,41 @@ export function SupervisorHomePage() {
   const [alerts, setAlerts] = useState<VisitAlert[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [sellers, setSellers] = useState<User[]>([]);
+  const [weekRoutes, setWeekRoutes] = useState<RouteCard[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lens, setLens] = useState<HomeRouteLens>("hoy");
   const day = todayISO();
+  const weekStart = weekStartISO();
   const firstName = user?.full_name?.split(" ")[0] ?? "";
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [alertList, visitList, sellerList] = await Promise.all([
+        const [alertList, visitList, sellerList, routeList] = await Promise.all([
           fetchAlerts({ unacked_only: true }),
           fetchVisits({ day }),
           fetchSellers(),
+          fetchRoutes(weekStart).catch(() => []),
         ]);
         if (cancelled) return;
         setAlerts(alertList.slice(0, 6));
         setVisits(visitList);
         setSellers(sellerList);
+        setWeekRoutes(routeList);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "No se pudo cargar el resumen");
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [day]);
+  }, [day, weekStart]);
 
   const visitCount = useMemo(() => {
     const open = visits.filter((v) => v.status !== "cancelada");
@@ -111,6 +119,46 @@ export function SupervisorHomePage() {
   }, [visitCount]);
 
   const ranking = useMemo(() => buildRanking(visits, sellers), [visits, sellers]);
+  const weekStats = useMemo(() => {
+    const planned = weekRoutes.reduce((n, r) => n + r.planned, 0);
+    const done = weekRoutes.reduce((n, r) => n + r.done, 0);
+    const unscheduled = weekRoutes.reduce((n, r) => n + r.unscheduled, 0);
+    return { planned, done, unscheduled, sellers: weekRoutes.length };
+  }, [weekRoutes]);
+  const showingWeek = lens === "semana";
+  const weekLabel = formatWeekSpan(weekStart);
+  const dayComplete = visitCount.total > 0 && visitCount.done === visitCount.total;
+  const weekComplete = weekStats.planned > 0 && weekStats.done === weekStats.planned;
+  const routeComplete = showingWeek ? weekComplete : dayComplete;
+  const progressPct = showingWeek
+    ? weekStats.planned
+      ? Math.round((weekStats.done / weekStats.planned) * 100)
+      : 0
+    : coverage;
+  const routeTitle = loading
+    ? showingWeek
+      ? "Ruta semanal del equipo"
+      : "Ruta del equipo hoy"
+    : showingWeek
+      ? weekComplete
+        ? "Ruta de la semana lista"
+        : weekStats.planned
+          ? `${weekStats.sellers} vendedor${weekStats.sellers === 1 ? "" : "es"} en ruta`
+          : "Semana vacía"
+      : dayComplete
+        ? "Ruta del día completada"
+        : visitCount.total
+          ? "Ruta del equipo"
+          : "Nada agendado hoy";
+  const progressLabel = loading
+    ? "Cargando…"
+    : showingWeek
+      ? weekStats.planned
+        ? `${weekStats.done} de ${weekStats.planned} paradas`
+        : "Semana vacía"
+      : visitCount.total
+        ? `${visitCount.done} de ${visitCount.total} paradas`
+        : "Sin paradas hoy";
 
   return (
     <PageWorkspace>
@@ -120,7 +168,13 @@ export function SupervisorHomePage() {
           <h1>
             Buenas{greetingPart()}, {firstName || "equipo"}
           </h1>
-          <p className="greeting-sub">La calle, en orden. Lo que necesita atención hoy.</p>
+          <p className="greeting-sub">
+            {routeComplete
+              ? showingWeek
+                ? "Semana del equipo cerrada"
+                : "Día del equipo cerrado"
+              : "La calle, en orden. Lo que necesita atención hoy."}
+          </p>
         </div>
       </div>
 
@@ -129,6 +183,28 @@ export function SupervisorHomePage() {
           {error}
         </p>
       ) : null}
+
+      <HomeRouteCard
+        lens={lens}
+        onLensChange={setLens}
+        loading={loading}
+        eyebrow={showingWeek ? `Semana ${weekLabel}` : "Ruta del equipo · hoy"}
+        title={routeTitle}
+        progressLabel={progressLabel}
+        progressPct={progressPct}
+        hasStops={showingWeek ? weekStats.planned > 0 : visitCount.total > 0}
+        complete={routeComplete}
+        extra={
+          loading ? null : showingWeek && weekStats.unscheduled ? (
+            <p className="route-sales">{weekStats.unscheduled} sin día</p>
+          ) : !showingWeek && visitCount.active ? (
+            <p className="route-sales">{visitCount.active} visita(s) en curso ahora</p>
+          ) : null
+        }
+        ctaTo="/sup/ruta"
+        ctaLabel={showingWeek ? "Ver ruta del equipo" : "Gestionar equipo en ruta"}
+        ctaKind="route"
+      />
 
       <section className="metrics kpi-row-4" aria-label="Indicadores del equipo">
         <article className="metric-card">
@@ -162,36 +238,6 @@ export function SupervisorHomePage() {
       </section>
 
       <section className="sup-pulse-section" aria-label="El pulso de la ruta">
-        <section className="goal-card card">
-          <div className="goal-top">
-            <div>
-              <p>El pulso de la ruta</p>
-              <strong>
-                {visitCount.done} / {visitCount.total || "—"}
-              </strong>
-            </div>
-            <div
-              className="ring"
-              style={{ ["--p" as string]: `${Math.min(100, coverage)}%` }}
-              aria-label={`${coverage}% cobertura`}
-            >
-              {coverage}%
-            </div>
-          </div>
-          <div className="progress-track" aria-hidden>
-            <div className="progress-fill" style={{ width: `${Math.min(100, coverage)}%` }} />
-          </div>
-          <p className="goal-tip">
-            {visitCount.active
-              ? `${visitCount.active} visita(s) en curso ahora`
-              : "Sin visitas en curso en este momento"}
-          </p>
-          <Link to="/sup/ruta" className="btn btn-accent" style={{ marginTop: "0.85rem" }}>
-            <Route size={18} />
-            Gestionar equipo en ruta
-          </Link>
-        </section>
-
         <div className="sup-pulse-split">
           <section className="card chart-card">
             <h2>Pulso del día</h2>

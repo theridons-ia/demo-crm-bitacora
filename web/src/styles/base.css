@@ -2444,6 +2444,32 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.route-card-lenses {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.route-card-done {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: rgba(158, 224, 176, 0.22);
+  color: #9ee0b0;
+}
+
+.route-card.is-complete .progress-fill {
+  background: #9ee0b0;
+}
+
+.route-card.is-complete .route-meta strong {
+  color: #9ee0b0;
 }
 
 .route-card .label {
@@ -2452,12 +2478,6 @@ a {
   font-weight: 700;
   letter-spacing: 1.2px;
   opacity: 0.8;
-}
-
-.route-card-lenses {
-  display: flex;
-  gap: 0.35rem;
-  margin: 0 0 0.75rem;
 }
 
 .route-card-lenses button {
