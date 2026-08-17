@@ -14,8 +14,8 @@ import {
 } from "../lib/gps";
 import { removeLocalVisit } from "../lib/offlineDb";
 import { enqueueCloseVisit, enqueueOfflineVisitSync } from "../lib/offlineQueue";
-import { formatDateTime } from "../lib/caracasTime";
-import { saleOrderCode, visitNoteForUi } from "../lib/saleLabels";
+import { formatDateTime, formatDurationHm } from "../lib/caracasTime";
+import { formatSaleTotal, saleOrderCode, visitNoteForUi } from "../lib/saleLabels";
 import { resolveVisitLog, writeVisitLog } from "../lib/visitFieldLog";
 import type { Visit } from "../lib/types";
 
@@ -43,16 +43,7 @@ function formatClock(iso: string | null | undefined): string {
 }
 
 function formatStay(startedIso: string, ended: Date): string {
-  const start = Date.parse(startedIso);
-  if (Number.isNaN(start)) return "—";
-  const ms = Math.max(0, ended.getTime() - start);
-  const totalMin = Math.round(ms / 60_000);
-  if (totalMin < 1) return "menos de 1 min";
-  const hours = Math.floor(totalMin / 60);
-  const minutes = totalMin % 60;
-  if (hours === 0) return `${minutes} min`;
-  if (minutes === 0) return `${hours} h`;
-  return `${hours} h ${minutes} min`;
+  return formatDurationHm(startedIso, ended) ?? "—";
 }
 
 function formatFix(fix: { latitude: number; longitude: number; accuracy_m?: number | null }): string {
@@ -417,7 +408,7 @@ export function CloseVisitSheet({
               <p className="eyebrow">Orden de venta</p>
               <strong>{saleOrderCode(existingSale)}</strong>
               <p className="muted small">
-                ${Number(existingSale.total_amount).toFixed(2)} {existingSale.currency}
+                {formatSaleTotal(existingSale)}
                 {" · "}
                 {itemCount} ítem{itemCount === 1 ? "" : "s"}
               </p>

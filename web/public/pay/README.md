@@ -15,7 +15,8 @@ Suelta aquí los archivos. Vite los sirve en `/pay/{nombre}`.
 | Archivo | Uso |
 |---|---|
 | `zelle.png` | Zelle |
-| `usdt.png` / `binance.png` | USDT |
+| `usdt.png` / `binance.png` | USDT / Binance P2P |
+| `bcv.png` | BCV (tasas) |
 | `banesco.png` | Banesco |
 | `mercantil.png` | Mercantil |
 

@@ -127,6 +127,24 @@ export function formatTime(iso: string | Date | null | undefined): string {
   });
 }
 
+/** «2 h 19 min» · «45 min» · «menos de 1 min». */
+export function formatDurationHm(
+  startIso: string | Date | null | undefined,
+  endIso: string | Date | null | undefined,
+): string | null {
+  const start = asDate(startIso ?? "");
+  const end = asDate(endIso ?? "");
+  if (!start || !end) return null;
+  const ms = Math.max(0, end.getTime() - start.getTime());
+  const totalMin = Math.round(ms / 60_000);
+  if (totalMin < 1) return "menos de 1 min";
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+
 export function formatLongDate(d = new Date()): string {
   return d.toLocaleDateString(CARACAS_LOCALE, {
     timeZone: CARACAS_TZ,

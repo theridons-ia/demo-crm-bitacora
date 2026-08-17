@@ -42,7 +42,7 @@ export function SupervisorMoreSheet({ open, onClose, pathname }: Props) {
       </ul>
       {!isSupervisorMorePath(pathname) ? (
         <p className="muted small" style={{ marginTop: "0.75rem" }}>
-          Alertas y tasa FX están en el menú del perfil (arriba a la derecha).
+          Alertas y tasas BCV están en el menú del perfil (arriba a la derecha).
         </p>
       ) : null}
     </SideSheet>

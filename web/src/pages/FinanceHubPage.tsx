@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote,
+  CircleDollarSign,
   Landmark,
   Receipt,
   ShoppingCart,
@@ -69,6 +70,13 @@ export function FinanceHubPage() {
         icon: Landmark,
         variant: "outline" as const,
         to: "/sup/bancos",
+      },
+      {
+        key: "tasas",
+        label: "Tasas BCV / USDT",
+        icon: CircleDollarSign,
+        variant: "muted" as const,
+        to: "/sup/fx",
       },
       {
         key: "cxp",

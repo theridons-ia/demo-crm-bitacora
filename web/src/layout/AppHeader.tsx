@@ -306,7 +306,7 @@ export function AppHeader() {
                   onClick={() => setProfileOpen(false)}
                 >
                   <DollarSign size={16} aria-hidden />
-                  Tasa FX
+                  Tasas
                 </Link>
               ) : null}
               {user?.role === "vendedor" ? (

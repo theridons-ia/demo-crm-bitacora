@@ -6,12 +6,13 @@ import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
+import { VisitDetailSheet } from "./VisitDetailSheet";
 import { clientPdvIconFor } from "../lib/mapMarkers";
 import { mapsNavigateUrl } from "../lib/gps";
 import { fetchSales, fetchSellers } from "../lib/api";
 import { formatDateTime } from "../lib/caracasTime";
-import { saleOrderCode } from "../lib/saleLabels";
-import type { Client, Sale, User } from "../lib/types";
+import { saleOrderCode, formatSaleTotal, saleCurrencyLabel } from "../lib/saleLabels";
+import type { Client, Sale, User, Visit } from "../lib/types";
 
 type Props = {
   client: Client;
@@ -62,6 +63,7 @@ export function ClientDetailSheet({
   const [sellerById, setSellerById] = useState<Map<number, string>>(new Map());
   const [salesLoading, setSalesLoading] = useState(false);
   const [viewSale, setViewSale] = useState<Sale | null>(null);
+  const [linkedVisit, setLinkedVisit] = useState<Visit | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -253,8 +255,8 @@ export function ClientDetailSheet({
                           </span>
                         </span>
                         <span className="client-sale-row-amt">
-                          ${Number(sale.total_amount).toFixed(2)}
-                          <span className="muted small">{sale.currency}</span>
+                          {formatSaleTotal(sale)}
+                          <span className="muted small">{saleCurrencyLabel(sale.currency)}</span>
                         </span>
                       </button>
                     </li>
@@ -322,7 +324,19 @@ export function ClientDetailSheet({
           sellerById.get(viewSale.seller_id) ??
           null
         }
-        onClose={() => setViewSale(null)}
+        onClose={() => {
+          setViewSale(null);
+          setLinkedVisit(null);
+        }}
+        onOpenVisit={setLinkedVisit}
+      />
+    ) : null}
+    {linkedVisit ? (
+      <VisitDetailSheet
+        visit={linkedVisit}
+        open
+        onClose={() => setLinkedVisit(null)}
+        onUpdated={setLinkedVisit}
       />
     ) : null}
     </>

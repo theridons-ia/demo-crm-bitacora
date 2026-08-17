@@ -4,14 +4,15 @@ import { useAuth } from "../auth/AuthContext";
 import { Button } from "./Button";
 import { ClientDetailSheet } from "./ClientDetailSheet";
 import { CloseVisitSheet } from "./CloseVisitSheet";
+import { GpsProofPin } from "./GpsProofLegend";
 import { LiveLed } from "./LiveLed";
 import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
 import { TextAreaField } from "./TextField";
 import { VisitMapSheet } from "./VisitMapSheet";
 import { VisitSaleWizard } from "./VisitSaleWizard";
-import { formatDateTime, formatPillParts, todayISO } from "../lib/caracasTime";
-import { rewriteCloseNote, saleOrderCode } from "../lib/saleLabels";
+import { formatDateTime, formatDurationHm, formatPillParts, todayISO } from "../lib/caracasTime";
+import { rewriteCloseNote, saleOrderCode, formatSaleTotal } from "../lib/saleLabels";
 import {
   clearVisitSaleDraft,
   hasVisitSaleDraft,
@@ -31,8 +32,12 @@ import { ApiError, cancelVisit, patchVisitNotes, pinVisitGps, startVisit } from 
 import { coordsFromClient, distanceMeters, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
 import {
   GPS_FAR_M,
+  GPS_PROOF_OK_M,
+  GPS_PROOF_PARTIAL_M,
   parseCoord,
   visitGpsProof,
+  visitGpsProofDetail,
+  visitGpsProofLabel,
 } from "../lib/visitEvidence";
 import type { Visit, VisitStatus } from "../lib/types";
 
@@ -43,6 +48,9 @@ type Props = {
   onUpdated: (visit: Visit) => void;
   /** Supervisor: quitar una programada de la ruta del día. */
   onRemoveFromRoute?: () => void;
+  /** Tras crear con Ahora: misma pregunta «¿Estás aquí?» que al Iniciar. */
+  confirmHereOnOpen?: boolean;
+  confirmHereFailReason?: string | null;
 };
 
 const STATUS_LABEL: Record<VisitStatus, string> = {
@@ -113,6 +121,14 @@ function formatCoordPair(lat: number, lng: number): string {
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
+function distTone(meters: number | null, completed: boolean): string {
+  if (meters == null) return "";
+  if (!completed) return meters > GPS_FAR_M ? "is-warn" : "";
+  if (meters <= GPS_PROOF_OK_M) return "is-ok";
+  if (meters <= GPS_PROOF_PARTIAL_M) return "is-partial";
+  return "is-bad";
+}
+
 function gpsConfirmMessage(visit: Visit, failReason: string | null): string | null {
   if (failReason) {
     return `${failReason}. Mala señal o sin conexión. Puedes continuar sin GPS (temporal) y actualizar después.`;
@@ -161,8 +177,10 @@ function VisitGpsEvidence({
     hasEnd && pdv ? distanceMeters(endLat, endLng, pdv.latitude, pdv.longitude) : null;
   const farStartEnd = startEndM != null && startEndM > GPS_FAR_M;
   const farStartPdv = startPdvM != null && startPdvM > GPS_FAR_M;
-  const farEndPdv = endPdvM != null && endPdvM > GPS_FAR_M;
+  const completed = visit.status === "completada";
   const proof = visitGpsProof(visit);
+  const proofDetail = visitGpsProofDetail(proof);
+  const proofLabel = visitGpsProofLabel(proof);
 
   const body = (
     <>
@@ -229,24 +247,20 @@ function VisitGpsEvidence({
             Inicio a ~{Math.round(startPdvM!)} m del PDV. Actualiza el GPS si no estás en el local.
           </p>
         ) : startPdvM != null ? (
-          <p className={`visit-gps-span ${farStartPdv ? "is-warn" : ""}`.trim()}>
+          <p className={`visit-gps-span ${distTone(startPdvM, completed)}`.trim()}>
             Inicio a ~{Math.round(startPdvM)} m del PDV
           </p>
         ) : null}
         {endPdvM != null ? (
-          <p className={`visit-gps-span ${farEndPdv ? "is-warn" : ""}`.trim()}>
+          <p className={`visit-gps-span ${distTone(endPdvM, completed)}`.trim()}>
             Cierre a ~{Math.round(endPdvM)} m del PDV
           </p>
         ) : null}
         {gpsOk ? <p className="gps-ok-note">{gpsOk}</p> : null}
-        {proof !== "none" ? (
-          <p className="visit-gps-proof">
+        {proofDetail ? (
+          <p className={`visit-gps-proof is-${proof}`}>
             <ShieldCheck size={14} aria-hidden />
-            {proof === "full"
-              ? "Prueba de visita: GPS de inicio y cierre"
-              : proof === "photo"
-                ? "Prueba de visita: foto del PDV"
-                : "Prueba de visita: GPS parcial"}
+            {proofDetail}
           </p>
         ) : null}
       </div>
@@ -279,9 +293,16 @@ function VisitGpsEvidence({
       <summary className="visit-gps-summary">
         <MapPin size={16} aria-hidden />
         <span>GPS</span>
-        <span className="muted small">
-          {hasGps || hasEnd ? "Registrado · tocar para ver" : "Oculto · tocar para ver"}
-        </span>
+        {proofLabel ? (
+          <span className={`visit-gps-proof-flag is-${proof}`}>
+            <GpsProofPin kind={proof} size={13} />
+            {proofLabel}
+          </span>
+        ) : (
+          <span className="muted small">
+            {hasGps || hasEnd ? "Registrado · tocar para ver" : "Oculto · tocar para ver"}
+          </span>
+        )}
         <ChevronDown size={16} aria-hidden className="visit-gps-chevron" />
       </summary>
       {body}
@@ -290,7 +311,15 @@ function VisitGpsEvidence({
 }
 
 /** Ficha de visita: identidad, GPS accionable, OV y cierre. */
-export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFromRoute }: Props) {
+export function VisitDetailSheet({
+  visit,
+  open,
+  onClose,
+  onUpdated,
+  onRemoveFromRoute,
+  confirmHereOnOpen = false,
+  confirmHereFailReason = null,
+}: Props) {
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
@@ -351,8 +380,11 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
       return prev || resumeWizard || hasVisitSaleDraft(visit.id);
     });
     setShowMap(false);
-    setGpsConfirm(false);
-    setGpsConfirmNote(null);
+    const shouldConfirm = confirmHereOnOpen && visit.status === "en_curso";
+    setGpsConfirm(shouldConfirm);
+    setGpsConfirmNote(
+      shouldConfirm ? gpsConfirmMessage(visit, confirmHereFailReason ?? null) : null,
+    );
     setViewSaleDoc(false);
     setConfirmCancel(false);
     setSaleJustConfirmed(false);
@@ -364,7 +396,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
         clientName: visit.client?.name ?? "",
       });
     }
-  }, [open, visit.id]);
+  }, [open, visit.id, visit.status, confirmHereOnOpen, confirmHereFailReason]);
 
   useEffect(() => {
     if (!open) return;
@@ -413,6 +445,13 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
         : current.status === "cancelada"
           ? "is-cancelled"
           : "is-planned";
+  const stayLabel =
+    current.status === "completada"
+      ? formatDurationHm(
+          current.visited_at || current.created_at,
+          current.closed_at || current.end_gps_captured_at,
+        )
+      : null;
 
   async function onStart() {
     setBusy(true);
@@ -680,6 +719,12 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
                 </p>
               ) : null}
             </div>
+            {stayLabel ? (
+              <div className="visit-detail-hero-stay">
+                <p className="eyebrow">Duración</p>
+                <strong>{stayLabel}</strong>
+              </div>
+            ) : null}
           </div>
 
           {sale ? (
@@ -693,9 +738,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
                 <div className="visit-sale-metrics">
                   <div>
                     <span className="muted small">Total</span>
-                    <b>
-                      ${Number(sale.total_amount).toFixed(2)} {sale.currency}
-                    </b>
+                    <b>{formatSaleTotal(sale)}</b>
                   </div>
                   <div>
                     <span className="muted small">Ítems</span>
@@ -860,6 +903,7 @@ export function VisitDetailSheet({ visit, open, onClose, onUpdated, onRemoveFrom
           open
           initialTab="documento"
           sellerName={user?.full_name ?? current.seller?.full_name ?? null}
+          fromVisit
           onClose={() => setViewSaleDoc(false)}
         />
       ) : null}

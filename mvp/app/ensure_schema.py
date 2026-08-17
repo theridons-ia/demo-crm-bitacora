@@ -76,7 +76,11 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "products", "category", "VARCHAR(40)")
     _add_column_if_missing(engine, "products", "presentation", "VARCHAR(80)")
     _add_column_if_missing(engine, "products", "barcode", "VARCHAR(32)")
-    _add_column_if_missing(engine, "products", "cost_usd", "NUMERIC(12,2)")
+    _add_column_if_missing(engine, "products", "price_usd_2", "NUMERIC(12,2)")
+    _add_column_if_missing(engine, "products", "price_ves", "NUMERIC(14,2)")
+    _add_column_if_missing(engine, "products", "price_usd_auto", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(engine, "products", "price_usd_2_auto", "BOOLEAN NOT NULL DEFAULT TRUE")
+    _add_column_if_missing(engine, "products", "price_ves_auto", "BOOLEAN NOT NULL DEFAULT TRUE")
     _add_column_if_missing(engine, "products", "pack_units", "INTEGER")
     _add_column_if_missing(engine, "products", "min_stock", "INTEGER NOT NULL DEFAULT 40")
     _add_column_if_missing(engine, "products", "lot", "VARCHAR(40)")
@@ -91,6 +95,23 @@ def ensure_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "sale_payments", "payment_reference", "VARCHAR(64)")
     _add_column_if_missing(engine, "sale_payments", "payment_evidence", "TEXT")
     _add_column_if_missing(engine, "bank_accounts", "holder_name", "VARCHAR(80)")
+    _add_column_if_missing(engine, "fx_rates", "eur_to_ves", "NUMERIC(14,4)")
+    _add_column_if_missing(engine, "fx_rates", "usdt_to_ves", "NUMERIC(14,4)")
+    _add_column_if_missing(engine, "fx_rates", "usd_source", "VARCHAR(160)")
+    _add_column_if_missing(engine, "fx_rates", "eur_source", "VARCHAR(160)")
+    _add_column_if_missing(engine, "fx_rates", "usdt_source", "VARCHAR(160)")
+    _add_column_if_missing(engine, "fx_rates", "captured_at", "TIMESTAMPTZ")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE fx_rates
+                SET usd_source = 'Tasa demo (no oficial)'
+                WHERE usd_source IS NULL
+                  AND notes ILIKE '%demo%'
+                """
+            )
+        )
 
     # Extender enum PaymentMethod si es nativo en Postgres
     with engine.begin() as conn:

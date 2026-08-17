@@ -50,8 +50,8 @@ export function ClientAssignmentsPage() {
     return map;
   }, [sellers]);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     setError(null);
     try {
       const [sellerList, clientList] = await Promise.all([fetchSellers(), fetchClients()]);
@@ -71,7 +71,7 @@ export function ClientAssignmentsPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar clientes");
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
 
@@ -274,7 +274,8 @@ export function ClientAssignmentsPage() {
             return [client, ...without];
           });
           setSelected(client);
-          void reload();
+          setEditing((prev) => (prev && prev.id === client.id ? client : prev));
+          void reload(true);
         }}
       />
 

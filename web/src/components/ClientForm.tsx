@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { MapPin, Store } from "lucide-react";
 import { Button } from "./Button";
 import { ClientLocationPicker } from "./ClientLocationPicker";
@@ -94,36 +94,54 @@ export function ClientForm({
   const [gpsBusy, setGpsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [pinNote, setPinNote] = useState<string | null>(null);
+  const pinSaveTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setMapReady(false);
+      setPinNote(null);
+      if (pinSaveTimer.current) window.clearTimeout(pinSaveTimer.current);
+      return;
+    }
     const h = hydrate(initialClient);
     setForm(h.form);
     setIdType(h.idType);
     setLatitude(h.latitude);
     setLongitude(h.longitude);
     setError(null);
+    setPinNote(null);
     setSellerId("");
+    setMapReady(true);
+  }, [open, initialClient?.id]);
 
-    if (!canAssign || !sellers) return;
-    if (editing && initialClient) {
-      void (async () => {
-        for (const s of sellers) {
-          try {
-            const row = await fetchClientAssignments(s.id);
-            if (row.client_ids.includes(initialClient.id)) {
-              setSellerId(s.id);
-              return;
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      })();
-    } else if (sellers.length === 1) {
+  useEffect(() => {
+    if (!open || !canAssign || !sellers) return;
+    if (!editing && sellers.length === 1) {
       setSellerId(sellers[0].id);
+      return;
     }
-  }, [open, initialClient, canAssign, sellers, editing]);
+    if (!editing || !initialClient) return;
+    let cancelled = false;
+    void (async () => {
+      for (const s of sellers) {
+        try {
+          const row = await fetchClientAssignments(s.id);
+          if (cancelled) return;
+          if (row.client_ids.includes(initialClient.id)) {
+            setSellerId(s.id);
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, canAssign, sellers, editing, initialClient?.id]);
 
   const previewId = useMemo(() => {
     const v = form.idValue.trim();
@@ -146,6 +164,46 @@ export function ClientForm({
     setLatitude(lat);
     setLongitude(lng);
     setError(null);
+    persistPin(lat, lng);
+  }
+
+  function buildPayload(lat: number | null, lng: number | null): ClientCreateInput | null {
+    const idValue = form.idValue.trim();
+    if (!form.name.trim() || !idValue || form.city.trim().length < 2) return null;
+    return {
+      name: form.name.trim(),
+      rif: idType === "rif" ? idValue : null,
+      ci: idType === "ci" ? idValue : null,
+      state: form.state.trim() || null,
+      city: form.city.trim(),
+      address: form.address.trim() || null,
+      phone: form.phone.trim() || null,
+      notes: form.notes.trim() || null,
+      latitude: lat,
+      longitude: lng,
+    };
+  }
+
+  function persistPin(lat: number | null, lng: number | null) {
+    if (!editing || !initialClient) return;
+    const payload = buildPayload(lat, lng);
+    if (!payload) return;
+    if (pinSaveTimer.current) window.clearTimeout(pinSaveTimer.current);
+    pinSaveTimer.current = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const saved = await updateClient(initialClient.id, payload);
+          onSaved(saved);
+          setPinNote(
+            lat != null && lng != null
+              ? `Pin guardado · ${lat.toFixed(5)}, ${lng.toFixed(5)}`
+              : "Pin quitado y guardado",
+          );
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : "No se pudo guardar el pin");
+        }
+      })();
+    }, 350);
   }
 
   async function useMyGps() {
@@ -159,6 +217,7 @@ export function ClientForm({
       }
       setLatitude(geo.fix.latitude);
       setLongitude(geo.fix.longitude);
+      persistPin(geo.fix.latitude, geo.fix.longitude);
     } finally {
       setGpsBusy(false);
     }
@@ -323,14 +382,18 @@ export function ClientForm({
             />
           </FormStep>
 
-          <FormStep step="02" title="Ubicación" blurb="Pin del PDV. Se puede actualizar después.">
+          <FormStep step="02" title="Ubicación" blurb="Toca el mapa o arrastra el pin. En un PDV existente se guarda al soltar.">
             <div className="map-stage">
-              <ClientLocationPicker
-                latitude={latitude}
-                longitude={longitude}
-                label={form.name.trim() || "PDV"}
-                onPick={onPick}
-              />
+              {mapReady ? (
+                <ClientLocationPicker
+                  latitude={latitude}
+                  longitude={longitude}
+                  label={form.name.trim() || "PDV"}
+                  onPick={onPick}
+                />
+              ) : (
+                <div className="client-pick-map" aria-hidden />
+              )}
             </div>
             <div className="ficha-actions" style={{ marginTop: "0.65rem" }}>
               <Button type="button" variant="secondary" disabled={gpsBusy} onClick={useMyGps}>
@@ -344,12 +407,18 @@ export function ClientForm({
                   onClick={() => {
                     setLatitude(null);
                     setLongitude(null);
+                    persistPin(null, null);
                   }}
                 >
                   Quitar pin
                 </Button>
               ) : null}
             </div>
+            {pinNote ? (
+              <p className="gps-ok-note" style={{ marginTop: "0.45rem", marginBottom: 0 }}>
+                {pinNote}
+              </p>
+            ) : null}
           </FormStep>
 
           <FormStep

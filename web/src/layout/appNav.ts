@@ -93,7 +93,7 @@ export function crumbForPath(pathname: string): { section: string; page: string 
     "/sup/cobranza": { section: "Finanzas", page: "Cobranza" },
     "/sup/bancos": { section: "Finanzas", page: "Bancos" },
     "/sup/por-pagar": { section: "Finanzas", page: "Por pagar" },
-    "/sup/fx": { section: "Finanzas", page: "Tasa FX" },
+    "/sup/fx": { section: "Finanzas", page: "Tasas" },
     "/sup/mapa": { section: "Mi operación", page: "Mapa del equipo" },
     "/sup/perfil": { section: "Cuenta", page: "Perfil" },
     "/sup/ajustes": { section: "Cuenta", page: "Ajustes" },

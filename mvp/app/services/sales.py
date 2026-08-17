@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..models import (
     Client,
-    CurrencyCode,
     PaymentMethod,
     Sale,
     SaleOrigin,
@@ -81,17 +80,7 @@ def _persist_sale(
 
     total, items = apply_sale_to_inventory(db, sale_in)
     payment_method = PaymentMethod.credit if sale_in.is_credit else sale_in.payment_method
-    fx_rate = None
-    if sale_in.currency == CurrencyCode.VES:
-        fx_rate = resolve_usd_to_ves(db)
-        if fx_rate is None:
-            raise HTTPException(
-                status_code=400,
-                detail="No hay tasa FX del día: el supervisor debe cargarla en /api/fx",
-            )
-    else:
-        # Conservar tasa del día en snapshot/consulta aunque la OV sea USD
-        fx_rate = resolve_usd_to_ves(db)
+    fx_rate = resolve_usd_to_ves(db)
 
     sale = Sale(
         visit_id=visit_id,

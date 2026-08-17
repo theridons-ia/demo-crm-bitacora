@@ -7,6 +7,8 @@ type MetricTileProps = {
   label: string;
   value: string | number;
   icon?: LucideIcon;
+  /** Logo cuadrado (BCV, Binance). Gana sobre `icon`. */
+  markSrc?: string;
   hint?: string;
   tone?: MetricTone;
   className?: string;
@@ -17,6 +19,7 @@ export function MetricTile({
   label,
   value,
   icon: Icon,
+  markSrc,
   hint,
   tone = "default",
   className = "",
@@ -25,7 +28,11 @@ export function MetricTile({
     <article className={`metric-tile tone-${tone} ${className}`.trim()}>
       <div className="metric-tile-top">
         <p className="metric-tile-label">{label}</p>
-        {Icon ? (
+        {markSrc ? (
+          <span className="metric-tile-icon is-mark" aria-hidden>
+            <img src={markSrc} alt="" />
+          </span>
+        ) : Icon ? (
           <span className="metric-tile-icon" aria-hidden>
             <Icon size={16} strokeWidth={2} />
           </span>

@@ -171,6 +171,11 @@ class ProductCreate(BaseModel):
     name: str
     unit: str = "unidad"
     price_usd: Decimal = Decimal("0")
+    price_usd_2: Decimal | None = None
+    price_ves: Decimal | None = None
+    price_usd_auto: bool = False
+    price_usd_2_auto: bool = True
+    price_ves_auto: bool = True
     stock: int = 0
     image_url: str | None = None
     brand: str | None = None
@@ -189,6 +194,11 @@ class ProductUpdate(BaseModel):
     name: str | None = None
     unit: str | None = None
     price_usd: Decimal | None = None
+    price_usd_2: Decimal | None = None
+    price_ves: Decimal | None = None
+    price_usd_auto: bool | None = None
+    price_usd_2_auto: bool | None = None
+    price_ves_auto: bool | None = None
     image_url: str | None = None
     brand: str | None = None
     category: str | None = None
@@ -209,6 +219,11 @@ class ProductOut(ORMModel):
     name: str
     unit: str
     price_usd: Decimal
+    price_usd_2: Decimal | None = None
+    price_ves: Decimal | None = None
+    price_usd_auto: bool = False
+    price_usd_2_auto: bool = True
+    price_ves_auto: bool = True
     stock: int
     image_url: str | None = None
     brand: str | None = None
@@ -624,6 +639,12 @@ class FxRateOut(ORMModel):
     id: int
     rate_date: date
     usd_to_ves: Decimal
+    eur_to_ves: Decimal | None = None
+    usdt_to_ves: Decimal | None = None
+    usd_source: str | None = None
+    eur_source: str | None = None
+    usdt_source: str | None = None
+    captured_at: datetime | None = None
     notes: str | None
     created_by_id: int | None
     created_at: datetime
@@ -634,4 +655,6 @@ class FxRateOut(ORMModel):
 class FxRateUpsert(BaseModel):
     rate_date: date
     usd_to_ves: Decimal = Field(gt=0)
+    eur_to_ves: Decimal | None = None
+    usdt_to_ves: Decimal | None = None
     notes: str | None = Field(default=None, max_length=255)

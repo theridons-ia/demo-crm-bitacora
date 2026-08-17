@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
+import { unitPriceForQuote } from "../lib/productPrices";
 import { formatQuoteAmount, IVA_RATE, quoteMoney, roundMoney } from "../lib/quoteMoney";
 import type { CurrencyCode, Product } from "../lib/types";
 import { SearchPickField } from "./SearchPickField";
@@ -58,7 +59,7 @@ export function SaleQuoter({
   }, [lines]);
 
   const fx = fxRate != null && fxRate > 0 ? fxRate : null;
-  const subtotal = quoteLinesTotal(lines, products);
+  const subtotal = quoteLinesTotal(lines, products, currency);
   const money = quoteMoney(subtotal, applyIva);
 
   function updateLine(key: string, patch: Partial<QuoteLine>) {
@@ -82,8 +83,8 @@ export function SaleQuoter({
     });
   }
 
-  function amount(usd: number): string {
-    return formatQuoteAmount(usd, currency, fx);
+  function amount(n: number): string {
+    return formatQuoteAmount(n, currency);
   }
 
   return (
@@ -108,8 +109,9 @@ export function SaleQuoter({
             const product = line.productId != null ? byId.get(line.productId) : undefined;
             const maxStock = product?.stock ?? 0;
             const opts = optionsFor(line);
-            const unitUsd = product ? Number(product.price_usd) : 0;
-            const lineUsd = product ? roundMoney(line.quantity * unitUsd) : 0;
+            const unit = product ? unitPriceForQuote(product, currency) : null;
+            const lineTotal =
+              product && unit != null ? roundMoney(line.quantity * unit) : 0;
 
             return (
               <li key={line.key} className="sale-quoter-row">
@@ -186,12 +188,12 @@ export function SaleQuoter({
 
                 <div className="sale-quoter-meta is-num">
                   <span className="sale-quoter-label">Precio unit.</span>
-                  <strong>{product ? amount(unitUsd) : "—"}</strong>
+                  <strong>{product && unit != null ? amount(unit) : "—"}</strong>
                 </div>
 
                 <div className="sale-quoter-meta is-num">
                   <span className="sale-quoter-label">Subtotal</span>
-                  <strong>{product ? amount(lineUsd) : "—"}</strong>
+                  <strong>{product && unit != null ? amount(lineTotal) : "—"}</strong>
                 </div>
               </li>
             );
@@ -264,14 +266,33 @@ export function quoteLinesToItems(
     .map((l) => ({ product_id: l.productId, quantity: l.quantity }));
 }
 
-export function quoteLinesTotal(lines: QuoteLine[], products: Product[]): number {
+export function quoteLinesTotal(
+  lines: QuoteLine[],
+  products: Product[],
+  currency: CurrencyCode = "USD",
+): number {
   const byId = new Map(products.map((p) => [p.id, p]));
   return roundMoney(
     lines.reduce((sum, line) => {
       if (line.productId == null) return sum;
       const p = byId.get(line.productId);
       if (!p) return sum;
-      return sum + line.quantity * Number(p.price_usd);
+      const unit = unitPriceForQuote(p, currency);
+      if (unit == null) return sum;
+      return sum + line.quantity * unit;
     }, 0),
   );
+}
+
+export function quoteMissingVesPrice(lines: QuoteLine[], products: Product[]): string | null {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  for (const line of lines) {
+    if (line.productId == null) continue;
+    const p = byId.get(line.productId);
+    if (!p) continue;
+    if (unitPriceForQuote(p, "VES") == null) {
+      return `${p.name} no tiene Precio 3 (Bs)`;
+    }
+  }
+  return null;
 }

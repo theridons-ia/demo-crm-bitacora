@@ -1,3 +1,4 @@
+import { SaleRow } from "./SaleRow";
 import type { Sale } from "../lib/types";
 import {
   formatSaleWhen,
@@ -6,6 +7,8 @@ import {
   saleItemCount,
   saleOrderCode,
   saleUnitCount,
+  formatSaleTotal,
+  saleCurrencyLabel,
 } from "../lib/saleLabels";
 
 type Props = {
@@ -15,10 +18,21 @@ type Props = {
   onRowClick: (sale: Sale) => void;
 };
 
-/** Tabla de órdenes: columnas densas, clic para detalle. */
+/** Móvil: SaleRow. Desktop: tabla de columnas. */
 export function SalesTable({ sales, sellerNameById, showSeller, onRowClick }: Props) {
   return (
-    <div className="sales-table-card">
+    <>
+      <ul className="visit-row-list sale-row-list">
+        {sales.map((sale) => (
+          <SaleRow
+            key={sale.id}
+            sale={sale}
+            sellerName={showSeller ? sellerNameById?.get(sale.seller_id) : null}
+            onClick={() => onRowClick(sale)}
+          />
+        ))}
+      </ul>
+      <div className="sales-table-card">
       <div className={`sales-table-head ${showSeller ? "with-seller" : ""}`.trim()} aria-hidden>
         <span>OV</span>
         <span>Cliente</span>
@@ -74,10 +88,8 @@ export function SalesTable({ sales, sellerNameById, showSeller, onRowClick }: Pr
                   )}
                 </div>
                 <div className="sales-col sales-col-total">
-                  <strong>
-                    ${Number(sale.total_amount).toFixed(2)}
-                  </strong>
-                  <span className="muted small">{sale.currency}</span>
+                  <strong>{formatSaleTotal(sale)}</strong>
+                  <span className="muted small">{saleCurrencyLabel(sale.currency)}</span>
                 </div>
               </button>
             </li>
@@ -85,5 +97,6 @@ export function SalesTable({ sales, sellerNameById, showSeller, onRowClick }: Pr
         })}
       </ul>
     </div>
+    </>
   );
 }

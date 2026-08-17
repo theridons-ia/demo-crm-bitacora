@@ -1,6 +1,6 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, RefreshCw } from "lucide-react";
+import { Maximize2, Minimize2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/Button";
 import { ListSkeleton } from "../components/ListSkeleton";
@@ -9,6 +9,7 @@ import { VisitRow } from "../components/VisitRow";
 import { WeekDayStrip } from "../components/WeekDayStrip";
 import { WeekNav } from "../components/WeekNav";
 import { WorkspacePage } from "../layout/WorkspacePage";
+import { useBodyScrollLock, useEscapeKey } from "../hooks/useOverlay";
 import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
 import { ApiError, fetchCurrentRoute } from "../lib/api";
 import { addDaysISO, formatAgendaDay, todayISO, weekDayISOs, weekStartISO } from "../lib/caracasTime";
@@ -44,7 +45,7 @@ function defaultDayChip(weekStart: string): string | "sin-dia" {
   return days.includes(today) ? today : weekStart;
 }
 
-/** Semana del vendedor (SF-5.2). El mapa es el slice de hoy. */
+/** Semana del vendedor (SF-5.2). Mapa compacto del día; Explorar lo abre a pantalla. */
 export function SellerRouteMapPage() {
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -56,8 +57,8 @@ export function SellerRouteMapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Visit | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
   const today = todayISO();
-  const showMap = dayChip === today;
 
   const visits = useMemo(
     () => (route?.visits ?? []).filter((v) => v.status !== "cancelada"),
@@ -80,6 +81,16 @@ export function SellerRouteMapPage() {
     return set;
   }, [visits]);
 
+  const hasPins = useMemo(() => dayVisits.some((v) => stopCoords(v)), [dayVisits]);
+
+  useEffect(() => {
+    setMapOpen(false);
+  }, [dayChip]);
+
+  const closeMap = useCallback(() => setMapOpen(false), []);
+  useBodyScrollLock(mapOpen);
+  useEscapeKey(mapOpen, closeMap);
+
   useRestoreVisitSheet(setSelected, visits, loading);
 
   const reload = useCallback(async () => {
@@ -101,7 +112,7 @@ export function SellerRouteMapPage() {
   }, [reload]);
 
   useEffect(() => {
-    if (!showMap || !mapEl.current) {
+    if (!hasPins || !mapEl.current) {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -110,7 +121,15 @@ export function SellerRouteMapPage() {
       return;
     }
     if (!mapRef.current) {
-      const map = L.map(mapEl.current, { zoomControl: true });
+      const map = L.map(mapEl.current, {
+        zoomControl: true,
+        dragging: false,
+        touchZoom: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+      });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap",
@@ -170,7 +189,28 @@ export function SellerRouteMapPage() {
       );
     }
     window.setTimeout(() => map.invalidateSize(), 80);
-  }, [showMap, dayVisits]);
+  }, [hasPins, dayVisits]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (mapOpen) {
+      map.dragging.enable();
+      map.touchZoom.enable();
+      map.scrollWheelZoom.enable();
+      map.doubleClickZoom.enable();
+      map.boxZoom.enable();
+      map.keyboard.enable();
+    } else {
+      map.dragging.disable();
+      map.touchZoom.disable();
+      map.scrollWheelZoom.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+      map.keyboard.disable();
+    }
+    window.setTimeout(() => map.invalidateSize(), 80);
+  }, [mapOpen, hasPins]);
 
   useEffect(() => {
     return () => {
@@ -197,31 +237,29 @@ export function SellerRouteMapPage() {
     setSelected((cur) => (cur && cur.id === updated.id ? updated : cur));
   }
 
-  const weekDone = route?.done ?? 0;
-  const weekPlanned = route?.planned ?? 0;
   const dayDone = dayVisits.filter((v) => v.status === "completada").length;
 
   return (
     <WorkspacePage
       eyebrow="Ruta"
-      title={route?.title ?? "Tu semana"}
-      blurb="Plan de la semana. El mapa es el recorrido de hoy."
+      title={route?.seller_name ?? "Tu semana"}
+      blurb="Plan de la semana. El mapa es el recorrido del día."
     >
-      <header className="page-header">
+      <header className="page-header is-route-week">
         <div>
           <p className="eyebrow">{route?.code ?? "Semana"}</p>
-          <h1 className="display-title">{route?.title ?? "Tu semana"}</h1>
-          <p className="muted">
-            {loading
-              ? "Cargando…"
-              : weekPlanned
-                ? `${weekDone} de ${weekPlanned} paradas`
-                : "Semana vacía"}
-          </p>
+          <h1 className="display-title">{route?.seller_name ?? "Tu semana"}</h1>
         </div>
-        <Button type="button" variant="secondary" onClick={() => void reload()} disabled={loading}>
+        <Button
+          type="button"
+          variant="secondary"
+          className="route-week-refresh"
+          onClick={() => void reload()}
+          disabled={loading}
+          aria-label="Actualizar"
+        >
           <RefreshCw size={16} />
-          Actualizar
+          <span className="route-week-refresh-label">Actualizar</span>
         </Button>
       </header>
 
@@ -242,24 +280,47 @@ export function SellerRouteMapPage() {
         label="Día de tu ruta"
       />
 
-      {showMap ? (
-        <div className="map-stage is-bleed">
-          <div ref={mapEl} className="map-stage-canvas" role="img" aria-label="Mapa de ruta de hoy" />
-          <div className="map-stage-legend" aria-hidden>
-            <span className="route-map-legend-item">
-              <i className="route-map-swatch is-done" /> Hecho
-            </span>
-            <span className="route-map-legend-item">
-              <i className="route-map-swatch is-todo" /> Pendiente
-            </span>
-          </div>
+      {hasPins ? (
+        <div className={`map-stage is-bleed ${mapOpen ? "is-expanded" : "is-peek"}`}>
+          <div
+            ref={mapEl}
+            className="map-stage-canvas"
+            role="img"
+            aria-label={mapOpen ? "Mapa de la ruta del día" : "Vista previa del mapa"}
+          />
+          {mapOpen ? (
+            <button
+              type="button"
+              className="map-stage-toggle is-close"
+              onClick={closeMap}
+            >
+              <Minimize2 size={16} aria-hidden />
+              Lista
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="map-stage-toggle"
+              onClick={() => setMapOpen(true)}
+            >
+              <Maximize2 size={16} aria-hidden />
+              Explorar
+            </button>
+          )}
+          {mapOpen ? (
+            <div className="map-stage-legend" aria-hidden>
+              <span className="route-map-legend-item">
+                <i className="route-map-swatch is-done" /> Hecho
+              </span>
+              <span className="route-map-legend-item">
+                <i className="route-map-swatch is-todo" /> Pendiente
+              </span>
+            </div>
+          ) : null}
         </div>
-      ) : (
-        <p className="muted small seller-week-map-hint">
-          <MapPin size={14} aria-hidden />
-          El mapa aparece al ver el día de hoy.
-        </p>
-      )}
+      ) : !loading ? (
+        <p className="muted small seller-week-map-hint">Este día no tiene pines en el mapa.</p>
+      ) : null}
 
       <section className="card route-day-list">
         <h2 className="section-heading">

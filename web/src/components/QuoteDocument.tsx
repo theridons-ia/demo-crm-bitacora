@@ -9,7 +9,8 @@ import {
   type Ref,
 } from "react";
 import { formatDateTime } from "../lib/caracasTime";
-import { formatQuoteAmount, IVA_RATE, quoteMoney } from "../lib/quoteMoney";
+import { formatLegacyQuoteAmount, formatQuoteAmount, IVA_RATE, quoteMoney } from "../lib/quoteMoney";
+import { unitPriceForQuote } from "../lib/productPrices";
 import {
   armFilePickerGuard,
   settleFilePickerGuard,
@@ -57,6 +58,8 @@ export type QuoteDocumentData = {
   notes?: string | null;
   isCredit?: boolean;
   applyIva?: boolean;
+  /** Líneas ya están en la moneda de la OV (Precio 1 USD / Precio 3 Bs). */
+  pricedInQuoteCurrency?: boolean;
   /** Emisor (distribuidor). Vacío hasta cargar razón social real. */
   issuer?: QuoteIssuer | null;
 };
@@ -80,6 +83,7 @@ export { draftQuoteCode } from "../lib/saleCode";
 export function buildQuoteLines(
   lines: QuoteLine[],
   products: Product[],
+  currency: CurrencyCode = "USD",
 ): QuoteDocLine[] {
   const byId = new Map(products.map((p) => [p.id, p]));
   const out: QuoteDocLine[] = [];
@@ -87,13 +91,14 @@ export function buildQuoteLines(
     if (line.productId == null || line.quantity <= 0) continue;
     const p = byId.get(line.productId);
     if (!p) continue;
-    const unitUsd = Number(p.price_usd);
+    const unit = unitPriceForQuote(p, currency);
+    if (unit == null) continue;
     out.push({
       sku: p.sku,
       name: p.name,
       quantity: line.quantity,
-      unitUsd,
-      lineUsd: unitUsd * line.quantity,
+      unitUsd: unit,
+      lineUsd: unit * line.quantity,
     });
   }
   return out;
@@ -244,8 +249,12 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
     const validLabel = formatDateTime(validUntil);
     const isOv = data.code.startsWith("OV-");
     const isVes = data.currency === "VES";
-    function amount(usd: number): string {
-      return formatQuoteAmount(usd, data.currency, fx);
+    const pricedInQuote = Boolean(data.pricedInQuoteCurrency);
+    function amount(n: number): string {
+      if (isVes && !pricedInQuote) {
+        return formatLegacyQuoteAmount(n, data.currency, fx);
+      }
+      return formatQuoteAmount(n, data.currency);
     }
     const ivaNote = applyIva
       ? `Incluye IVA ${(IVA_RATE * 100).toFixed(0)}%`

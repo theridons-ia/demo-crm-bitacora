@@ -379,6 +379,11 @@ export type ProductCreateInput = {
   name: string;
   unit?: string;
   price_usd?: number;
+  price_usd_2?: number | null;
+  price_ves?: number | null;
+  price_usd_auto?: boolean;
+  price_usd_2_auto?: boolean;
+  price_ves_auto?: boolean;
   stock?: number;
   image_url?: string | null;
   brand?: string | null;
@@ -405,6 +410,11 @@ export type ProductUpdateInput = {
   name?: string;
   unit?: string;
   price_usd?: number;
+  price_usd_2?: number | null;
+  price_ves?: number | null;
+  price_usd_auto?: boolean;
+  price_usd_2_auto?: boolean;
+  price_ves_auto?: boolean;
   image_url?: string | null;
   brand?: string | null;
   category?: string | null;
@@ -651,6 +661,12 @@ export type FxRate = {
   id: number;
   rate_date: string;
   usd_to_ves: string;
+  eur_to_ves?: string | null;
+  usdt_to_ves?: string | null;
+  usd_source?: string | null;
+  eur_source?: string | null;
+  usdt_source?: string | null;
+  captured_at?: string | null;
   notes: string | null;
   created_by_id: number | null;
   created_at: string;
@@ -667,9 +683,15 @@ export function fetchFxRates(): Promise<FxRate[]> {
   return request<FxRate[]>("/api/fx");
 }
 
+export function refreshFxRates(): Promise<FxRate> {
+  return request<FxRate>("/api/fx/refresh", { method: "POST" });
+}
+
 export function upsertFxRate(payload: {
   rate_date: string;
   usd_to_ves: number;
+  eur_to_ves?: number | null;
+  usdt_to_ves?: number | null;
   notes?: string | null;
 }): Promise<FxRate> {
   return request<FxRate>("/api/fx", {

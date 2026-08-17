@@ -8,13 +8,24 @@ alwaysApply: false
 
 Contrato vivo: `docs/implementacion/FASE-4-UI-MOVIL.md`. Una SF por vez. No tocar `startVisit` / `createVisitSale`. Tokens EnRutas (teal/coral/cream); no copiar Tuzona ni Farmatodo.
 
+## Fila de lista (gramática única)
+
+Todas las listas táctiles (visitas, clientes, ventas, inventario) comparten la misma lectura:
+
+**punto/estado · nombre humano · meta de una línea · valor a la derecha · chevron**
+
+- Toda la fila es el tap → ficha. Sin botones extra, coords ni iconos decorativos repetidos (el carrito de Ventas vive en el tabbar, no en cada OV).
+- Título = lo que buscas en campo (PDV, producto). Códigos (`OV-…`, SKU, RIF) van en **meta**, no como H1 de la fila.
+- Valor derecha: hora (visitas), monto (ventas), qty/estado (inventario). Chevron siempre.
+- Máximo **2 líneas de texto** + nota opcional. No apilar 4 renglones.
+
 ## Fila de visita
 
 Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
 
-- Estado (punto / `LiveLed`) · nombre PDV · hora o estado · chevron.
+- Estado (punto / `LiveLed`) · nombre PDV · hora o estado · chevron. En culminadas, el **pin GPS** va **antes de** «En el PDV / Dudosa / Sin evidencia» en la meta (no sustituye el punto). Leyenda `GpsProofLegend` en **1 fila**, items juntos; tap/hover muestra hint humano.
 - Toda la fila es el tap → ficha. Sin lat/lng, GPS, Ver trail, ni 3 botones en la fila.
-- Programadas: carrusel de **bitácora** (`week-strip` / `day-chip`, con conteo). Culminadas: fecha DESC.
+- Programadas **y Culminadas:** carrusel de **bitácora** (`week-strip` / `day-chip`, con conteo). Chip **Todas** = lista completa de ese estado. Culminadas: días hacia atrás; orden fecha DESC dentro del día. Canceladas: sin carrusel.
 - Ruta semanal: `WeekNav` + `WeekDayStrip` (punto = hay paradas). No reusar el carrusel de Visitas. Ver `ui-enrutas.mdc` § Fechas.
 
 ## Chrome y FAB
@@ -26,8 +37,9 @@ Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
 
 - Trazo y numeración = `scheduled_time` (no vecino más cercano como ruta oficial).
 - Mapa del día ≠ historial. Sin pin: en la lista, hueco en el polyline.
-- Tres lentes de la misma `Visit` **en Fase 4:** Ruta = hoy · Visitas = bitácora · Mapa = trazo. La **ruta semanal** (1 vendedor × semana) es Fase 5; no abrir entidad `Route` aquí.
-- **Marco:** en **página** (Recorrido, Mapa equipo) el mapa va **a todo el ancho** (sin recuadro a medias). En **ficha/modal** (trail, pin de cliente) va **encerrado**, borde parejo. Misma pieza CSS: `.map-stage`. Leyenda debajo, no encima del mapa.
+- Tres lentes de la misma `Visit`: Ruta = día elegido · Visitas = bitácora · Mapa = trazo.
+- **Ruta vendedor:** mapa **peek** (~168 px) cualquier día con pines, para que la lista de paradas quede en el fold. **Explorar** expande a pantalla (pan/zoom); **Lista** vuelve. Sin pin: no hay mapa ese día.
+- **Marco:** en **página** (Recorrido, Mapa equipo) el mapa va **a todo el ancho** (sin recuadro a medias). En **ficha/modal** (trail, pin de cliente) va **encerrado**, borde parejo. Misma pieza CSS: `.map-stage`. Leyenda debajo, no encima del mapa. En peek, leyenda oculta.
 
 ## Foto y wizard
 
@@ -35,5 +47,6 @@ Una pieza (`VisitRow`) en agenda Home, Visitas, Orden del día, Ruta supervisor.
 - Un signo de moneda: `Total` + `$ 13.57`, nunca `Total $ $`.
 - Pago: USD = Efectivo USD / Zelle / USDT. Bs = Efectivo Bs / Pago móvil / Transferencia.
 - Wizard 1-2-3: `WizardSteps` (sin blurb de pasos). Footer **Anterior** + **Siguiente / Confirmar OV**. Nombre de producto completo. Cuenta destino una vez.
-- Inventario: fila nombre · cantidad · estado. SKU / mínimo / $ no apilan 6 renglones en el teléfono.
-- Cliente: tap = ficha. Sin pin, coords ni Ver|Editar|Re-asignar en la fila.
+- Inventario: fila nombre · cantidad · estado. SKU / mínimo / $ no apilan 6 renglones en el teléfono. Miniatura o icono **solo** si identifica el ítem (foto de producto); no un pictograma genérico en cada fila.
+- Cliente: tap = ficha. Nombre · RIF/zona · chevron. Sin pin, coords ni Ver|Editar|Re-asignar en la fila.
+- **Ventas (móvil):** pieza `SaleRow` (misma gramática que `VisitRow`). Título = PDV; meta = código OV · crédito/contado · vendedor si equipo; derecha = `$ 235.25` + moneda; punto = contado success / crédito `--progress`. Desktop puede seguir en `SalesTable` de columnas. No reintroducir carrito en la fila.

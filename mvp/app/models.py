@@ -182,6 +182,11 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(160), index=True)
     unit: Mapped[str] = mapped_column(String(40), default="unidad")
     price_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    price_usd_2: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    price_ves: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    price_usd_auto: Mapped[bool] = mapped_column(Boolean, default=False)
+    price_usd_2_auto: Mapped[bool] = mapped_column(Boolean, default=True)
+    price_ves_auto: Mapped[bool] = mapped_column(Boolean, default=True)
     stock: Mapped[int] = mapped_column(Integer, default=0)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     brand: Mapped[str | None] = mapped_column(String(80), nullable=True)
@@ -517,13 +522,19 @@ class StockMovement(Base):
 
 
 class FxRate(Base):
-    """Tasa USD→VES del día (SF-3.3). Cuántos bolívares por 1 USD."""
+    """Tasas del día (Caracas). usd_to_ves = BCV oficial; USDT y EUR son snapshot."""
 
     __tablename__ = "fx_rates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     rate_date: Mapped[date] = mapped_column(Date, unique=True, index=True)
     usd_to_ves: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    eur_to_ves: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    usdt_to_ves: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    usd_source: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    eur_source: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    usdt_source: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

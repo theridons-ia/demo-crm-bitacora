@@ -239,8 +239,8 @@ Excel (SF-3.4) y Alembic (SF-3.5) siguen pendientes; no mezclarlos con esta fase
 
 ### Cómo verificar SF-3.3
 
-1. Supervisor → Tasa FX → guardar.
-2. Vendedor → Ventas en VES → ve Bs equivalentes; sin tasa el API rechaza.
+1. Supervisor → Tasas → Actualizar ahora (o guardar BCV manual).
+2. Vendedor → Ventas en VES → ve Bs con la tasa BCV; sin tasa el API rechaza.
 
 ### Cómo verificar SF-3.2
 

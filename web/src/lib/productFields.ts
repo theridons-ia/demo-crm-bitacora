@@ -20,6 +20,11 @@ export type ProductFormState = {
   unit: string;
   pack_units: string;
   price_usd: string;
+  price_usd_2: string;
+  price_ves: string;
+  price_usd_auto: boolean;
+  price_usd_2_auto: boolean;
+  price_ves_auto: boolean;
   cost_usd: string;
   min_stock: string;
   stock: string;
@@ -39,6 +44,11 @@ export const emptyProductForm: ProductFormState = {
   unit: "unidad",
   pack_units: "",
   price_usd: "",
+  price_usd_2: "",
+  price_ves: "",
+  price_usd_auto: false,
+  price_usd_2_auto: true,
+  price_ves_auto: true,
   cost_usd: "",
   min_stock: "40",
   stock: "0",
@@ -63,6 +73,11 @@ export function productToForm(product: Product): ProductFormState {
     unit: product.unit || "unidad",
     pack_units: product.pack_units != null ? String(product.pack_units) : "",
     price_usd: product.price_usd,
+    price_usd_2: product.price_usd_2 ?? "",
+    price_ves: product.price_ves ?? "",
+    price_usd_auto: product.price_usd_auto === true,
+    price_usd_2_auto: product.price_usd_2_auto !== false,
+    price_ves_auto: product.price_ves_auto !== false,
     cost_usd: product.cost_usd ?? "",
     min_stock: String(product.min_stock ?? 40),
     stock: String(product.stock),
@@ -90,6 +105,11 @@ export type ProductPayload = {
   name: string;
   unit: string;
   price_usd: number;
+  price_usd_2: number | null;
+  price_ves: number | null;
+  price_usd_auto: boolean;
+  price_usd_2_auto: boolean;
+  price_ves_auto: boolean;
   stock?: number;
   image_url: string | null;
   brand: string | null;
@@ -108,11 +128,19 @@ export function parseProductForm(form: ProductFormState): { error: string } | { 
   const name = form.name.trim();
   const sku = form.sku.trim().toUpperCase();
   const price = Number(form.price_usd);
+  const price2 = optionalNumber(form.price_usd_2);
+  const price3 = optionalNumber(form.price_ves);
   const cost = optionalNumber(form.cost_usd);
   const minStock = Number(form.min_stock.trim() || "40");
   const packUnits = optionalNumber(form.pack_units);
   if (!name) return { error: "El nombre es obligatorio" };
-  if (!Number.isFinite(price) || price < 0) return { error: "Precio inválido" };
+  if (form.price_usd_auto) {
+    if (price2 == null) return { error: "Precio 2 es obligatorio para calcular Precio 1 por margen" };
+  } else if (!Number.isFinite(price) || price < 0) {
+    return { error: "Precio 1 inválido" };
+  }
+  if (price2 != null && price2 < 0) return { error: "Precio 2 inválido" };
+  if (price3 != null && price3 < 0) return { error: "Precio 3 (Bs) inválido" };
   if (cost != null && cost < 0) return { error: "Costo inválido" };
   if (!Number.isFinite(minStock) || minStock < 0) return { error: "Stock mínimo inválido" };
   if (packUnits != null && packUnits < 1) return { error: "Unidades por empaque debe ser al menos 1" };
@@ -122,7 +150,12 @@ export function parseProductForm(form: ProductFormState): { error: string } | { 
       sku,
       name,
       unit: form.unit.trim() || "unidad",
-      price_usd: price,
+      price_usd: Number.isFinite(price) && price >= 0 ? price : 0,
+      price_usd_2: price2,
+      price_ves: price3,
+      price_usd_auto: form.price_usd_auto,
+      price_usd_2_auto: form.price_usd_2_auto,
+      price_ves_auto: form.price_ves_auto,
       image_url: form.image_url,
       brand: optionalText(form.brand),
       category: optionalText(form.category),

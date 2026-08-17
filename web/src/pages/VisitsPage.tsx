@@ -9,6 +9,7 @@ import { FormStep } from "../components/SideSheet";
 import { SelectField, TextAreaField, TextField } from "../components/TextField";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import { VisitRow } from "../components/VisitRow";
+import { GpsProofLegend } from "../components/GpsProofLegend";
 import { ListSkeleton } from "../components/ListSkeleton";
 import { useRestoreVisitSheet } from "../hooks/useRestoreVisitSheet";
 import { WorkspacePage } from "../layout/WorkspacePage";
@@ -26,7 +27,7 @@ import {
   type LocalPendingVisit,
 } from "../lib/offlineDb";
 import { getCachedClients } from "../lib/offlineQueue";
-import { formatAgendaDay, formatWeekdayShort } from "../lib/caracasTime";
+import { dateISOInCaracas, formatAgendaDay, formatWeekdayShort } from "../lib/caracasTime";
 import { isVisitOverdue, sortVisitsAgenda, sortVisitsHistory } from "../lib/visitOrder";
 import type { Client, Visit } from "../lib/types";
 
@@ -37,6 +38,14 @@ const FILTER_CHIPS: { key: VisitFilter; label: string }[] = [
   { key: "done", label: "Culminadas" },
   { key: "cancelada", label: "Canceladas" },
 ];
+
+function visitDoneDay(visit: Visit): string | null {
+  const iso = visit.visited_at || visit.closed_at || visit.created_at;
+  if (!iso) return visit.scheduled_date;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10) || visit.scheduled_date;
+  return dateISOInCaracas(d);
+}
 
 function clientIdLabel(client: Client | null | undefined, clientId: number): string {
   if (!client) return `Cliente #${clientId}`;
@@ -92,6 +101,8 @@ export function VisitsPage() {
   const [formMode, setFormMode] = useState<"now" | "schedule">("now");
   const [agendaDay, setAgendaDay] = useState<string | "all">(() => calendarTodayISO());
   const [detailVisit, setDetailVisit] = useState<Visit | null>(null);
+  const [confirmHere, setConfirmHere] = useState(false);
+  const [confirmHereFail, setConfirmHereFail] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<VisitFilter>("open");
@@ -174,7 +185,10 @@ export function VisitsPage() {
           }
         }
       }
-      if (filter === "done" && v.status !== "completada") return false;
+      if (filter === "done") {
+        if (v.status !== "completada") return false;
+        if (agendaDay !== "all" && visitDoneDay(v) !== agendaDay) return false;
+      }
       if (filter === "cancelada" && v.status !== "cancelada") return false;
       if (!q) return true;
       const blob = `${v.client?.name ?? ""} ${v.client?.rif ?? ""} ${v.client?.ci ?? ""} ${v.client?.address ?? ""} ${v.description ?? ""}`.toLowerCase();
@@ -198,12 +212,21 @@ export function VisitsPage() {
   }, [overdueVisits]);
 
   const weekDays = useMemo(() => {
+    if (filter === "done") {
+      return Array.from({ length: 30 }, (_, i) => addDaysISO(today, -i));
+    }
     return Array.from({ length: 30 }, (_, i) => addDaysISO(today, i));
-  }, [today]);
+  }, [today, filter]);
 
   const agendaCountByDay = useMemo(() => {
     const map = new Map<string, number>();
     for (const v of visits) {
+      if (filter === "done") {
+        if (v.status !== "completada") continue;
+        const day = visitDoneDay(v);
+        if (day) map.set(day, (map.get(day) ?? 0) + 1);
+        continue;
+      }
       if (v.status === "programada" && v.scheduled_date) {
         map.set(v.scheduled_date, (map.get(v.scheduled_date) ?? 0) + 1);
       } else if (v.status === "en_curso") {
@@ -212,7 +235,7 @@ export function VisitsPage() {
       }
     }
     return map;
-  }, [visits, today]);
+  }, [visits, today, filter]);
 
   function openSchedule(day?: string) {
     const pick = day && day !== "all" ? day : today;
@@ -271,7 +294,12 @@ export function VisitsPage() {
               role="tab"
               aria-selected={filter === key}
               aria-label={`${label}, ${count}`}
-              onClick={() => setFilter(key)}
+              onClick={() => {
+                setFilter(key);
+                if (key === "done" && agendaDay !== "all" && agendaDay > today) {
+                  setAgendaDay(today);
+                }
+              }}
             >
               <span className="chip-label">{label}</span>
               <span className="chip-count">{count}</span>
@@ -280,8 +308,10 @@ export function VisitsPage() {
         })}
       </div>
 
-      {filter === "open" ? (
-        <section className="calendar-panel" aria-label="Agenda">
+      {filter === "done" ? <GpsProofLegend /> : null}
+
+      {filter === "open" || filter === "done" ? (
+        <section className="calendar-panel" aria-label={filter === "done" ? "Culminadas" : "Agenda"}>
           <div className="week-strip" role="tablist" aria-label="Día">
             <button
               type="button"
@@ -289,32 +319,34 @@ export function VisitsPage() {
               onClick={() => setAgendaDay("all")}
             >
               <span>Todas</span>
-              <strong>{counts.open}</strong>
+              <strong>{filter === "done" ? counts.done : counts.open}</strong>
             </button>
-            {overdueDays.map((day) => {
-              const d = Number(day.slice(8, 10));
-              const label = formatWeekdayShort(day);
-              const count = agendaCountByDay.get(day) ?? 0;
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  className={[
-                    "day-chip",
-                    "is-past",
-                    "has-stops",
-                    day === agendaDay ? "active" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => setAgendaDay(day)}
-                >
-                  <span>{label}</span>
-                  <strong>{d}</strong>
-                  {count > 0 ? <em>{count}</em> : null}
-                </button>
-              );
-            })}
+            {filter === "open"
+              ? overdueDays.map((day) => {
+                  const d = Number(day.slice(8, 10));
+                  const label = formatWeekdayShort(day);
+                  const count = agendaCountByDay.get(day) ?? 0;
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      className={[
+                        "day-chip",
+                        "is-past",
+                        "has-stops",
+                        day === agendaDay ? "active" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => setAgendaDay(day)}
+                    >
+                      <span>{label}</span>
+                      <strong>{d}</strong>
+                      {count > 0 ? <em>{count}</em> : null}
+                    </button>
+                  );
+                })
+              : null}
             {weekDays.map((day) => {
               const d = Number(day.slice(8, 10));
               const label = formatWeekdayShort(day);
@@ -344,27 +376,35 @@ export function VisitsPage() {
           </div>
           <div className="week-strip-foot">
             <p className="muted small">
-              {agendaDay === "all"
-                ? overdueVisits.length
-                  ? `Todas · ${overdueVisits.length} sin asistir`
-                  : "Todas las programadas"
-                : agendaDay === today
+              {filter === "done"
+                ? agendaDay === "all"
+                  ? "Todas las culminadas"
+                  : agendaDay === today
+                    ? "Hoy"
+                    : formatAgendaDay(agendaDay)
+                : agendaDay === "all"
                   ? overdueVisits.length
-                    ? `Hoy · ${overdueVisits.length} de días anteriores`
-                    : "Hoy"
-                  : agendaDay < today
-                    ? `Sin asistir · ${formatAgendaDay(agendaDay)}`
-                    : formatAgendaDay(agendaDay)}
+                    ? `Todas · ${overdueVisits.length} sin asistir`
+                    : "Todas las programadas"
+                  : agendaDay === today
+                    ? overdueVisits.length
+                      ? `Hoy · ${overdueVisits.length} de días anteriores`
+                      : "Hoy"
+                    : agendaDay < today
+                      ? `Sin asistir · ${formatAgendaDay(agendaDay)}`
+                      : formatAgendaDay(agendaDay)}
             </p>
-            <button
-              type="button"
-              className="week-strip-add"
-              onClick={() =>
-                openSchedule(agendaDay === "all" || agendaDay < today ? today : agendaDay)
-              }
-            >
-              Programar
-            </button>
+            {filter === "open" ? (
+              <button
+                type="button"
+                className="week-strip-add"
+                onClick={() =>
+                  openSchedule(agendaDay === "all" || agendaDay < today ? today : agendaDay)
+                }
+              >
+                Programar
+              </button>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -393,7 +433,9 @@ export function VisitsPage() {
         <p className="muted">
           {filter === "open" && agendaDay !== "all"
             ? "Nada programado este día."
-            : "Sin coincidencias. Prueba otro filtro o crea una visita."}
+            : filter === "done" && agendaDay !== "all"
+              ? "Nada culminado este día."
+              : "Sin coincidencias. Prueba otro filtro o crea una visita."}
         </p>
       ) : null}
 
@@ -410,9 +452,13 @@ export function VisitsPage() {
           if (visit.status === "programada" && visit.scheduled_date) {
             setFilter("open");
             setAgendaDay(visit.scheduled_date);
+            setConfirmHere(false);
+            setConfirmHereFail(null);
           } else if (visit.status === "en_curso") {
             setFilter("open");
             setAgendaDay(today);
+            setConfirmHere(true);
+            setConfirmHereFail(note ?? null);
           }
           if (note) setGpsNote(note);
         }}
@@ -422,7 +468,13 @@ export function VisitsPage() {
         <VisitDetailSheet
           visit={detailVisit}
           open
-          onClose={() => setDetailVisit(null)}
+          confirmHereOnOpen={confirmHere}
+          confirmHereFailReason={confirmHereFail}
+          onClose={() => {
+            setDetailVisit(null);
+            setConfirmHere(false);
+            setConfirmHereFail(null);
+          }}
           onUpdated={(updated) => {
             setVisits((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
             setDetailVisit(updated);
@@ -595,7 +647,7 @@ function VisitForm({
       <FormStep
         step="02"
         title="Cuándo"
-        blurb={mode === "now" ? "Inicia ya con evidencia GPS." : "Agenda con día y hora."}
+        blurb={mode === "now" ? "Inicia la visita ahora." : "Agenda con día y hora."}
       >
         <div className="field">
           <span className="field-label">Modo</span>
@@ -605,7 +657,7 @@ function VisitForm({
               className={mode === "now" ? "chip active" : "chip"}
               onClick={() => setMode("now")}
             >
-              Ahora + GPS
+              Ahora
             </button>
             <button
               type="button"
@@ -662,7 +714,7 @@ function VisitForm({
       blurb={
         mode === "schedule"
           ? "Calendario + hora para dejarla en la ruta."
-          : "Si eliges Ahora, pediremos tu ubicación al iniciar."
+          : "Si eliges Ahora, la visita queda en curso al confirmar."
       }
       footer={
         <div className="side-sheet-actions">

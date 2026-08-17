@@ -4,6 +4,7 @@ import { Button } from "../components/Button";
 import { ListSearch } from "../components/ListSearch";
 import { ListSkeleton } from "../components/ListSkeleton";
 import { PhotoDrop } from "../components/PhotoDrop";
+import { PriceAutoField } from "../components/PriceAutoField";
 import { SearchPickField } from "../components/SearchPickField";
 import { SideSheet } from "../components/SideSheet";
 import { StockTable, stockState, type StockState } from "../components/StockTable";
@@ -22,13 +23,24 @@ import {
   ApiError,
   createProduct,
   createStockMovement,
+  fetchFxToday,
   fetchProducts,
   fetchStockMovements,
   fetchSuppliers,
   updateProduct,
+  type FxRate,
   type StockMovement,
   type Supplier,
 } from "../lib/api";
+import {
+  derivePriceUsd1,
+  derivePriceUsd2,
+  derivePriceVes,
+  moneyInput,
+  priceUsd1MarginHint,
+  priceUsd2AutoHint,
+  priceVesAutoHint,
+} from "../lib/productPrices";
 import type { Product } from "../lib/types";
 
 /** Inventario supervisor: ficha de producto, ingresos y ajustes. */
@@ -52,19 +64,22 @@ export function SupervisorStockPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okNote, setOkNote] = useState<string | null>(null);
+  const [fx, setFx] = useState<FxRate | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [p, s, m] = await Promise.all([
+      const [p, s, m, rate] = await Promise.all([
         fetchProducts(),
         fetchSuppliers(),
         fetchStockMovements(),
+        fetchFxToday().catch(() => null),
       ]);
       setProducts(p);
       setSuppliers(s);
       setMovements(m);
+      setFx(rate);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar inventario");
     } finally {
@@ -75,6 +90,62 @@ export function SupervisorStockPage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!createOpen) return;
+    let cancelled = false;
+    fetchFxToday()
+      .then((rate) => {
+        if (!cancelled) setFx(rate);
+      })
+      .catch(() => {
+        if (!cancelled) setFx(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [createOpen]);
+
+  useEffect(() => {
+    if (!createOpen) return;
+    setCreateForm((prev) => {
+      let price_usd = prev.price_usd;
+      let price_usd_2 = prev.price_usd_2;
+      let price_ves = prev.price_ves;
+      const p1Auto = prev.price_usd_auto;
+      const p2Auto = prev.price_usd_2_auto && !p1Auto;
+      if (p2Auto && prev.price_usd.trim()) {
+        const p1 = Number(prev.price_usd);
+        const derived = derivePriceUsd2(Number.isFinite(p1) ? p1 : 0, fx);
+        if (derived != null) price_usd_2 = moneyInput(derived);
+      } else if (p1Auto && prev.price_usd_2.trim()) {
+        const p2 = Number(prev.price_usd_2);
+        const derived = derivePriceUsd1(Number.isFinite(p2) ? p2 : 0, fx);
+        if (derived != null) price_usd = moneyInput(derived);
+      }
+      if (prev.price_ves_auto && price_usd_2.trim()) {
+        const p2 = Number(price_usd_2);
+        const derived = derivePriceVes(Number.isFinite(p2) ? p2 : null, fx);
+        if (derived != null) price_ves = moneyInput(derived);
+      }
+      if (
+        price_usd === prev.price_usd &&
+        price_usd_2 === prev.price_usd_2 &&
+        price_ves === prev.price_ves
+      ) {
+        return prev;
+      }
+      return { ...prev, price_usd, price_usd_2, price_ves };
+    });
+  }, [
+    createOpen,
+    fx,
+    createForm.price_usd,
+    createForm.price_usd_2,
+    createForm.price_usd_auto,
+    createForm.price_usd_2_auto,
+    createForm.price_ves_auto,
+  ]);
 
   const valueStock = useMemo(
     () => products.reduce((acc, p) => acc + Number(p.price_usd) * p.stock, 0),
@@ -573,16 +644,63 @@ export function SupervisorStockPage() {
                 onChange={(e) => setCreateForm((prev) => ({ ...prev, cost_usd: e.target.value }))}
                 placeholder="0.00"
               />
-              <TextField
+              <PriceAutoField
                 id="product-price"
-                label="Precio USD"
-                type="number"
-                step="0.01"
-                min="0"
+                label="Precio 1 (USD)"
                 value={createForm.price_usd}
-                onChange={(e) => setCreateForm((prev) => ({ ...prev, price_usd: e.target.value }))}
-                required
-                hint={marginPct != null && Number.isFinite(marginPct) ? `Margen ${marginPct}%` : undefined}
+                auto={createForm.price_usd_auto}
+                autoLabel="Margen"
+                prefix="$"
+                placeholder="0.00"
+                onAutoChange={(price_usd_auto) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    price_usd_auto,
+                    price_usd_2_auto: price_usd_auto ? false : prev.price_usd_2_auto,
+                  }))
+                }
+                onChange={(price_usd) => setCreateForm((prev) => ({ ...prev, price_usd }))}
+                hint={
+                  createForm.price_usd_auto
+                    ? priceUsd1MarginHint(fx)
+                    : marginPct != null && Number.isFinite(marginPct)
+                      ? `Margen ${marginPct}% vs costo`
+                      : undefined
+                }
+              />
+            </div>
+            <div className="product-form-grid">
+              <PriceAutoField
+                id="product-price-2"
+                label="Precio 2 (USD)"
+                value={createForm.price_usd_2}
+                auto={createForm.price_usd_2_auto && !createForm.price_usd_auto}
+                prefix="$"
+                onAutoChange={(price_usd_2_auto) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    price_usd_2_auto,
+                    price_usd_auto: price_usd_2_auto ? false : prev.price_usd_auto,
+                  }))
+                }
+                onChange={(price_usd_2) => setCreateForm((prev) => ({ ...prev, price_usd_2 }))}
+                placeholder="0.00"
+                hint={
+                  createForm.price_usd_2_auto && !createForm.price_usd_auto
+                    ? priceUsd2AutoHint(fx)
+                    : undefined
+                }
+              />
+              <PriceAutoField
+                id="product-price-3"
+                label="Precio 3 (Bs)"
+                value={createForm.price_ves}
+                auto={createForm.price_ves_auto}
+                prefix="Bs."
+                onAutoChange={(price_ves_auto) => setCreateForm((prev) => ({ ...prev, price_ves_auto }))}
+                onChange={(price_ves) => setCreateForm((prev) => ({ ...prev, price_ves }))}
+                placeholder="0.00"
+                hint={createForm.price_ves_auto ? priceVesAutoHint(fx) : undefined}
               />
             </div>
             <div className="product-form-grid">

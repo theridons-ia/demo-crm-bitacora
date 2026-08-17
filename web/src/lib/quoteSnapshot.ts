@@ -17,6 +17,7 @@ export type QuoteSnapshot = {
   notes: string | null;
   isCredit: boolean;
   applyIva?: boolean;
+  pricedInQuoteCurrency?: boolean;
   issuer?: {
     companyName?: string | null;
     rif?: string | null;
@@ -41,6 +42,7 @@ export function serializeQuoteSnapshot(data: QuoteDocumentData): string {
     notes: data.notes ?? null,
     isCredit: Boolean(data.isCredit),
     applyIva: Boolean(data.applyIva),
+    pricedInQuoteCurrency: Boolean(data.pricedInQuoteCurrency),
     issuer: data.issuer ?? DEFAULT_QUOTE_ISSUER,
     lines: data.lines,
   };
@@ -84,6 +86,7 @@ export function snapshotToQuoteDocumentData(snap: QuoteSnapshot): QuoteDocumentD
     notes: snap.notes,
     isCredit: snap.isCredit,
     applyIva: Boolean(snap.applyIva),
+    pricedInQuoteCurrency: Boolean(snap.pricedInQuoteCurrency),
     issuer: snap.issuer ?? null,
   };
 }
@@ -118,6 +121,7 @@ export function buildQuoteDataFromSale(
     notes: sale.notes,
     isCredit: sale.is_credit,
     applyIva: Boolean(sale.apply_iva),
+    pricedInQuoteCurrency: sale.currency !== "VES",
   };
 }
 
@@ -143,9 +147,10 @@ export function buildQuoteDataFromDraft(input: {
     clientFallback: input.clientFallback,
     currency: input.currency,
     fxRate: input.fxRate,
-    lines: buildQuoteLines(input.lines, input.products),
+    lines: buildQuoteLines(input.lines, input.products, input.currency),
     notes: input.notes ?? null,
     isCredit: input.isCredit,
     applyIva: input.applyIva,
+    pricedInQuoteCurrency: true,
   };
 }

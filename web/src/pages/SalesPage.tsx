@@ -15,10 +15,12 @@ import {
   type PaymentCaptureValue,
 } from "../components/PaymentCapture";
 import { SaleDetailSheet } from "../components/SaleDetailSheet";
+import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import {
   newQuoteLine,
   quoteLinesToItems,
   quoteLinesTotal,
+  quoteMissingVesPrice,
   SaleQuoter,
   type QuoteLine,
 } from "../components/SaleQuoter";
@@ -52,6 +54,7 @@ import {
 } from "../lib/saleWizardDraft";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
 import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
+import { unitPriceForQuote } from "../lib/productPrices";
 import { draftQuoteCode, buildQuoteLines, QuoteDocument } from "../components/QuoteDocument";
 import { useAuth } from "../auth/AuthContext";
 import type {
@@ -62,6 +65,7 @@ import type {
   Sale,
   SaleOrigin,
   User,
+  Visit,
 } from "../lib/types";
 
 type SalesPageProps = {
@@ -82,6 +86,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [composing, setComposing] = useState(() => loadStandaloneSaleDraft() != null);
   const [detailSale, setDetailSale] = useState<Sale | null>(null);
+  const [linkedVisit, setLinkedVisit] = useState<Visit | null>(null);
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -288,7 +293,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     draftCode,
   ]);
 
-  const subtotal = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
+  const subtotal = useMemo(() => quoteLinesTotal(lines, products, currency), [lines, products, currency]);
   const money = useMemo(() => quoteMoney(subtotal, applyIva), [subtotal, applyIva]);
   const selectedClient = useMemo(
     () => (clientId === "" ? null : clients.find((c) => c.id === clientId) ?? null),
@@ -303,10 +308,11 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       clientFallback: selectedClient?.name ?? (clientId === "" ? "Cliente" : `Cliente #${clientId}`),
       currency,
       fxRate,
-      lines: buildQuoteLines(lines, products),
+      lines: buildQuoteLines(lines, products, currency),
       notes: notes.trim() || null,
       isCredit,
       applyIva,
+      pricedInQuoteCurrency: true,
     }),
     [
       draftCode,
@@ -324,10 +330,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     ],
   );
 
-  const fxHint =
-    currency === "VES" && (fxRate == null || fxRate <= 0)
-      ? "Liquidar en Bs (falta tasa FX)"
-      : null;
+  const vesGap = currency === "VES" ? quoteMissingVesPrice(lines, products) : null;
+  const fxHint = vesGap ?? null;
 
   function canAdvanceFrom(step: number): string | null {
     if (step === 0) {
@@ -336,8 +340,9 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     }
     if (step === 1) {
       if (!quoteLinesToItems(lines).length) return "Agrega al menos un producto";
-      if (currency === "VES" && fxRate == null && navigator.onLine) {
-        return "No hay tasa FX del día; el supervisor debe cargarla o usa USD";
+      if (currency === "VES") {
+        const missing = quoteMissingVesPrice(lines, products);
+        if (missing) return missing;
       }
       return null;
     }
@@ -389,13 +394,14 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       `COTIZACIÓN · ${client?.name ?? `Cliente #${clientId}`}`,
       ...items.map((it) => {
         const p = products.find((x) => x.id === it.product_id);
-        return `· ${p?.name ?? it.product_id} x${it.quantity} = $${(
-          (p ? Number(p.price_usd) : 0) * it.quantity
-        ).toFixed(2)}`;
+        return `· ${p?.name ?? it.product_id} x${it.quantity} = ${formatQuoteAmount(
+          ((p ? unitPriceForQuote(p, currency) : 0) ?? 0) * it.quantity,
+          currency,
+        )}`;
       }),
-      `Subtotal: ${formatQuoteAmount(money.subtotal, currency, fxRate)}`,
-      applyIva ? `IVA 16%: ${formatQuoteAmount(money.iva, currency, fxRate)}` : "Sin IVA",
-      `Total: ${formatQuoteAmount(money.total, currency, fxRate)}`,
+      `Subtotal: ${formatQuoteAmount(money.subtotal, currency)}`,
+      applyIva ? `IVA 16%: ${formatQuoteAmount(money.iva, currency)}` : "Sin IVA",
+      `Total: ${formatQuoteAmount(money.total, currency)}`,
       notes.trim() ? `Nota: ${notes.trim()}` : "",
     ]
       .filter(Boolean)
@@ -571,13 +577,26 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       <SaleDetailSheet
         sale={detailSale}
         open={detailSale != null}
-        onClose={() => setDetailSale(null)}
+        onClose={() => {
+          setDetailSale(null);
+          setLinkedVisit(null);
+        }}
         sellerName={
           detailSale && teamView
             ? sellerNameById.get(detailSale.seller_id) ?? null
             : null
         }
+        onOpenVisit={setLinkedVisit}
       />
+
+      {linkedVisit ? (
+        <VisitDetailSheet
+          visit={linkedVisit}
+          open
+          onClose={() => setLinkedVisit(null)}
+          onUpdated={setLinkedVisit}
+        />
+      ) : null}
 
       {!teamView ? (
         <Modal
@@ -721,12 +740,12 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
               <>
                 <p className="sale-total">
                   Total:{" "}
-                  <strong>{formatQuoteAmount(money.total, currency, fxRate)}</strong>
+                  <strong>{formatQuoteAmount(money.total, currency)}</strong>
                   {applyIva ? (
                     <span className="muted">
                       {" "}
-                      · subtotal {formatQuoteAmount(money.subtotal, currency, fxRate)} + IVA{" "}
-                      {formatQuoteAmount(money.iva, currency, fxRate)}
+                      · subtotal {formatQuoteAmount(money.subtotal, currency)} + IVA{" "}
+                      {formatQuoteAmount(money.iva, currency)}
                     </span>
                   ) : (
                     <span className="muted"> · sin IVA</span>

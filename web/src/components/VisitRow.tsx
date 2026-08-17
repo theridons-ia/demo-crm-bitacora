@@ -1,9 +1,10 @@
 import { AlertTriangle, ChevronRight } from "lucide-react";
+import { GpsProofPin } from "./GpsProofLegend";
 import { LiveLed } from "./LiveLed";
 import { formatAgendaDay, formatTime, todayISO } from "../lib/caracasTime";
 import { isVisitOverdue } from "../lib/visitOrder";
 import { visitNoteForUi } from "../lib/saleLabels";
-import { visitGpsProof, visitGpsProofLabel } from "../lib/visitEvidence";
+import { visitGpsProof, visitGpsProofHint, visitGpsProofLabel, type VisitGpsProof } from "../lib/visitEvidence";
 import type { Visit, VisitStatus } from "../lib/types";
 
 const STATUS_LABEL: Record<VisitStatus, string> = {
@@ -45,25 +46,45 @@ function whenLabel(visit: Visit, clock?: "agenda"): string {
   return "Sin hora";
 }
 
-function metaLabel(visit: Visit, pinMissing?: boolean, showSeller?: boolean): string {
-  let base = STATUS_LABEL[visit.status];
-  if (visit.status === "completada") {
-    if (visit.result === "sin_venta") base = "Sin venta";
-    else if (visit.result) base = "Con venta";
-    else base = STATUS_LABEL.completada;
-    const proof = visitGpsProofLabel(visitGpsProof(visit));
-    if (proof) base = `${base} · ${proof}`;
-  } else if (visit.status === "en_curso") {
-    base = "Toca para continuar";
-  } else if (visit.status === "programada") {
-    base = isVisitOverdue(visit, todayISO()) ? "Sin asistir" : "Programada";
-  }
+type MetaBits = {
+  lead: string;
+  proof: VisitGpsProof;
+  proofLabel: string | null;
+  tail: string;
+};
+
+function metaBits(visit: Visit, pinMissing?: boolean, showSeller?: boolean): MetaBits {
+  const lead: string[] = [];
+  const tail: string[] = [];
+  let proof: VisitGpsProof = "none";
+
   if (showSeller && visit.seller?.full_name) {
-    base = `${visit.seller.full_name} · ${base}`;
+    lead.push(visit.seller.full_name);
   }
-  if (visit.schedule_locked) base = `${base} · Fija`;
-  else if (visit.origin_plan === "vendedor") base = `${base} · Extra`;
-  return pinMissing ? `${base} · Sin pin` : base;
+
+  if (visit.status === "completada") {
+    if (visit.result === "sin_venta") lead.push("Sin venta");
+    else if (visit.result) lead.push("Con venta");
+    else lead.push(STATUS_LABEL.completada);
+    proof = visitGpsProof(visit);
+  } else if (visit.status === "en_curso") {
+    lead.push("Toca para continuar");
+  } else if (visit.status === "programada") {
+    lead.push(isVisitOverdue(visit, todayISO()) ? "Sin asistir" : "Programada");
+  } else {
+    lead.push(STATUS_LABEL[visit.status]);
+  }
+
+  if (visit.schedule_locked) tail.push("Fija");
+  else if (visit.origin_plan === "vendedor") tail.push("Extra");
+  if (pinMissing) tail.push("Sin pin");
+
+  return {
+    lead: lead.join(" · "),
+    proof,
+    proofLabel: visitGpsProofLabel(proof),
+    tail: tail.join(" · "),
+  };
 }
 
 /**
@@ -76,6 +97,7 @@ export function VisitRow({ visit, onClick, index, clock, pinMissing, showSeller 
   const overdue = isVisitOverdue(visit, todayISO());
   const title = index != null ? `${index}. ${name}` : name;
   const note = visitNoteForUi(visit.description);
+  const meta = metaBits(visit, pinMissing, showSeller);
 
   return (
     <li>
@@ -95,7 +117,19 @@ export function VisitRow({ visit, onClick, index, clock, pinMissing, showSeller 
         </span>
         <span className="visit-row-copy">
           <span className="visit-row-name">{title}</span>
-          <span className="visit-row-meta">{metaLabel(visit, pinMissing, showSeller)}</span>
+          <span className="visit-row-meta">
+            {meta.lead ? <span className="visit-row-meta-bit">{meta.lead}</span> : null}
+            {meta.proofLabel ? (
+              <span
+                className={`visit-row-proof is-${meta.proof}`}
+                title={visitGpsProofHint(meta.proof) ?? undefined}
+              >
+                <GpsProofPin kind={meta.proof} size={12} />
+                {meta.proofLabel}
+              </span>
+            ) : null}
+            {meta.tail ? <span className="visit-row-meta-bit">{meta.tail}</span> : null}
+          </span>
           {note ? <span className="visit-row-note">{note}</span> : null}
         </span>
         <span className="visit-row-when">{whenLabel(visit, clock)}</span>

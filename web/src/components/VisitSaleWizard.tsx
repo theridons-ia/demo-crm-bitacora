@@ -26,6 +26,7 @@ import {
   newQuoteLine,
   quoteLinesToItems,
   quoteLinesTotal,
+  quoteMissingVesPrice,
   SaleQuoter,
   type QuoteLine,
 } from "./SaleQuoter";
@@ -186,7 +187,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
   }, [open, visit.id, step, lines, currency, isCredit, applyIva, payment, notes, issuedAt]);
 
   const items = useMemo(() => quoteLinesToItems(lines), [lines]);
-  const subtotal = useMemo(() => quoteLinesTotal(lines, products), [lines, products]);
+  const subtotal = useMemo(() => quoteLinesTotal(lines, products, currency), [lines, products, currency]);
   const money = useMemo(() => quoteMoney(subtotal, applyIva), [subtotal, applyIva]);
   const clientName = visit.client?.name ?? `Cliente #${visit.client_id}`;
   const quoteCode = useMemo(() => draftQuoteCode(issuedAt), [issuedAt]);
@@ -200,10 +201,11 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
       clientFallback: clientName,
       currency,
       fxRate,
-      lines: buildQuoteLines(lines, products),
+      lines: buildQuoteLines(lines, products, currency),
       notes: notes.trim() || null,
       isCredit,
       applyIva,
+      pricedInQuoteCurrency: true,
     }),
     [
       quoteCode,
@@ -228,9 +230,12 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
         setError("Agrega al menos un producto");
         return;
       }
-      if (currency === "VES" && fxRate == null && navigator.onLine) {
-        setError("No hay tasa FX del día; el supervisor debe cargarla o usa USD");
-        return;
+      if (currency === "VES") {
+        const missing = quoteMissingVesPrice(lines, products);
+        if (missing) {
+          setError(missing);
+          return;
+        }
       }
       setStep(1);
       return;
@@ -356,17 +361,17 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
             <div className="visit-sale-quote-summary" role="status">
               <div>
                 <span className="muted small">Subtotal</span>
-                <strong>{formatQuoteAmount(money.subtotal, currency, fxRate)}</strong>
+                <strong>{formatQuoteAmount(money.subtotal, currency)}</strong>
               </div>
               <div>
                 <span className="muted small">{applyIva ? "IVA 16%" : "IVA"}</span>
                 <strong>
-                  {applyIva ? formatQuoteAmount(money.iva, currency, fxRate) : "Sin IVA"}
+                  {applyIva ? formatQuoteAmount(money.iva, currency) : "Sin IVA"}
                 </strong>
               </div>
               <div className="is-total">
                 <span className="muted small">Total</span>
-                <strong>{formatQuoteAmount(money.total, currency, fxRate)}</strong>
+                <strong>{formatQuoteAmount(money.total, currency)}</strong>
               </div>
             </div>
 

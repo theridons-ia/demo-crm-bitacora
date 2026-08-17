@@ -23,7 +23,8 @@ from ..models import (
 )
 from ..schemas import SaleIn
 from .catalog_visibility import assert_seller_can_use_products
-from .fx import resolve_usd_to_ves
+from .fx import get_today_out, resolve_usd_to_ves
+from .product_prices import product_to_out, unit_price_for_sale
 
 # Umbrales evidencia (metros)
 GPS_ACCURACY_WARN_M = Decimal("100")
@@ -85,6 +86,9 @@ def apply_sale_to_inventory(db: Session, sale_in: SaleIn) -> tuple[Decimal, list
 
     total = Decimal("0")
     items: list[SaleItem] = []
+    fx = get_today_out(db)
+    bcv = fx.usd_to_ves if fx else None
+    usdt = fx.usdt_to_ves if fx else None
 
     for line in sale_in.items:
         product = db.query(Product).filter(Product.id == line.product_id, Product.is_active.is_(True)).first()
@@ -96,7 +100,13 @@ def apply_sale_to_inventory(db: Session, sale_in: SaleIn) -> tuple[Decimal, list
                 detail=f"Stock insuficiente de {product.name}: hay {product.stock}, pediste {line.quantity}",
             )
 
-        unit_price = Decimal(product.price_usd)
+        priced = product_to_out(product, bcv=bcv, usdt=usdt)
+        unit_price = unit_price_for_sale(priced, sale_in.currency)
+        if unit_price is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{product.name} no tiene Precio 3 (Bs); no se puede cotizar en bolívares",
+            )
         line_total = unit_price * line.quantity
         product.stock -= line.quantity
         total += line_total
@@ -287,14 +297,7 @@ def close_visit_with_optional_sale(
         if seller:
             assert_seller_can_use_products(db, seller, [line.product_id for line in sale_in.items])
         total, items = apply_sale_to_inventory(db, sale_in)
-        fx_rate = None
-        if sale_in.currency == CurrencyCode.VES:
-            fx_rate = resolve_usd_to_ves(db)
-            if fx_rate is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="No hay tasa FX del día: el supervisor debe cargarla",
-                )
+        fx_rate = resolve_usd_to_ves(db)
         sale = Sale(
             visit_id=visit.id,
             seller_id=seller_id,

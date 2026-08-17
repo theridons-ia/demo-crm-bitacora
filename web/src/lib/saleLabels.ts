@@ -31,6 +31,21 @@ export function saleUnitCount(sale: Sale): number {
   return (sale.items ?? []).reduce((n, i) => n + i.quantity, 0);
 }
 
+/** Total en la moneda de la OV. USD y Bs son ventas distintas; no mezclar símbolos. */
+export function formatSaleTotal(sale: Pick<Sale, "total_amount" | "currency">): string {
+  const n = Number(sale.total_amount);
+  const x = Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  if (sale.currency === "VES") return `Bs. ${x}`;
+  if (sale.currency === "EUR") return `€ ${x}`;
+  return `$ ${x}`;
+}
+
+export function saleCurrencyLabel(currency: Sale["currency"]): string {
+  if (currency === "VES") return "Bs";
+  if (currency === "EUR") return "EUR";
+  return "USD";
+}
+
 /** Más reciente primero. */
 export function sortSalesNewestFirst(sales: Sale[]): Sale[] {
   return [...sales].sort(

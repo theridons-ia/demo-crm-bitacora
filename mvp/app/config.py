@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     # Orígenes del front Vite (coma-separados). En prod pondrás tu dominio.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # Tasas VE (pack SPTCA). ExchangeRate-API es fallback opcional.
+    exchangerate_api_key: str = ""
+    binance_top_n: int = 15
+    yadio_top_n: int = 25
 
     @property
     def cors_origin_list(self) -> list[str]:

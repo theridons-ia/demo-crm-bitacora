@@ -218,6 +218,7 @@ def _ensure_fx(db, supervisor: User) -> None:
                 FxRate(
                     rate_date=d,
                     usd_to_ves=Decimal(val),
+                    usd_source="Tasa demo (no oficial)",
                     notes=notes,
                     created_by_id=supervisor.id,
                 )
@@ -969,9 +970,11 @@ def sync_ali_today_route(db, users: dict[str, User]) -> None:
             db.add(c)
             db.flush()
         else:
-            c.latitude = Decimal(str(lat))
-            c.longitude = Decimal(str(lng))
-            c.address = address
+            if lat is not None and c.latitude is None:
+                c.latitude = Decimal(str(lat))
+                c.longitude = Decimal(str(lng))
+            if not c.address:
+                c.address = address
             c.phone = c.phone or phone
         _assign(db, ali, c)
         planned.append((c, day, hour, minute, name))

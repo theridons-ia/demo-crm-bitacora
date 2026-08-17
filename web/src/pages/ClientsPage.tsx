@@ -158,6 +158,7 @@ export function ClientsPage() {
             return [client, ...without];
           });
           setSelected(client);
+          setEditing((prev) => (prev && prev.id === client.id ? client : prev));
         }}
       />
 

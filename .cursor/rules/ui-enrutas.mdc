@@ -31,7 +31,7 @@ Patrón obligatorio:
    - Inicio · Ruta · Visitas · Clientes · **Más**
 2. **Más** abre hoja inferior (`SideSheet` / menú) con el resto:
    - Ventas · Vendedores · Catálogo · Inventario · Cobranza · Mapa equipo
-3. Alertas y FX viven en **header** (campana / menú perfil), no en el tabbar.
+3. Alertas y Tasas viven en **header** (campana / menú perfil), no en el tabbar.
 4. Desktop (≥900px): sidebar completa a **alto de pantalla** (`100dvh`, sticky). El fondo blanco no se corta a mitad; “Vista vendedor” queda al pie. Sin tabbar.
 
 Unificar vistas solo cuando aporte (ej. tabs internas Visitas/Ventas en una pantalla “Actividad”); no fusionar módulos distintos solo para ahorrar un ítem de menú.
@@ -88,8 +88,8 @@ Reglas del strip de ruta:
 - **En curso:** componente `LiveLed` (punto coral parpadeante) en ficha, card activa, lista y agenda.
 - Al crear visita (ahora/programada): cerrar form y **abrir la ficha** de esa visita (`setDetailVisit`), no solo dejar el listado.
 - Cancelar visita: `POST /api/visits/{id}/cancel` desde la ficha (programada o en curso **sin OV**).
-- **Lista de visitas:** chips **Programadas · Culminadas · Canceladas** (default Programadas). El carrusel de fechas vive **dentro** de Programadas (hoy por defecto; **Todas** para el backlog). En curso: LED en la misma fila. Orden horario ASC. **Culminadas:** más reciente primero. Ficha: nombre del PDV una sola vez. Sin coords en la fila; si hay evidencia, meta **Prueba GPS**. Pieza: `VisitRow`.
-- Tras **Iniciar**: mapa «¿Estás en el PDV?». **Actualizar GPS** recaptura y **reemplaza el punto de inicio** (`pinVisitGps` + `replace_start`). No hay botón de trail. Sin señal: mensaje + continuar sin GPS (temporal). Al cerrar se toma un GPS nuevo.
+- **Lista de visitas:** chips **Programadas · Culminadas · Canceladas** (default Programadas). El carrusel de fechas vive **dentro** de Programadas y Culminadas (hoy por defecto; **Todas** para la lista completa). En curso: LED en la misma fila. Orden horario ASC. **Culminadas:** más reciente primero. Ficha: nombre del PDV una sola vez. Sin coords en la fila; si hay evidencia, meta **[pin] En el PDV / Dudosa / Sin evidencia** (el pin va **junto a esas palabras**, no sustituye el punto ni va en los chips). Extra/Fija van separados con `·` y gap. Leyenda `GpsProofLegend` en **una fila** compacta; tap o hover abre hint humano (`visitGpsProofHint`). Umbral: inicio **y** cierre ≤ 40 m = En el PDV; 40–100 m o GPS incompleto = Dudosa; > 100 m o faltó un punto = Sin evidencia (anti-trampa: venta sin visitar; no sentencia “no fue”, porque el cierre lejos también cae aquí). Pieza: `VisitRow`. Supervisor (Equipo → Visitas, Culminadas): leyenda + chips En el PDV · Dudosa · Sin evidencia · Con venta (chips sin pin).
+- Tras **Iniciar** o **crear con Ahora**: mapa «¿Estás en el PDV?». **Actualizar GPS** recaptura y **reemplaza el punto de inicio** (`pinVisitGps` + `replace_start`). No hay botón de trail. Sin señal: mensaje + continuar sin GPS (temporal). Al cerrar se toma un GPS nuevo.
 - **GPS de prueba (solo `npm run dev`):** toggle en el **header** (`GPS simular`). Simula estar **junto al PDV** (coords del cliente ± ~20 m) al iniciar, guardar GPS o cerrar. **No** genera un trail de puntos en movimiento. Al apagarlo, el muestreo continuo se detiene.
 - Mapa de evidencia (`VisitMapSheet`): PDV fucsia · Inicio negro · Trail coral · **Ahora** teal con etiqueta (posición actual, distinto del trail) · Cierre rojo.
 
@@ -138,15 +138,19 @@ Reglas de evidencia:
 - Encabezado tipo membrete: **logo | NOMBRE EMPRESA (grande) · RIF · slogan + dirección (pequeño)**. Demo: `DEFAULT_QUOTE_ISSUER` (Carabobo).
 - Bloque cliente: renglones **Cliente | Válido hasta**, **RIF/CI | Tasa o moneda**, **Dirección | Condición**. Etiqueta en negrita + valor; metadatos **pegados a la derecha** del mismo renglón.
 - Totales **dentro de la tabla** (`tfoot`): etiquetas bajo Precio unit., montos bajo Subtotal, barra TOTAL alineada al borde derecho. No una caja suelta desfasada.
-- Una moneda: si USD todo en $; si Bs todo en Bs. Columnas: código, descripción, cant., precio unit., subtotal.
+- Una moneda: si USD todo en `$`; si Bs todo en `Bs`. Columnas: código, descripción, cant., precio unit., subtotal. USD y VES son operaciones distintas; la tasa BCV no se inventa en UI.
 - Paleta EnRutas (teal/coral/cream). No copiar verdes/morados de cotizaciones de terceros.
 - Helper único: `quoteMoney()` / IVA 16%. Snapshot guarda `applyIva`.
 
 ## Lista de Ventas
 
-- No usar fichas sueltas para el listado: `SalesTable` (columnas densas, fecha desc.).
-- Clic en fila → `SaleDetailSheet` (resumen OV + líneas).
-- Mismo patrón visual que inventario (`stock-table-*`).
+Gramática de fila: ver `ui-movil.mdc` § Fila de lista. No es una tabla Excel recortada.
+
+- **Móvil:** `SaleRow` — punto (contado / crédito) · **nombre del PDV** · meta `OV-… · Contado|Crédito` (y vendedor en vista equipo) · **monto + moneda** · chevron. Código OV nunca es el título. Sin carrito por fila (el módulo ya es Ventas).
+- **Desktop:** `SalesTable` columnas densas (OV, cliente, vendedor, fecha, origen, pago, total), fecha desc. Cabecera tipo inventario (`sales-table-head`).
+- Clic en fila → `SaleDetailSheet` (resumen OV + líneas + documento). En el resumen: **Visita relacionada** (estado + fecha) o **Sin visita · Mostrador/Online**. Tap abre la ficha de visita. Si la OV se abrió desde una visita, solo dice «Registrada en esta visita». Contado: **Cuenta de cobro** colapsada (`PayMark` + nombre del banco/cuenta; titular y `pay_hint` al desplegar) y **Referencia de pago**. Crédito: sin cuenta ni referencia.
+- **USD y Bs son ventas distintas.** Una OV es de una sola moneda (`USD` o `VES`); no mezclar `$` y `Bs.` en el mismo documento. Totales con `formatSaleTotal` (`$ …` o `Bs. …`). USD cotiza **Precio 1**; Bs cotiza **Precio 3**. Liquidar/tasa BCV no sustituye Precio 3.
+- Prohibido: 4 renglones de texto sin chevron; ítems/ud como segunda línea si ya está el monto (eso vive en la ficha).
 
 ## Feeling FINA → EnRutas
 
@@ -156,6 +160,15 @@ Reglas de evidencia:
 - `PaymentCapture` en venta contado / cierre con venta / abonos.
 - Bancos = catálogo de cuentas de la empresa; el vendedor solo elige destino.
 - Cotizador: `SaleQuoter` con líneas + subtotales; copiar cotización ≠ confirmar venta.
+
+## Tasas BCV (`/sup/fx`)
+
+- Pack SPTCA (`mvp/app/services/tasas_fuentes.py`): **no** inventar APIs viejas.
+- UI: 4 tiles — **USD BCV** (logo BCV), **USDT** (logo Binance), **USDT / BCV** (ratio ~1,13 y % sobre BCV), **EUR BCV**. CTA **Actualizar ahora** (`POST /api/fx/refresh`).
+- BS ya no duplica el BCV: el diferencial es `USDT ÷ BCV` (1,13 ≈ +13 %).
+- Ajuste manual solo para BCV si fallan las fuentes. Ventas VES leen `usd_to_ves`; no mezclar USDT en el total de la OV todavía.
+- Inventario (ficha producto): **Precio 1 (USD)** Manual o **Margen** (= Precio 2 ÷ diferencial USDT/BCV). **Precio 2 (USD)** Auto = Precio 1 x diferencial (USDT/BCV) o Manual. **Precio 3 (Bs)** Auto = Precio 2 x USD BCV o Manual. P1 Margen y P2 Auto son excluyentes. Prefijos `$` / `Bs.` en los campos. GET lista recalcula Auto con la tasa viva.
+- Cotizador: **USD usa Precio 1**; **Bs usa Precio 3**. No convertir Precio 1 × BCV al cotizar en bolívares. Totales `$ 0.00` / `Bs. 0.00`.
 
 ## Acciones rápidas (vendedor)
 
@@ -179,7 +192,8 @@ Reglas de evidencia:
 - Chips de moneda pegados a la tabla. **Tasa del día** en la misma línea que “Precios de línea sin IVA…”.
 - IVA a la izquierda del pie; etiquetas de totales bajo Precio unit. y montos bajo Subtotal.
 - Barra TOTAL redondeada (`--radius`), pegada a la tabla (sin hueco).
-- Etiqueta **Total** + monto `formatQuoteAmount` (un solo `$`). Prohibido `Total $ $ 13.57`.
+- Etiqueta **Total** + monto `formatQuoteAmount` (`$ 0.00` o `Bs. 0.00`, un solo prefijo). Prohibido `Total $ $ 13.57`.
+- USD usa **Precio 1**; Bs usa **Precio 3**. No convertir Precio 1 × BCV en el cotizador.
 - Misma UI en venta sin visita y venta en visita.
 
 ## Paso 2 Pago (`PaymentCapture`)

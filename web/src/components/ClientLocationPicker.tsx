@@ -14,6 +14,10 @@ type Props = {
   onPick: (lat: number, lng: number) => void;
 };
 
+function farEnough(a: L.LatLng, lat: number, lng: number): boolean {
+  return Math.abs(a.lat - lat) > 1e-6 || Math.abs(a.lng - lng) > 1e-6;
+}
+
 /** Mapa para fijar el pin del PDV (tocar o arrastrar marcador). */
 export function ClientLocationPicker({ latitude, longitude, label, onPick }: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
@@ -21,11 +25,18 @@ export function ClientLocationPicker({ latitude, longitude, label, onPick }: Pro
   const markerRef = useRef<L.Marker | null>(null);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const origin = useRef({ latitude, longitude });
 
   useEffect(() => {
     if (!mapEl.current || mapRef.current) return;
 
-    const map = L.map(mapEl.current, { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    const startLat = origin.current.latitude;
+    const startLng = origin.current.longitude;
+    const hasPin = startLat != null && startLng != null;
+    const map = L.map(mapEl.current, { zoomControl: true }).setView(
+      hasPin ? [startLat, startLng] : DEFAULT_CENTER,
+      hasPin ? 16 : DEFAULT_ZOOM,
+    );
     mapRef.current = map;
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -37,7 +48,7 @@ export function ClientLocationPicker({ latitude, longitude, label, onPick }: Pro
       onPickRef.current(e.latlng.lat, e.latlng.lng);
     });
 
-    const t = window.setTimeout(() => map.invalidateSize(), 100);
+    const t = window.setTimeout(() => map.invalidateSize(), 120);
     return () => {
       window.clearTimeout(t);
       map.remove();
@@ -66,12 +77,17 @@ export function ClientLocationPicker({ latitude, longitude, label, onPick }: Pro
         const pos = markerRef.current?.getLatLng();
         if (pos) onPickRef.current(pos.lat, pos.lng);
       });
-    } else {
-      markerRef.current.setLatLng(ll);
-      markerRef.current.setIcon(icon);
-      markerRef.current.bindPopup(popupText);
+      map.setView(ll, Math.max(map.getZoom(), 15));
+      return;
     }
-    map.setView(ll, Math.max(map.getZoom(), 15));
+
+    markerRef.current.setIcon(icon);
+    markerRef.current.bindPopup(popupText);
+    const cur = markerRef.current.getLatLng();
+    if (farEnough(cur, latitude, longitude)) {
+      markerRef.current.setLatLng(ll);
+      map.setView(ll, Math.max(map.getZoom(), 15));
+    }
   }, [latitude, longitude, label]);
 
   return <div ref={mapEl} className="client-pick-map" role="application" aria-label="Mapa ubicación PDV" />;

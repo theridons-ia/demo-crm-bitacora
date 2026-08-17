@@ -18,8 +18,17 @@ from ..services.catalog_visibility import (
     set_visibility,
     visible_product_ids_for_seller,
 )
+from ..services.fx import get_today_out
+from ..services.product_prices import apply_auto_prices, product_to_out
 
 router = APIRouter(tags=["catalog"])
+
+
+def _fx_pair(db: Session) -> tuple:
+    fx = get_today_out(db)
+    if not fx:
+        return None, None
+    return fx.usd_to_ves, fx.usdt_to_ves
 
 
 @router.get("/api/products", response_model=list[ProductOut])
@@ -31,7 +40,8 @@ def list_products(db: Session = Depends(get_db), current_user: User = Depends(ge
             if not allowed:
                 return []
             query = query.filter(Product.id.in_(allowed))
-    return query.order_by(Product.name).all()
+    bcv, usdt = _fx_pair(db)
+    return [product_to_out(p, bcv=bcv, usdt=usdt) for p in query.order_by(Product.name).all()]
 
 
 def _normalize_image_url(value: str | None) -> str | None:
@@ -67,6 +77,10 @@ def _sanitize_product_payload(data: dict) -> dict:
         raise HTTPException(status_code=400, detail="Stock mínimo inválido")
     if "cost_usd" in data and data["cost_usd"] is not None and data["cost_usd"] < 0:
         raise HTTPException(status_code=400, detail="Costo inválido")
+    if "price_usd_2" in data and data["price_usd_2"] is not None and data["price_usd_2"] < 0:
+        raise HTTPException(status_code=400, detail="Precio 2 inválido")
+    if "price_ves" in data and data["price_ves"] is not None and data["price_ves"] < 0:
+        raise HTTPException(status_code=400, detail="Precio 3 (Bs) inválido")
     return data
 
 
@@ -89,11 +103,13 @@ def create_product(
     data["stock"] = max(0, payload.stock)
     if data.get("min_stock") is None:
         data["min_stock"] = 40
+    bcv, usdt = _fx_pair(db)
+    apply_auto_prices(data, bcv=bcv, usdt=usdt)
     product = Product(**data)
     db.add(product)
     db.commit()
     db.refresh(product)
-    return product
+    return product_to_out(product, bcv=bcv, usdt=usdt)
 
 
 @router.patch("/api/products/{product_id}", response_model=ProductOut)
@@ -115,9 +131,22 @@ def update_product(
             raise HTTPException(status_code=400, detail="El nombre no puede quedar vacío")
     for key, value in data.items():
         setattr(product, key, value)
+    bcv, usdt = _fx_pair(db)
+    snapshot = {
+        "price_usd": product.price_usd,
+        "price_usd_2": product.price_usd_2,
+        "price_ves": product.price_ves,
+        "price_usd_auto": product.price_usd_auto,
+        "price_usd_2_auto": product.price_usd_2_auto,
+        "price_ves_auto": product.price_ves_auto,
+    }
+    apply_auto_prices(snapshot, bcv=bcv, usdt=usdt)
+    product.price_usd = snapshot.get("price_usd")
+    product.price_usd_2 = snapshot.get("price_usd_2")
+    product.price_ves = snapshot.get("price_ves")
     db.commit()
     db.refresh(product)
-    return product
+    return product_to_out(product, bcv=bcv, usdt=usdt)
 
 
 @router.get("/api/suppliers", response_model=list[SupplierOut])

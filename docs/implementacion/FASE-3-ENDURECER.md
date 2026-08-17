@@ -41,19 +41,18 @@ Estado de cuenta básico: ventas `is_credit` + abonos hasta saldar.
 
 ---
 
-## SF-3.3 — FX diario
+## SF-3.3 — Tasas (BCV / USDT)
 
 ### Objetivo
-Tasa **USD → VES** del día (Bs por 1 USD), cargada por supervisor; se congela en la venta si liquidan en Bs.
+Tasa **USD BCV → VES** del día para liquidar ventas en Bs, más snapshot **USDT** y **EUR BCV**. Fuentes del pack SPTCA (`tasas_fuentes.py`): DolarApi → Dolitoday → ExchangeRate-API; USDT Binance P2P → Yadio.
 
 ### Qué se hizo
-- Tabla `fx_rates` + columna `sales.fx_rate_usd_ves`.
-- `GET /api/fx/today`, `GET /api/fx`, `PUT /api/fx`.
-- UI `/sup/fx`.
-- Ventas en VES requieren tasa; muestran equivalente en Bs.
-- Seed: tasa demo 36.50 si no hay filas.
+- Tabla `fx_rates` (`usd_to_ves`, `usdt_to_ves`, `eur_to_ves`, fuentes) + columna `sales.fx_rate_usd_ves`.
+- `GET /api/fx/today`, `GET /api/fx`, `POST /api/fx/refresh`, `PUT /api/fx`.
+- UI `/sup/fx`: tarjetas USD BCV · USDT · BS (alias BCV) · EUR + **Actualizar ahora**.
+- Ventas en VES siguen usando **solo** `usd_to_ves` (BCV). Equivalencias de precio a varias tasas: pendiente.
 
 ### Cómo verificar
-1. Supervisor → **Tasa FX** → guardar Bs/USD.
-2. Marina → Ventas → moneda VES → ver equivalente.
-3. Confirmar venta VES → queda `fx_rate_usd_ves` en la venta.
+1. Supervisor → **Tasas** → **Actualizar ahora**.
+2. Ver USD BCV, USDT y BS (mismo valor que BCV).
+3. Marina → Ventas → moneda VES → usa el BCV guardado.
