@@ -270,7 +270,7 @@ export function PaymentCapture({
           id="pay-photo"
           label="Comprobante"
           hint="Opcional · JPG o PNG"
-          readyHint="Se adjunta a la OV"
+          readyHint="Se adjunta al pedido"
           value={value.payment_evidence}
           disabled={disabled}
           onChange={(next) => onChange({ ...value, payment_evidence: next })}

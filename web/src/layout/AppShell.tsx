@@ -49,7 +49,7 @@ export function AppShell({ variant }: Props) {
           >
             <span>
               {visitWork?.selling || draft
-                ? "OV en curso"
+                ? "Pedido en curso"
                 : "Visita en curso"}
               {visitWork?.clientName ? ` · ${visitWork.clientName}` : ""}
             </span>

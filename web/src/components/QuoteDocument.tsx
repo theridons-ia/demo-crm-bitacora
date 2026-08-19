@@ -247,7 +247,7 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
     validUntil.setDate(validUntil.getDate() + 1);
     validUntil.setHours(23, 59, 0, 0);
     const validLabel = formatDateTime(validUntil);
-    const isOv = data.code.startsWith("OV-");
+    const isPedido = data.code.startsWith("OV-") || data.code.startsWith("PED-");
     const isVes = data.currency === "VES";
     const pricedInQuote = Boolean(data.pricedInQuoteCurrency);
     function amount(n: number): string {
@@ -469,7 +469,7 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
             </div>
           </div>
           <div className="quote-doc-meta">
-            <span className="quote-doc-title">{isOv ? "ORDEN DE VENTA" : "COTIZACIÓN"}</span>
+            <span className="quote-doc-title">{isPedido ? "PEDIDO" : "COTIZACIÓN"}</span>
             <p>
               <strong>{data.code}</strong>
             </p>
@@ -600,9 +600,9 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
               <li>{ivaNote}.</li>
               <li>Precios sujetos a tasa del día y existencia.</li>
               <li>
-                {isOv
-                  ? "Documento asociado a la orden de venta confirmada."
-                  : "Al confirmar se genera la orden de venta (OV)."}
+                {isPedido
+                  ? "Documento asociado al pedido confirmado."
+                  : "Al confirmar se genera el pedido."}
               </li>
             </ul>
           </div>

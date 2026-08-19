@@ -208,7 +208,7 @@ export function ReceivablesPage() {
             id="cobranza-search"
             value={query}
             onChange={setQuery}
-            placeholder="Cliente, vendedor u OV…"
+            placeholder="Cliente, vendedor u pedido…"
           />
           <div className="filter-chips" role="tablist" aria-label="Filtro cobranza">
             <button
@@ -260,7 +260,7 @@ export function ReceivablesPage() {
                       <strong className="ficha-amount">${balance.toFixed(0)}</strong>
                     </span>
                     <p className="ficha-meta">
-                      OV-{r.sale_id}
+                      PED-{r.sale_id}
                       {r.seller_name ? ` · ${r.seller_name}` : ""}
                       {` · ${formatDateShort(r.created_at)}`}
                     </p>
@@ -292,7 +292,7 @@ export function ReceivablesPage() {
         {paying ? (
           <div className="sheet-form-stack">
             <p className="muted" style={{ marginTop: 0 }}>
-              {paying.client_name ?? `Cliente #${paying.client_id}`} · OV-{paying.sale_id}
+              {paying.client_name ?? `Cliente #${paying.client_id}`} · PED-{paying.sale_id}
             </p>
             <p className="ficha-amount" style={{ margin: "0 0 0.75rem" }}>
               Saldo ${Number(paying.balance).toFixed(2)}

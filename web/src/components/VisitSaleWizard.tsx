@@ -56,7 +56,7 @@ const STEPS = [
 
 /**
  * Wizard 1→2→3 en Modal (flujo largo).
- * 1 productos+moneda · 2 pago · 3 cotización descargable + confirmar OV.
+ * 1 productos+moneda · 2 pago · 3 cotización descargable + confirmar pedido.
  */
 export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
   const { user } = useAuth();
@@ -291,7 +291,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
       open={open}
       onClose={requestClose}
       size="wide"
-      eyebrow="Orden de venta"
+      eyebrow="Pedido"
       title={clientName}
       footer={
         <WizardFooter
@@ -300,7 +300,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
           nextDisabled={loading}
           onBack={() => setStep((s) => Math.max(0, s - 1))}
           primaryLabel={
-            step < 2 ? "Siguiente" : submitting ? "Registrando…" : "Confirmar OV"
+            step < 2 ? "Siguiente" : submitting ? "Registrando…" : "Confirmar pedido"
           }
           onPrimary={step < 2 ? goNext : () => void confirmSale()}
         />
@@ -376,7 +376,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
               />
             ) : (
               <p className="pay-credit-note">
-                Esta OV se registra a crédito. No hace falta comprobante ni referencia de
+                Este pedido se registra a crédito. No hace falta comprobante ni referencia de
                 pago.
               </p>
             )}

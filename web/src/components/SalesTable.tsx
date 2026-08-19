@@ -34,7 +34,7 @@ export function SalesTable({ sales, sellerNameById, showSeller, onRowClick }: Pr
       </ul>
       <div className="sales-table-card">
       <div className={`sales-table-head ${showSeller ? "with-seller" : ""}`.trim()} aria-hidden>
-        <span>OV</span>
+        <span>Pedido</span>
         <span>Cliente</span>
         {showSeller ? <span>Vendedor</span> : null}
         <span>Fecha</span>

@@ -75,7 +75,7 @@ type SalesPageProps = {
 
 type StandaloneOrigin = Exclude<SaleOrigin, "visita">;
 
-/** Órdenes: lista + alta sin visita (mostrador / online) en Modal. */
+/** Pedidos: lista + alta sin visita (mostrador / online) en Modal. */
 export function SalesPage({ teamView = false }: SalesPageProps) {
   const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
@@ -172,7 +172,9 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       const name = sale.client?.name ?? "";
       const id = sale.client?.rif ?? sale.client?.ci ?? "";
       const seller = sellerNameById.get(sale.seller_id) ?? "";
-      return `${name} ${id} ${seller} ${saleOrderCode(sale)} OV-${sale.id}`.toLowerCase().includes(q);
+      return `${name} ${id} ${seller} ${saleOrderCode(sale)} PED-${sale.id} OV-${sale.id}`
+        .toLowerCase()
+        .includes(q);
     });
   }, [sales, query, sellerNameById]);
 
@@ -499,17 +501,17 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     <>
       <WorkspacePage
         eyebrow={teamView ? "Equipo" : "Comercial"}
-        title="Ventas"
+        title="Pedidos"
         blurb={
           teamView
-            ? "Órdenes del equipo · clic para ver detalle."
-            : "Órdenes recientes · clic para ver resumen."
+            ? "Pedidos del equipo · clic para ver detalle."
+            : "Pedidos recientes · clic para ver resumen."
         }
         asideExtra={
           <AsideStats
-            title="Ventas"
+            title="Pedidos"
             items={[
-              { label: "Órdenes", value: sales.length },
+              { label: "Pedidos", value: sales.length },
               { label: "Total", value: `$${totalAmount.toFixed(0)}` },
               { label: "A crédito", value: creditCount },
             ]}
@@ -519,7 +521,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
         <header className="page-header page-header-with-action">
           <div>
             <p className="eyebrow">{teamView ? "Equipo · comercial" : "Comercial"}</p>
-            <h1 className="display-title">Ventas</h1>
+            <h1 className="display-title">Pedidos</h1>
             <p className="muted">
               {sales.length} órdenes · ${totalAmount.toFixed(0)}
             </p>
@@ -537,8 +539,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           ) : null}
         </header>
 
-        <MetricGrid aria-label="Resumen ventas" className="chrome-defer-metrics">
-          <MetricTile label="Órdenes" value={sales.length} icon={ShoppingCart} />
+        <MetricGrid aria-label="Resumen pedidos" className="chrome-defer-metrics">
+          <MetricTile label="Pedidos" value={sales.length} icon={ShoppingCart} />
           <MetricTile
             label="Total"
             value={`$${totalAmount.toFixed(0)}`}
@@ -557,7 +559,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
             id="sales-search"
             value={query}
             onChange={setQuery}
-            placeholder={teamView ? "Cliente, OV o vendedor…" : "Cliente u OV…"}
+            placeholder={teamView ? "Cliente, pedido o vendedor…" : "Cliente u pedido…"}
           />
         </div>
 
@@ -626,7 +628,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   ? "Siguiente"
                   : submitting
                     ? "Guardando…"
-                    : "Confirmar OV"
+                    : "Confirmar pedido"
               }
               primaryType={wizardStep < 2 ? "button" : "submit"}
               form={wizardStep < 2 ? undefined : "sale-create-form"}
@@ -773,7 +775,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   </Button>
                   {quoteCopied ? (
                     <p className="muted small" role="status">
-                      Copiada. Puedes confirmar la OV cuando el cliente acepte.
+                      Copiada. Puedes confirmar el pedido cuando el cliente acepte.
                     </p>
                   ) : null}
                 </div>

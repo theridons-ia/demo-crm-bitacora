@@ -24,7 +24,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onClosed: (visit: Visit) => void;
-  /** Si no hay OV: volver a la ficha para registrar venta. */
+  /** Si no hay pedido: volver a la ficha para registrar pedido. */
   onGoRegisterSale?: () => void;
 };
 
@@ -364,7 +364,7 @@ export function CloseVisitSheet({
           <CloseTimeSummary visit={draft} />
           <div className="visit-close-warn" role="status">
             <p className="eyebrow">Advertencia</p>
-            <strong>No hay OV registrada</strong>
+            <strong>No hay pedido registrada</strong>
             <p className="muted">
               Lo habitual es registrar la venta en la visita abierta y luego cerrar.
               Puedes volver a cotizar o confirmar el cierre sin venta.
@@ -405,7 +405,7 @@ export function CloseVisitSheet({
         {existingSale ? (
           <div className="visit-sale-confirmed" role="status">
             <div className="visit-sale-confirmed-copy">
-              <p className="eyebrow">Orden de venta</p>
+              <p className="eyebrow">Pedido</p>
               <strong>{saleOrderCode(existingSale)}</strong>
               <p className="muted small">
                 {formatSaleTotal(existingSale)}

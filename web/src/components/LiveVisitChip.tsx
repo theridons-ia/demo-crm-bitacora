@@ -12,7 +12,7 @@ function activeWork() {
   return { visitId: draft.visitId, selling: true, clientName: "" };
 }
 
-/** LED de visita/OV en curso en el header. Tocar reabre la ficha. */
+/** LED de visita/pedido en curso en el header. Tocar reabre la ficha. */
 export function LiveVisitChip() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -23,7 +23,7 @@ export function LiveVisitChip() {
   if (!work || work.visitId === 0) return null;
 
   const selling = work.selling || Boolean(peekVisitSaleDraft());
-  const label = selling ? "OV en curso" : "En curso";
+  const label = selling ? "Pedido en curso" : "En curso";
   const hint = work.clientName ? `${label} · ${work.clientName}` : label;
 
   function resume() {

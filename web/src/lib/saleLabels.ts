@@ -53,18 +53,24 @@ export function sortSalesNewestFirst(sales: Sale[]): Sale[] {
   );
 }
 
-/** Código de OV confirmada (snapshot) o sello OV-YYMMDD-HHMM-id en ventas viejas. */
+function normalizePedidoCode(code: string): string {
+  if (code.startsWith("OV-")) return `PED-${code.slice("OV-".length)}`;
+  if (code.startsWith("PED-")) return code;
+  return code;
+}
+
+/** Código de pedido confirmada (snapshot) o sello PED-YYMMDD-HHMM-id. */
 export function saleOrderCode(sale: Sale): string {
   if (sale.quote_snapshot?.trim()) {
     try {
       const data = JSON.parse(sale.quote_snapshot) as { code?: unknown };
       const code = typeof data?.code === "string" ? data.code.trim() : "";
-      if (code && !/^OV-\d+$/.test(code)) return code;
+      if (code && !/^OV-\d+$/.test(code)) return normalizePedidoCode(code);
     } catch {
       /* snapshot viejo o corrupto */
     }
   }
-  return formatSaleStamp(sale.created_at, sale.id);
+  return normalizePedidoCode(formatSaleStamp(sale.created_at, sale.id));
 }
 
 /** Notas de cierre antiguas «Cierre con OV-41» → código actual. */
@@ -72,13 +78,18 @@ export function rewriteCloseNote(description: string | null | undefined, sale: S
   if (!description?.trim()) return null;
   if (!sale) return visitNoteForUi(description);
   const code = saleOrderCode(sale);
-  const next = description.replace(/\bOV-\d+\b/g, code);
-  if (/^Cierre con OV-[\w-]+\s*$/i.test(next.trim())) return null;
+  const next = description
+    // Legacy: “OV-41”
+    .replace(/\b(?:OV|PED)-\d+\b/g, code)
+    // Sello: “OV-YYMMDD-HHMM-0001”
+    .replace(/\b(?:OV|PED)-\d{6}-\d{4}-\d{4}\b/g, code);
+
+  if (/^Cierre con (?:OV|PED)-[\w-]+\s*$/i.test(next.trim())) return null;
   return visitNoteForUi(next);
 }
 
 const SYSTEM_VISIT_NOTE =
-  /^(Ruta Ali ·|Ruta hoy ·|Sin asistir ·|Cierre con OV-|Cancelada$|Cierre demo)/i;
+  /^(Ruta Ali ·|Ruta hoy ·|Sin asistir ·|Cierre con (?:OV|PED)-|Cancelada$|Cierre demo)/i;
 
 /** Nota de campo para UI: oculta marcadores de seed/cierre automático. */
 export function visitNoteForUi(description: string | null | undefined): string | null {

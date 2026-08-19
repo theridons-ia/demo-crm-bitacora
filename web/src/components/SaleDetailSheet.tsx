@@ -56,7 +56,7 @@ function visitWhen(visit: Visit): string {
   return formatDateTime(visit.created_at);
 }
 
-/** Ficha de OV: resumen + cotización/OV guardada (descargable). */
+/** Ficha de pedido: resumen + cotización/documento guardado (descargable). */
 export function SaleDetailSheet({
   sale,
   open,
@@ -189,7 +189,7 @@ export function SaleDetailSheet({
       open={open}
       onClose={onClose}
       size="wide"
-      eyebrow="Orden de venta"
+      eyebrow="Pedido"
       title={saleOrderCode(sale)}
       blurb={`${formatDateTime(sale.created_at)} · ${originLabel}`}
       footer={
@@ -201,7 +201,7 @@ export function SaleDetailSheet({
       }
     >
       <div className="sale-detail sheet-form-stack">
-        <div className="choice-group" role="tablist" aria-label="Vista de la OV">
+        <div className="choice-group" role="tablist" aria-label="Vista del pedido">
           <button
             type="button"
             className={tab === "resumen" ? "chip active" : "chip"}

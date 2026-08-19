@@ -349,7 +349,7 @@ function VisitGpsEvidence({
   );
 }
 
-/** Ficha de visita: identidad, GPS accionable, OV y cierre. */
+/** Ficha de visita: identidad, GPS accionable, pedido y cierre. */
 export function VisitDetailSheet({
   visit,
   open,
@@ -896,7 +896,7 @@ export function VisitDetailSheet({
                 </p>
               ) : live && !sale ? (
                 <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-                  Registra la OV y luego cierra con evidencia.
+                  Registra el pedido y luego cierra con evidencia.
                 </p>
               ) : null}
               {confirmCancel ? (
@@ -919,7 +919,7 @@ export function VisitDetailSheet({
               role="status"
             >
               <div className="visit-sale-confirmed-copy">
-                <p className="eyebrow">Orden de venta</p>
+                <p className="eyebrow">Pedido</p>
                 <strong>{saleOrderCode(sale)}</strong>
                 <div className="visit-sale-metrics">
                   <div>
@@ -942,7 +942,7 @@ export function VisitDetailSheet({
                 ) : null}
                 <div style={{ marginTop: "0.65rem" }}>
                   <Button type="button" variant="secondary" onClick={() => setViewSaleDoc(true)}>
-                    Ver cotización / OV
+                    Ver cotización / pedido
                   </Button>
                 </div>
               </div>

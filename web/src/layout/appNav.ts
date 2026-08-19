@@ -29,7 +29,7 @@ export type AppNavItem = {
 const SELLER_ITEMS: AppNavItem[] = [
   { to: "/app/inicio", label: "Inicio", icon: Home },
   { to: "/app/visitas", label: "Visitas", icon: ClipboardList },
-  { to: "/app/ventas", label: "Ventas", icon: ShoppingCart },
+  { to: "/app/ventas", label: "Pedidos", icon: ShoppingCart },
   { to: "/app/inventario", label: "Inventario", icon: Package },
   { to: "/app/clientes", label: "Clientes", icon: Store },
 ];
@@ -38,7 +38,7 @@ const SUPERVISOR_ITEMS: AppNavItem[] = [
   { to: "/sup/hoy", label: "Inicio", icon: LayoutDashboard },
   { to: "/sup/ruta", label: "Equipo en ruta", icon: Route },
   { to: "/sup/visitas", label: "Visitas", icon: ClipboardList },
-  { to: "/sup/ventas", label: "Ventas", icon: ShoppingCart },
+  { to: "/sup/ventas", label: "Pedidos", icon: ShoppingCart },
   { to: "/sup/vendedores", label: "Vendedores", icon: Users },
   { to: "/sup/clientes", label: "Clientes", icon: Store },
   { to: "/sup/proveedores", label: "Proveedores", icon: Truck },
@@ -69,7 +69,7 @@ export function crumbForPath(pathname: string): { section: string; page: string 
   const map: Record<string, { section: string; page: string }> = {
     "/app/inicio": { section: "Mi operación", page: "Inicio" },
     "/app/visitas": { section: "Mi operación", page: "Visitas" },
-    "/app/ventas": { section: "Mi operación", page: "Ventas" },
+    "/app/ventas": { section: "Mi operación", page: "Pedidos" },
     "/app/inventario": { section: "Mi operación", page: "Inventario" },
     "/app/clientes": { section: "Mi operación", page: "Clientes" },
     "/app/ruta": { section: "Mi operación", page: "Mi recorrido" },
@@ -82,7 +82,7 @@ export function crumbForPath(pathname: string): { section: string; page: string 
     "/sup/hoy": { section: "Mi operación", page: "Inicio" },
     "/sup/ruta": { section: "Mi operación", page: "Equipo en ruta" },
     "/sup/visitas": { section: "Equipo", page: "Visitas" },
-    "/sup/ventas": { section: "Equipo", page: "Ventas" },
+    "/sup/ventas": { section: "Equipo", page: "Pedidos" },
     "/sup/vendedores": { section: "Equipo", page: "Vendedores" },
     "/sup/alertas": { section: "Mi operación", page: "Alertas" },
     "/sup/clientes": { section: "Mi operación", page: "Clientes" },

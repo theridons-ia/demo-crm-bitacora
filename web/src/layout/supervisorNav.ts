@@ -39,7 +39,7 @@ export const SUPERVISOR_MORE_ITEMS: { to: string; label: string; icon: LucideIco
   [
     { to: "/sup/mapa", label: "Mapa", icon: MapIcon, blurb: "Visitas del día en mapa" },
     { to: "/sup/finanzas", label: "Finanzas", icon: Wallet, blurb: "Hub cobranza, bancos y CxP" },
-    { to: "/sup/ventas", label: "Ventas", icon: ShoppingCart, blurb: "Órdenes del equipo" },
+    { to: "/sup/ventas", label: "Pedidos", icon: ShoppingCart, blurb: "Pedidos del equipo" },
     { to: "/sup/cobranza", label: "Cobranza", icon: Banknote, blurb: "Créditos y abonos" },
     { to: "/sup/bancos", label: "Bancos", icon: Landmark, blurb: "Cajas y cuentas de cobro" },
     { to: "/sup/por-pagar", label: "Por pagar", icon: Receipt, blurb: "CxP demo proveedores" },

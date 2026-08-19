@@ -10,7 +10,7 @@ export type SellerNavTab = {
 export const SELLER_NAV_TABS: SellerNavTab[] = [
   { to: "/app/inicio", label: "Inicio", icon: Home },
   { to: "/app/visitas", label: "Visitas", icon: ClipboardList },
-  { to: "/app/ventas", label: "Ventas", icon: ShoppingCart },
+  { to: "/app/ventas", label: "Pedidos", icon: ShoppingCart },
   { to: "/app/inventario", label: "Inventario", icon: Package },
   { to: "/app/clientes", label: "Clientes", icon: Store },
 ];

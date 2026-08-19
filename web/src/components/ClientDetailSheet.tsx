@@ -230,7 +230,7 @@ export function ClientDetailSheet({
           ) : sales.length === 0 ? (
             <p className="muted small">
               {user?.role === "vendedor"
-                ? "Aún no tienes OV registradas en este PDV."
+                ? "Aún no tienes pedidos registrados en este PDV."
                 : "Sin órdenes registradas en este PDV."}
             </p>
           ) : (

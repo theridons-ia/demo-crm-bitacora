@@ -284,7 +284,7 @@ export function BanksPage() {
                       <p className="ficha-meta">
                         {m.payment_method ?? "—"}
                         {m.reference ? ` · ref ${m.reference}` : ""}
-                        {m.sale_id ? ` · OV-${m.sale_id}` : ""}
+                        {m.sale_id ? ` · PED-${m.sale_id}` : ""}
                       </p>
                       {m.notes ? <p className="ficha-note">{m.notes}</p> : null}
                     </div>
