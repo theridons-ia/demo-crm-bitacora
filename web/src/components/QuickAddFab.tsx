@@ -60,7 +60,7 @@ export function QuickAddFab() {
               <ShoppingCart size={18} />
             </span>
             <span>
-              <strong>Registrar venta</strong>
+              <strong>Nuevo pedido</strong>
               <em>Pedido / cobro al cliente</em>
             </span>
           </button>

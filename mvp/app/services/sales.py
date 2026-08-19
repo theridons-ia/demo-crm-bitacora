@@ -188,3 +188,13 @@ def list_sales_for_user(
         query = query.filter(Sale.client_id == client_id)
         limit = max(limit, 40)
     return query.limit(limit).all()
+
+
+def get_sale_for_user(db: Session, user: User, sale_id: int) -> Sale:
+    query = db.query(Sale).options(joinedload(Sale.items), joinedload(Sale.client), joinedload(Sale.seller))
+    if user.role == UserRole.vendedor:
+        query = query.filter(Sale.seller_id == user.id)
+    sale = query.filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    return sale

@@ -304,11 +304,26 @@ export function SaleQuoter({
       ) : null}
 
       {itemCount > 0 && (applyIva || fx != null) ? (
-        <p className="sale-cart-iva-note muted small">
-          {applyIva ? `Subtotal ${amount(money.subtotal)} + IVA ${amount(money.iva)}` : null}
-          {applyIva && fx != null ? " · " : null}
-          {fx != null ? `Tasa ${fx.toFixed(2)} Bs/$` : null}
-        </p>
+        <div className="sale-cart-iva-note muted small" aria-live="polite">
+          {applyIva ? (
+            <span className="sale-cart-iva-summary">
+              <span>
+                Subtotal <strong>{amount(money.subtotal)}</strong>
+              </span>
+              <span>
+                IVA <strong>{amount(money.iva)}</strong>
+              </span>
+              <span className="sale-cart-iva-total">
+                Total <strong>{amount(money.total)}</strong>
+              </span>
+            </span>
+          ) : null}
+          {fx != null ? (
+            <span className="sale-cart-rate">
+              Tasa <strong>{fx.toFixed(2)} Bs/$</strong>
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

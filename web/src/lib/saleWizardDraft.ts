@@ -47,16 +47,27 @@ function write(key: string, value: unknown) {
   try {
     localStorage.setItem(key, payload());
     sessionStorage.removeItem(key);
+    return;
   } catch {
-    /* cuota llena (foto pesada): se intenta sin evidencia */
+    /* Si localStorage está lleno, intentamos guardar en sessionStorage (misma pestaña). */
     try {
-      const copy = JSON.parse(JSON.stringify(value)) as { payment?: PaymentCaptureValue };
-      if (copy.payment) copy.payment.payment_evidence = null;
-      localStorage.setItem(key, JSON.stringify(copy));
-      sessionStorage.removeItem(key);
+      sessionStorage.setItem(key, payload());
+      return;
     } catch {
-      /* ignore */
+      /* quota aún llena: se intenta sin evidencia */
     }
+  }
+
+  try {
+    const copy = JSON.parse(JSON.stringify(value)) as { payment?: PaymentCaptureValue };
+    if (copy.payment) {
+      copy.payment.payment_evidence = null;
+      copy.payment.payment_evidence_photos = [];
+    }
+    localStorage.setItem(key, JSON.stringify(copy));
+    sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
   }
 }
 

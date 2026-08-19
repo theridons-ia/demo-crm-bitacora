@@ -1,4 +1,4 @@
-import { Download, Image as ImageIcon, Printer } from "lucide-react";
+import { Download, Printer, Share2 } from "lucide-react";
 import {
   forwardRef,
   useEffect,
@@ -79,6 +79,75 @@ type Props = {
 };
 
 export { draftQuoteCode } from "../lib/saleCode";
+
+export function QuotePreviewCard({ data }: { data: QuoteDocumentData }) {
+  const applyIva = Boolean(data.applyIva);
+  const subtotal = data.lines.reduce((sum, line) => sum + line.lineUsd, 0);
+  const money = quoteMoney(subtotal, applyIva);
+  const fx = data.fxRate != null && data.fxRate > 0 ? data.fxRate : null;
+  const isVes = data.currency === "VES";
+  const pricedInQuote = Boolean(data.pricedInQuoteCurrency);
+  const itemCount = data.lines.length;
+  const unitCount = data.lines.reduce((sum, line) => sum + line.quantity, 0);
+
+  function amount(n: number): string {
+    if (isVes && !pricedInQuote) {
+      return formatLegacyQuoteAmount(n, data.currency, fx);
+    }
+    return formatQuoteAmount(n, data.currency);
+  }
+
+  return (
+    <section className="quote-preview-card" aria-label="Vista previa del pedido">
+      <div className="quote-preview-head">
+        <div>
+          <p className="eyebrow">Vista previa</p>
+          <strong>{data.code}</strong>
+        </div>
+        <span className="quote-preview-kind">
+          {data.code.startsWith("OV-") || data.code.startsWith("PED-") ? "Pedido" : "Cotización"}
+        </span>
+      </div>
+      <div className="quote-preview-meta">
+        <span>Cliente: <strong>{data.client?.name ?? data.clientFallback}</strong></span>
+        <span>Emisión: <strong>{formatDateTime(data.issuedAt)}</strong></span>
+        <span>Atendido por: <strong>{data.sellerName}</strong></span>
+      </div>
+      <div className="quote-preview-totals">
+        <span><small>Ítems</small><strong>{itemCount} · {unitCount} ud</strong></span>
+        <span><small>Subtotal</small><strong>{amount(money.subtotal)}</strong></span>
+        <span><small>IVA</small><strong>{applyIva ? amount(money.iva) : "Sin IVA"}</strong></span>
+        <span className="is-total"><small>Total</small><strong>{amount(money.total)}</strong></span>
+      </div>
+      <ul className="quote-preview-lines">
+        {data.lines.slice(0, 5).map((line) => (
+          <li key={`${line.sku}-${line.name}`}>
+            <span>
+              <strong>{line.name}</strong>
+              <small>
+                {line.quantity} × {amount(line.unitUsd)}
+                {line.sku ? ` · ${line.sku}` : ""}
+              </small>
+            </span>
+            <strong>{amount(line.lineUsd)}</strong>
+          </li>
+        ))}
+      </ul>
+      {data.lines.length > 5 ? (
+        <p className="muted small quote-preview-more">
+          + {data.lines.length - 5} línea{data.lines.length - 5 === 1 ? "" : "s"} más en el
+          documento final.
+        </p>
+      ) : null}
+      {data.notes?.trim() ? (
+        <p className="quote-preview-note">
+          <span className="muted small">Nota</span>
+          <strong>{data.notes.trim()}</strong>
+        </p>
+      ) : null}
+    </section>
+  );
+}
 
 export function buildQuoteLines(
   lines: QuoteLine[],
@@ -629,8 +698,8 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
               disabled={busy != null}
               onClick={() => void downloadPng()}
             >
-              <ImageIcon size={16} />
-              {busy === "png" ? "Guardando…" : "Guardar imagen"}
+              <Share2 size={16} />
+              {busy === "png" ? "Compartiendo…" : "Compartir"}
             </Button>
             <Button
               type="button"
@@ -662,7 +731,7 @@ export const QuoteDocument = forwardRef<QuoteDocumentHandle, Props>(
             <span className="quote-doc-thumb-frame">
               <span className="quote-doc-thumb-scale">{renderSheet(undefined, true)}</span>
             </span>
-            <span>Toca para ampliar · pellizca en la vista previa</span>
+            <span>Vista ampliable</span>
           </button>
         ) : null}
         {previewError ? (

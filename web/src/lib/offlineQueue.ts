@@ -87,7 +87,14 @@ export async function loadSalesCache(): Promise<Sale[] | null> {
 }
 
 export async function saveSalesCache(sales: Sale[]): Promise<void> {
-  await saveMeta("sales:list", sales);
+  await saveMeta(
+    "sales:list",
+    sales.map((sale) => ({
+      ...sale,
+      has_payment_evidence: Boolean(sale.has_payment_evidence || sale.payment_evidence?.trim()),
+      payment_evidence: undefined,
+    })),
+  );
 }
 
 export async function loadRouteCache(weekStart: string): Promise<RouteDetail | null> {

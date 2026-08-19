@@ -8,6 +8,7 @@ import { ListSkeleton } from "../components/ListSkeleton";
 import { MetricGrid, MetricTile } from "../components/MetricTile";
 import { Modal } from "../components/Modal";
 import { SearchPickField } from "../components/SearchPickField";
+import { ProductThumb } from "../components/ProductThumb";
 import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
 import {
   emptyPaymentCapture,
@@ -49,7 +50,7 @@ import {
   loadSalesCache,
   saveSalesCache,
 } from "../lib/offlineQueue";
-import { sortSalesNewestFirst, saleOrderCode } from "../lib/saleLabels";
+import { PAYMENT_METHOD_LABEL, sortSalesNewestFirst, saleOrderCode } from "../lib/saleLabels";
 import {
   clearStandaloneSaleDraft,
   loadStandaloneSaleDraft,
@@ -60,6 +61,7 @@ import { formatQuoteAmount, IVA_RATE, quoteMoney } from "../lib/quoteMoney";
 import { unitPriceForQuote } from "../lib/productPrices";
 import { draftQuoteCode, buildQuoteLines, QuoteDocument } from "../components/QuoteDocument";
 import { useAuth } from "../auth/AuthContext";
+import { formatAgendaDay, formatDateTime, formatTime, isSameCaracasDay } from "../lib/caracasTime";
 import type {
   BankAccount,
   Client,
@@ -76,6 +78,25 @@ type SalesPageProps = {
 };
 
 type NonVisitOrigin = Exclude<SaleOrigin, "visita">;
+
+function visitPickerTitle(visit: Visit): string {
+  const when = visit.visited_at || visit.scheduled_time || visit.created_at;
+  if (visit.status === "en_curso") return `En curso · ${formatTime(visit.visited_at || visit.created_at)}`;
+  if (visit.scheduled_date) {
+    const time = visit.scheduled_time ? String(visit.scheduled_time).slice(0, 5) : "Sin hora";
+    return `Programada · ${time}`;
+  }
+  return `Visita #${visit.id} · ${formatTime(when)}`;
+}
+
+function visitPickerSubtitle(visit: Visit): string {
+  if (visit.scheduled_date) {
+    const day = isSameCaracasDay(visit.scheduled_date) ? "Hoy" : formatAgendaDay(visit.scheduled_date);
+    return `${day} · ${visit.client?.name ?? `Cliente #${visit.client_id}`}`;
+  }
+  const day = isSameCaracasDay(visit.visited_at || visit.created_at) ? "Hoy" : "Reciente";
+  return `${day} · ${visit.client?.name ?? `Cliente #${visit.client_id}`}`;
+}
 
 /** Pedidos: lista + alta sin visita (mostrador / online) en Modal. */
 export function SalesPage({ teamView = false }: SalesPageProps) {
@@ -104,14 +125,16 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [isCredit, setIsCredit] = useState(false);
   const [applyIva, setApplyIva] = useState(false);
   const [payment, setPayment] = useState<PaymentCaptureValue>(() => emptyPaymentCapture());
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
   const [draftCode, setDraftCode] = useState(() => draftQuoteCode());
-  const [quoteCopied, setQuoteCopied] = useState(false);
   const [issuedAt, setIssuedAt] = useState(() => new Date());
+  const [finalTab, setFinalTab] = useState<"resumen" | "documento">("resumen");
+  const [docReady, setDocReady] = useState(false);
   const wasComposing = useRef(false);
   const skipStandaloneSave = useRef(true);
 
@@ -127,6 +150,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     { id: "cliente", label: "Cliente" },
     { id: "productos", label: "Productos" },
     { id: "pago", label: "Pago" },
+    { id: "resumen", label: "Resumen" },
   ] as const;
 
   function reload() {
@@ -243,23 +267,28 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
         setVisitId(draft.visitId ?? null);
         setLines(draft.lines.length ? draft.lines : []);
         setPayment(draft.payment);
+        setPaymentProcessing(false);
         setIsCredit(draft.isCredit);
         setApplyIva(draft.applyIva);
         setCurrency(draft.currency);
         setNotes(draft.notes);
-        setWizardStep(draft.wizardStep);
+        setWizardStep(Math.max(0, Math.min(3, draft.wizardStep)));
+        setFinalTab("resumen");
+        setDocReady(false);
         setDraftCode(draft.draftCode);
         setIssuedAt(new Date(draft.issuedAt));
         setFormError(null);
-        setQuoteCopied(false);
       } else {
         setLines([]);
         setOrigin("mostrador");
         setVisitId(null);
         setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
+        setPaymentProcessing(false);
         setIsCredit(false);
         setApplyIva(false);
         setWizardStep(0);
+        setFinalTab("resumen");
+        setDocReady(false);
         setFormError(null);
         setDraftCode(draftQuoteCode());
         setIssuedAt(new Date());
@@ -356,6 +385,22 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
   const subtotal = useMemo(() => quoteLinesTotal(lines, products, currency), [lines, products, currency]);
   const money = useMemo(() => quoteMoney(subtotal, applyIva), [subtotal, applyIva]);
+  const quoteItems = useMemo(() => quoteLinesToItems(lines), [lines]);
+  const itemCount = quoteItems.length;
+  const unitCount = quoteItems.reduce((n, it) => n + it.quantity, 0);
+  const summaryLines = useMemo(
+    () =>
+      quoteItems
+        .map((item) => {
+          const product = products.find((p) => p.id === item.product_id);
+          if (!product) return null;
+          const unit = unitPriceForQuote(product, currency) ?? 0;
+          const lineTotal = unit * item.quantity;
+          return { item, product, unit, lineTotal };
+        })
+        .filter((row): row is NonNullable<typeof row> => row != null),
+    [currency, products, quoteItems],
+  );
   const selectedClient = useMemo(
     () => (clientId === "" ? null : clients.find((c) => c.id === clientId) ?? null),
     [clientId, clients],
@@ -408,6 +453,11 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       }
       return null;
     }
+    if (step === 2) {
+      if (paymentProcessing) return "Espera a que termine de procesarse el comprobante";
+      if (!isCredit && !payment.payment_method) return "Selecciona forma de pago";
+      return null;
+    }
     return null;
   }
 
@@ -418,7 +468,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       return;
     }
     setFormError(null);
-    setWizardStep((s) => Math.min(2, s + 1));
+    setWizardStep((s) => Math.min(3, s + 1));
   }
 
   function goBack() {
@@ -435,50 +485,14 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     setVisitId(null);
     setCurrency("USD");
     setPayment(emptyPaymentCapture());
+    setPaymentProcessing(false);
     setWizardStep(0);
-    setQuoteCopied(false);
+    setFinalTab("resumen");
+    setDocReady(false);
     clearStandaloneSaleDraft();
   }
 
-  async function copyQuote() {
-    setFormError(null);
-    setQuoteCopied(false);
-    if (clientId === "") {
-      setFormError("Selecciona un cliente");
-      return;
-    }
-    const items = quoteLinesToItems(lines);
-    if (!items.length) {
-      setFormError("Agrega al menos un producto");
-      return;
-    }
-    const client = clients.find((c) => c.id === clientId);
-    const draft = [
-      `COTIZACIÓN · ${client?.name ?? `Cliente #${clientId}`}`,
-      ...items.map((it) => {
-        const p = products.find((x) => x.id === it.product_id);
-        return `· ${p?.name ?? it.product_id} x${it.quantity} = ${formatQuoteAmount(
-          ((p ? unitPriceForQuote(p, currency) : 0) ?? 0) * it.quantity,
-          currency,
-        )}`;
-      }),
-      `Subtotal: ${formatQuoteAmount(money.subtotal, currency)}`,
-      applyIva ? `IVA 16%: ${formatQuoteAmount(money.iva, currency)}` : "Sin IVA",
-      `Total: ${formatQuoteAmount(money.total, currency)}`,
-      notes.trim() ? `Nota: ${notes.trim()}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-    try {
-      await navigator.clipboard.writeText(draft);
-      setQuoteCopied(true);
-    } catch {
-      setFormError("No se pudo copiar la cotización. Revisa permisos del navegador.");
-    }
-  }
-
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function confirmSale() {
     setFormError(null);
     if (clientId === "") {
       setFormError("Selecciona un cliente");
@@ -492,6 +506,10 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
     if (!isCredit && !payment.payment_method) {
       setFormError("Selecciona forma de pago");
+      return;
+    }
+    if (paymentProcessing) {
+      setFormError("Espera a que termine de procesarse el comprobante");
       return;
     }
 
@@ -581,6 +599,11 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    await confirmSale();
   }
 
   const totalAmount = sales.reduce((a, s) => a + Number(s.total_amount || 0), 0);
@@ -710,18 +733,17 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
             <WizardFooter
               step={wizardStep}
               submitting={submitting}
-              nextDisabled={loadingCatalog}
+              nextDisabled={loadingCatalog || paymentProcessing}
               onBack={goBack}
               primaryLabel={
-                wizardStep < 2
+                wizardStep < 3
                   ? "Siguiente"
                   : submitting
                     ? "Guardando…"
                     : "Confirmar pedido"
               }
-              primaryType={wizardStep < 2 ? "button" : "submit"}
-              form={wizardStep < 2 ? undefined : "sale-create-form"}
-              onPrimary={wizardStep < 2 ? goNext : undefined}
+              primaryType="button"
+              onPrimary={wizardStep < 3 ? goNext : () => void confirmSale()}
             />
           }
         >
@@ -818,8 +840,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                       emptyLabel="Sin visitas disponibles"
                       options={visitCandidates.map((v) => ({
                         id: v.id,
-                        title: `Visita #${v.id}`,
-                        subtitle: selectedClient?.name ?? v.status,
+                        title: visitPickerTitle(v),
+                        subtitle: visitPickerSubtitle(v),
                       }))}
                       onChange={(id) => setVisitId(id)}
                     />
@@ -908,6 +930,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   <PaymentCapture
                     value={payment}
                     onChange={setPayment}
+                    onProcessingChange={setPaymentProcessing}
                     accounts={accounts}
                     currency={currency}
                     disabled={submitting}
@@ -917,6 +940,17 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                     Venta a crédito — sin cobro ahora; va a cobranza.
                   </p>
                 )}
+                {!isCredit ? (
+                  <p className="muted small" role="status">
+                    {paymentProcessing
+                      ? "Subiendo comprobante…"
+                      : payment.payment_evidence
+                        ? "Comprobante listo"
+                        : payment.payment_evidence_photos?.length
+                          ? `Fotos adjuntas: ${payment.payment_evidence_photos.length}`
+                          : "Sin comprobante adjunto"}
+                  </p>
+                ) : null}
                 <TextField
                   id="sale-notes"
                   label="Nota (opcional)"
@@ -924,24 +958,152 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej. entrega parcial, horario…"
                 />
-                <div className="quote-copy-row">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={submitting}
-                    onClick={() => void copyQuote()}
-                  >
-                    Copiar cotización
-                  </Button>
-                  {quoteCopied ? (
-                    <p className="muted small" role="status">
-                      Copiada. Puedes confirmar el pedido cuando el cliente acepte.
-                    </p>
-                  ) : null}
-                </div>
               </div>
-              <QuoteDocument data={quoteData} asImage />
               </>
+            ) : null}
+
+            {wizardStep === 3 ? (
+              <div className="sale-compose-step">
+                <div
+                  className="choice-group"
+                  role="tablist"
+                  aria-label="Resumen y documento del pedido"
+                >
+                  <button
+                    type="button"
+                    className={`chip${finalTab === "resumen" ? " active" : ""}`}
+                    aria-selected={finalTab === "resumen"}
+                    onClick={() => setFinalTab("resumen")}
+                  >
+                    Resumen
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip${finalTab === "documento" ? " active" : ""}`}
+                    aria-selected={finalTab === "documento"}
+                    onClick={() => setFinalTab("documento")}
+                  >
+                    Documento
+                  </button>
+                </div>
+
+                {finalTab === "resumen" ? (
+                  <div className="profile-ficha">
+                    <div className="sale-summary-hero">
+                      <span className="muted small">Total</span>
+                      <strong>{formatQuoteAmount(money.total, currency)}</strong>
+                      <span className="muted small">
+                        {applyIva ? `Incluye IVA ${formatQuoteAmount(money.iva, currency)}` : "Sin IVA"}
+                      </span>
+                    </div>
+
+                    <div className="visit-sale-metrics sale-resumen-metrics">
+                      <div className="sale-summary-metric">
+                        <span>Fecha</span>
+                        <strong>{formatDateTime(issuedAt)}</strong>
+                      </div>
+                      <div className="sale-summary-metric">
+                        <span>Moneda</span>
+                        <strong>
+                          {currency === "VES" ? "Bs" : currency === "EUR" ? "EUR" : "USD"}
+                        </strong>
+                      </div>
+                      <div className="sale-summary-metric">
+                        <span>IVA</span>
+                        <strong>{applyIva ? `${(IVA_RATE * 100).toFixed(0)}%` : "—"}</strong>
+                      </div>
+                      <div className="sale-summary-metric">
+                        <span>Ítems</span>
+                        <strong>
+                          {itemCount} · {unitCount} ud
+                        </strong>
+                      </div>
+                    </div>
+
+                    {summaryLines.length ? (
+                      <div>
+                        <p className="sale-cart-heading">Items del pedido</p>
+                        <ul className="sale-cart-list sale-compose-lines">
+                          {summaryLines.map(({ item, product, unit, lineTotal }) => (
+                            <li key={product.id} className="sale-cart-row sale-compose-line">
+                              <div className="sale-cart-copy">
+                                <strong>{product.name}</strong>
+                                <span className="muted small">
+                                  {item.quantity} ud
+                                  {[product.sku, product.presentation].filter(Boolean).length
+                                    ? ` · ${[product.sku, product.presentation].filter(Boolean).join(" · ")}`
+                                    : ""}
+                                </span>
+                                <span className="sale-cart-price">
+                                  {formatQuoteAmount(unit, currency)} c/u
+                                </span>
+                                <strong className="sale-compose-line-total">
+                                  {formatQuoteAmount(lineTotal, currency)}
+                                </strong>
+                              </div>
+                              <ProductThumb src={product.image_url} alt="" size="lg" />
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    <div className="sale-pay-meta-row">
+                      <div className="sale-pay-meta-head">
+                        <span className="muted small">Pago</span>
+                      </div>
+                      {!isCredit ? (
+                        <>
+                          <span className="muted small">{PAYMENT_METHOD_LABEL[payment.payment_method]}</span>
+                          <strong>
+                            {payment.payment_reference.trim() ? payment.payment_reference.trim() : "Sin referencia"}
+                          </strong>
+                          {payment.bank_account_id != null ? (
+                            <span className="muted small">
+                              Cuenta:{" "}
+                              {accounts.find((a) => a.id === payment.bank_account_id)?.name ?? "—"}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          <span className="muted small">Crédito</span>
+                          <strong>Sin cobro ahora</strong>
+                        </>
+                      )}
+                    </div>
+
+                    {notes.trim() ? (
+                      <div>
+                        <span className="muted small">Nota</span>
+                        <strong>{notes.trim()}</strong>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div>
+                    {docReady ? (
+                      <QuoteDocument data={quoteData} showActions asImage />
+                    ) : (
+                      <>
+                        <div className="quote-copy-row">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={submitting}
+                            onClick={() => setDocReady(true)}
+                          >
+                            Generar documento
+                          </Button>
+                        </div>
+                        <p className="muted small">
+                          Puedes renderizarlo aquí antes de confirmar.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : null}
 
             {formError ? (

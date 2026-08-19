@@ -10,15 +10,30 @@ import {
 import { useEscapeKey } from "../hooks/useOverlay";
 import { Button } from "./Button";
 
-type Props = {
+type BaseProps = {
   id: string;
   label: string;
   hint?: string;
   readyHint?: string;
+  disabled?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+};
+
+type SingleProps = BaseProps & {
   value: string | null;
   onChange: (next: string | null) => void;
-  disabled?: boolean;
+  multiple?: false;
+  maxFiles?: 1;
 };
+
+type MultiProps = BaseProps & {
+  value: string[];
+  onChange: (next: string[]) => void;
+  multiple: true;
+  maxFiles?: number;
+};
+
+type Props = SingleProps | MultiProps;
 
 type SourceSheet = "chooser" | "camera" | null;
 
@@ -34,6 +49,9 @@ export function PhotoDrop({
   value,
   onChange,
   disabled,
+  multiple = false,
+  maxFiles = 1,
+  onBusyChange,
 }: Props) {
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -102,30 +120,48 @@ export function PhotoDrop({
     if (videoRef.current) videoRef.current.srcObject = null;
   }
 
-  async function applyFile(file: File) {
+  const files = Array.isArray(value) ? value : value ? [value] : [];
+  const hasValue = files.length > 0;
+
+  async function applyFiles(nextFiles: File[]) {
     holdFilePickerGuard();
     setBusy(true);
+    onBusyChange?.(true);
     setError(null);
     try {
-      onChange(await fileToCompressedDataUrl(file));
+      const processed = await Promise.all(nextFiles.map((file) => fileToCompressedDataUrl(file)));
+      if (multiple) {
+        (onChange as (next: string[]) => void)([...files, ...processed].slice(0, maxFiles));
+      } else {
+        (onChange as (next: string | null) => void)(processed[0] ?? null);
+      }
     } catch (err) {
-      onChange(null);
+      if (!multiple) {
+        (onChange as (next: string | null) => void)(null);
+      }
       setError(err instanceof Error ? err.message : "No se pudo leer la foto");
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
       settleFilePickerGuard(true);
     }
   }
 
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const picked = Array.from(event.target.files ?? []);
     event.target.value = "";
     setSheet(null);
-    if (!file) {
+    if (!picked.length) {
       settleFilePickerGuard(true);
       return;
     }
-    await applyFile(file);
+    const allowed = multiple ? Math.max(0, maxFiles - files.length) : 1;
+    const next = picked.slice(0, allowed);
+    if (!next.length) {
+      settleFilePickerGuard(true);
+      return;
+    }
+    await applyFiles(multiple ? [...next].slice(0, allowed) : [next[0]]);
   }
 
   function openGallery() {
@@ -162,11 +198,19 @@ export function PhotoDrop({
       setError("No se pudo capturar la foto");
       return;
     }
-    await applyFile(new File([blob], "comprobante.jpg", { type: "image/jpeg" }));
+    await applyFiles([new File([blob], "comprobante.jpg", { type: "image/jpeg" })]);
   }
 
-  function clear() {
-    onChange(null);
+  function clear(index?: number) {
+    if (multiple) {
+      if (typeof index !== "number") {
+        (onChange as (next: string[]) => void)([]);
+      } else {
+        (onChange as (next: string[]) => void)(files.filter((_, i) => i !== index));
+      }
+    } else {
+      (onChange as (next: string | null) => void)(null);
+    }
     setError(null);
     if (galleryRef.current) galleryRef.current.value = "";
     if (cameraRef.current) cameraRef.current.value = "";
@@ -183,6 +227,7 @@ export function PhotoDrop({
         className="file-input-offscreen"
         type="file"
         accept="image/*"
+        multiple={multiple}
         disabled={disabled || busy}
         aria-labelledby={`${id}-label`}
         onChange={(e) => void onFile(e)}
@@ -198,21 +243,54 @@ export function PhotoDrop({
         aria-labelledby={`${id}-label`}
         onChange={(e) => void onFile(e)}
       />
-      {value ? (
-        <div className="pay-photo-ready">
-          <img src={value} alt="" />
+      {hasValue ? (
+        <div className={multiple ? "pay-photo-ready is-multi" : "pay-photo-ready"}>
+          <div className={multiple ? "pay-photo-grid" : undefined}>
+            {files.map((src, index) => (
+              <div key={`${id}-${index}`} className="pay-photo-frame">
+                <img src={src} alt="" />
+                {multiple ? (
+                  <button
+                    type="button"
+                    className="pay-photo-remove pay-photo-remove-thumb"
+                    disabled={disabled}
+                    aria-label={`Quitar foto ${index + 1}`}
+                    onClick={() => clear(index)}
+                  >
+                    <Trash2 size={14} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
           <div className="pay-photo-ready-meta">
-            <strong>Foto lista</strong>
+            <strong>{multiple ? `${files.length} foto${files.length === 1 ? "" : "s"} lista${files.length === 1 ? "" : "s"}` : "Foto lista"}</strong>
             {readyHint ? <span className="muted small">{readyHint}</span> : null}
-            <button
-              type="button"
-              className="pay-photo-remove"
-              disabled={disabled}
-              onClick={clear}
-            >
-              <Trash2 size={14} aria-hidden />
-              Quitar
-            </button>
+            <div className="pay-photo-ready-actions">
+              {multiple && files.length < maxFiles ? (
+                <button
+                  type="button"
+                  className="pay-photo-remove"
+                  disabled={disabled || busy}
+                  onClick={() => {
+                    if (disabled || busy) return;
+                    setSheet("chooser");
+                  }}
+                >
+                  <ImagePlus size={14} aria-hidden />
+                  Agregar otra
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="pay-photo-remove"
+                disabled={disabled}
+                onClick={() => clear()}
+              >
+                <Trash2 size={14} aria-hidden />
+                Quitar
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -226,8 +304,9 @@ export function PhotoDrop({
           }}
         >
           <ImagePlus size={22} aria-hidden />
-          <strong>{busy ? "Procesando foto…" : "Subir foto"}</strong>
+          <strong>{busy ? "Subiendo imagen…" : multiple ? "Subir fotos" : "Subir foto"}</strong>
           <span>{hint}</span>
+          {busy ? <span className="photo-upload-bar" aria-hidden /> : null}
         </button>
       )}
       {error ? (

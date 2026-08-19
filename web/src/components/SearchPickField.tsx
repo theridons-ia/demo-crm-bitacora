@@ -1,5 +1,5 @@
 import { ChevronDown, Search } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { PayMark } from "./PayMark";
 import { ProductThumb } from "./ProductThumb";
 
@@ -23,6 +23,13 @@ type Props = {
   emptyLabel?: string;
   labelledBy?: string;
   "aria-label"?: string;
+  auxAction?: {
+    label: string;
+    icon?: ReactNode;
+    onClick: () => void;
+    pressed?: boolean;
+    disabled?: boolean;
+  } | null;
 };
 
 function fold(value: string): string {
@@ -50,6 +57,7 @@ export function SearchPickField({
   emptyLabel = "Sin coincidencias",
   labelledBy,
   "aria-label": ariaLabel,
+  auxAction = null,
 }: Props) {
   const autoId = useId();
   const fieldId = id ?? autoId;
@@ -111,45 +119,64 @@ export function SearchPickField({
 
   return (
     <div ref={rootRef} className={`search-pick${open ? " is-open" : ""}`}>
-      <button
-        type="button"
-        id={fieldId}
-        className="search-pick-trigger"
-        disabled={disabled}
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-labelledby={labelledBy}
-        aria-label={ariaLabel ?? (labelledBy ? undefined : placeholder)}
-        onClick={() => {
-          if (disabled) return;
-          setOpen((prev) => {
-            const next = !prev;
-            if (next) setQuery("");
-            return next;
-          });
-        }}
-      >
-        <span className="search-pick-trigger-main">
-          {selected?.markSlug ? (
-            <PayMark slugs={[selected.markSlug]} label={selected.title} />
-          ) : selected && "imageUrl" in selected ? (
-            <ProductThumb src={selected.imageUrl} alt="" />
-          ) : null}
-          <span className="search-pick-copy">
-            {selected ? (
-              <>
-                <strong className="search-pick-title">{selected.title}</strong>
-                {selected.subtitle ? (
-                  <span className="search-pick-sub">{selected.subtitle}</span>
-                ) : null}
-              </>
-            ) : (
-              <span className="search-pick-placeholder">{placeholder}</span>
-            )}
+      <div className={auxAction ? "search-pick-trigger-shell has-aux" : "search-pick-trigger-shell"}>
+        <button
+          type="button"
+          id={fieldId}
+          className={auxAction ? "search-pick-trigger is-stacked" : "search-pick-trigger"}
+          disabled={disabled}
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-labelledby={labelledBy}
+          aria-label={ariaLabel ?? (labelledBy ? undefined : placeholder)}
+          onClick={() => {
+            if (disabled) return;
+            setOpen((prev) => {
+              const next = !prev;
+              if (next) setQuery("");
+              return next;
+            });
+          }}
+        >
+          <span className="search-pick-trigger-main">
+            {selected?.markSlug ? (
+              <PayMark slugs={[selected.markSlug]} label={selected.title} />
+            ) : selected && "imageUrl" in selected ? (
+              <ProductThumb src={selected.imageUrl} alt="" />
+            ) : null}
+            <span className="search-pick-copy">
+              {selected ? (
+                <>
+                  <strong className="search-pick-title">{selected.title}</strong>
+                  {selected.subtitle ? (
+                    <span className="search-pick-sub">{selected.subtitle}</span>
+                  ) : null}
+                </>
+              ) : (
+                <span className="search-pick-placeholder">{placeholder}</span>
+              )}
+            </span>
           </span>
-        </span>
-        <ChevronDown className="search-pick-chevron" size={16} aria-hidden />
-      </button>
+          <ChevronDown className="search-pick-chevron" size={16} aria-hidden />
+        </button>
+        {auxAction ? (
+          <button
+            type="button"
+            className="search-pick-aux-line"
+            aria-label={auxAction.label}
+            aria-pressed={auxAction.pressed}
+            disabled={disabled || auxAction.disabled}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              auxAction.onClick();
+            }}
+          >
+            {auxAction.icon}
+            <span>{auxAction.label}</span>
+          </button>
+        ) : null}
+      </div>
 
       {open ? (
         <div className="search-pick-panel" id={listId} role="listbox">

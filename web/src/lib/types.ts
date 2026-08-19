@@ -189,6 +189,8 @@ export type Sale = {
   payment_method: PaymentMethod;
   bank_account_id?: number | null;
   payment_reference?: string | null;
+  payment_evidence?: string | null;
+  has_payment_evidence?: boolean;
   total_amount: string;
   is_credit: boolean;
   apply_iva?: boolean;

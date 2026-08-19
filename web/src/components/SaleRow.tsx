@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { formatSaleTotal, saleCurrencyLabel, saleOrderCode } from "../lib/saleLabels";
+import { formatSaleTotal, formatSaleWhen, saleCurrencyLabel, saleOrderCode } from "../lib/saleLabels";
 import type { Sale } from "../lib/types";
 
 type Props = {
@@ -14,13 +14,13 @@ function payLabel(sale: Sale): string {
 }
 
 function metaLabel(sale: Sale, sellerName?: string | null): string {
-  const parts = [saleOrderCode(sale), payLabel(sale)];
+  const parts = [formatSaleWhen(sale.created_at), saleOrderCode(sale), payLabel(sale)];
   if (sellerName) parts.push(sellerName);
   return parts.join(" · ");
 }
 
 /**
- * Fila de OV (móvil): punto · PDV · OV/pago · monto · chevron.
+ * Fila de pedido (móvil): punto · PDV · fecha/código/pago · monto · chevron.
  * Toda la fila abre la ficha. Sin carrito ni ítems/ud.
  */
 export function SaleRow({ sale, onClick, sellerName }: Props) {

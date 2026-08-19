@@ -5,7 +5,8 @@ import { Modal } from "./Modal";
 import { PayMark } from "./PayMark";
 import { ProductThumb } from "./ProductThumb";
 import { QuoteDocument } from "./QuoteDocument";
-import { fetchBankAccounts, fetchProducts, fetchVisit } from "../lib/api";
+import { QuoteDocViewer } from "./QuoteDocViewer";
+import { fetchBankAccounts, fetchProducts, fetchSale, fetchVisit } from "../lib/api";
 import { formatAgendaDay, formatDateTime } from "../lib/caracasTime";
 import { getCachedProducts } from "../lib/offlineQueue";
 import { payMarkSlugs } from "../lib/payMarks";
@@ -15,6 +16,7 @@ import {
   snapshotToQuoteDocumentData,
 } from "../lib/quoteSnapshot";
 import { formatQuoteAmount } from "../lib/quoteMoney";
+import { parsePaymentEvidence } from "../lib/imageEvidence";
 import {
   PAYMENT_METHOD_LABEL,
   SALE_ORIGIN_LABEL,
@@ -56,6 +58,20 @@ function visitWhen(visit: Visit): string {
   return formatDateTime(visit.created_at);
 }
 
+function formatHeaderWhen(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString("es-VE", {
+    timeZone: "America/Caracas",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** Ficha de pedido: resumen + cotización/documento guardado (descargable). */
 export function SaleDetailSheet({
   sale,
@@ -71,6 +87,16 @@ export function SaleDetailSheet({
   const [linkedVisit, setLinkedVisit] = useState<Visit | null>(null);
   const [payAccount, setPayAccount] = useState<BankAccount | null>(null);
   const [payAccountReady, setPayAccountReady] = useState(false);
+  const [paymentProofOpen, setPaymentProofOpen] = useState(false);
+  const [freshSale, setFreshSale] = useState<Sale | null>(null);
+  const [saleDetailLoading, setSaleDetailLoading] = useState(false);
+
+  const currentSale = freshSale ?? sale;
+  const paymentProofSrcs = parsePaymentEvidence(currentSale?.payment_evidence);
+  const paymentProofSrc = paymentProofSrcs[0] ?? null;
+  const hasPaymentProof = Boolean(
+    paymentProofSrcs.length || currentSale?.has_payment_evidence,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +104,55 @@ export function SaleDetailSheet({
   }, [open, sale?.id, initialTab]);
 
   useEffect(() => {
-    if (!open || !sale) return;
+    if (!open || !sale) {
+      setFreshSale(null);
+      setSaleDetailLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setFreshSale(sale);
+    setSaleDetailLoading(true);
+    void fetchSale(sale.id)
+      .then((row) => {
+        if (!cancelled) setFreshSale(row);
+      })
+      .catch(() => {
+        if (!cancelled) setFreshSale(sale);
+      })
+      .finally(() => {
+        if (!cancelled) setSaleDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sale]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTab(initialTab);
+  }, [open, sale?.id, initialTab]);
+
+  useEffect(() => {
+    if (!open || !sale) {
+      setFreshSale(null);
+      return;
+    }
+    let cancelled = false;
+    setFreshSale(sale);
+    void fetchSale(sale.id)
+      .then((row) => {
+        if (!cancelled) setFreshSale(row);
+      })
+      .catch(() => {
+        if (!cancelled) setFreshSale(sale);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sale]);
+
+  useEffect(() => {
+    if (!open || !currentSale) return;
     let cancelled = false;
     (async () => {
       try {
@@ -92,15 +166,15 @@ export function SaleDetailSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, sale?.id]);
+  }, [open, currentSale?.id]);
 
   useEffect(() => {
-    if (!open || !sale?.visit_id) {
+    if (!open || !currentSale?.visit_id) {
       setLinkedVisit(null);
       return;
     }
     let cancelled = false;
-    void fetchVisit(sale.visit_id)
+    void fetchVisit(currentSale.visit_id)
       .then((row) => {
         if (!cancelled) setLinkedVisit(row);
       })
@@ -110,15 +184,15 @@ export function SaleDetailSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, sale?.visit_id]);
+  }, [open, currentSale?.visit_id]);
 
   useEffect(() => {
-    if (!open || !sale?.bank_account_id) {
+    if (!open || !currentSale?.bank_account_id) {
       setPayAccount(null);
       setPayAccountReady(true);
       return;
     }
-    const accountId = sale.bank_account_id;
+    const accountId = currentSale.bank_account_id;
     let cancelled = false;
     setPayAccountReady(false);
     void fetchBankAccounts()
@@ -135,7 +209,7 @@ export function SaleDetailSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, sale?.bank_account_id]);
+  }, [open, currentSale?.bank_account_id]);
 
   const byId = useMemo(() => {
     const map = new Map<number, Product>();
@@ -144,26 +218,26 @@ export function SaleDetailSheet({
   }, [products]);
 
   const quoteData = useMemo(() => {
-    if (!sale) return null;
-    const snap = parseQuoteSnapshot(sale.quote_snapshot);
+    if (!currentSale) return null;
+    const snap = parseQuoteSnapshot(currentSale.quote_snapshot);
     if (snap) {
       const data = snapshotToQuoteDocumentData(snap);
-      data.code = saleOrderCode(sale);
+      data.code = saleOrderCode(currentSale);
       return data;
     }
-    return buildQuoteDataFromSale(sale, products, sellerName ?? "Vendedor");
-  }, [sale, products, sellerName]);
+    return buildQuoteDataFromSale(currentSale, products, sellerName ?? "Vendedor");
+  }, [currentSale, products, sellerName]);
 
-  if (!sale) return null;
+  if (!currentSale) return null;
 
-  const name = sale.client?.name ?? `Cliente #${sale.client_id}`;
+  const name = currentSale.client?.name ?? `Cliente #${currentSale.client_id}`;
   const clientId =
-    sale.client?.rif ?? (sale.client?.ci ? `CI ${sale.client.ci}` : null);
-  const items = saleItemCount(sale);
-  const units = saleUnitCount(sale);
-  const payLabel = sale.is_credit
+    currentSale.client?.rif ?? (currentSale.client?.ci ? `CI ${currentSale.client.ci}` : null);
+  const items = saleItemCount(currentSale);
+  const units = saleUnitCount(currentSale);
+  const payLabel = currentSale.is_credit
     ? "Crédito"
-    : PAYMENT_METHOD_LABEL[sale.payment_method] ?? sale.payment_method;
+    : PAYMENT_METHOD_LABEL[currentSale.payment_method] ?? currentSale.payment_method;
   const avatar = name
     .trim()
     .split(/\s+/)
@@ -172,15 +246,15 @@ export function SaleDetailSheet({
     .map((p) => p[0])
     .join("")
     .toUpperCase() || "?";
-  const originLabel = SALE_ORIGIN_LABEL[sale.origin];
+  const originLabel = SALE_ORIGIN_LABEL[currentSale.origin];
   const canOpenVisit = Boolean(onOpenVisit && linkedVisit && !fromVisit);
   const visitTitle = linkedVisit
     ? `${VISIT_STATUS[linkedVisit.status]} · ${visitWhen(linkedVisit)}`
-    : sale.visit_id
-      ? `Visita #${sale.visit_id}`
+    : currentSale.visit_id
+      ? `Visita #${currentSale.visit_id}`
       : `Sin visita · ${originLabel}`;
   const shownAccount =
-    payAccount && sale.bank_account_id && payAccount.id === sale.bank_account_id
+    payAccount && currentSale.bank_account_id && payAccount.id === currentSale.bank_account_id
       ? payAccount
       : null;
 
@@ -190,8 +264,8 @@ export function SaleDetailSheet({
       onClose={onClose}
       size="wide"
       eyebrow="Pedido"
-      title={saleOrderCode(sale)}
-      blurb={`${formatDateTime(sale.created_at)} · ${originLabel}`}
+      title={saleOrderCode(currentSale)}
+      blurb={`${formatHeaderWhen(currentSale.created_at)} · ${originLabel}`}
       footer={
         <div className="side-sheet-actions">
           <Button type="button" variant="accent" onClick={onClose}>
@@ -214,7 +288,7 @@ export function SaleDetailSheet({
             className={tab === "documento" ? "chip active" : "chip"}
             onClick={() => setTab("documento")}
           >
-            Cotización / documento
+            Documento
           </button>
         </div>
 
@@ -238,25 +312,25 @@ export function SaleDetailSheet({
             <div className="visit-sale-confirmed" role="status">
               <div className="visit-sale-confirmed-copy">
                 <p className="eyebrow">Resumen</p>
-                <strong>{formatSaleTotal(sale)}</strong>
+                <div className="sale-summary-hero">
+                  <strong>{formatSaleTotal(currentSale)}</strong>
+                </div>
                 <div className="visit-sale-metrics sale-resumen-metrics">
-                  <div>
+                  <div className="sale-summary-metric">
+                    <span className="muted small">Fecha</span>
+                    <b>{formatHeaderWhen(currentSale.created_at)}</b>
+                  </div>
+                  <div className="sale-summary-metric">
                     <span className="muted small">Moneda</span>
-                    <b>{saleCurrencyLabel(sale.currency)}</b>
+                    <b>{saleCurrencyLabel(currentSale.currency)}</b>
                   </div>
-                  <div>
+                  <div className="sale-summary-metric">
                     <span className="muted small">IVA</span>
-                    <b>{sale.apply_iva || quoteData?.applyIva ? "16%" : "Sin IVA"}</b>
+                    <b>{currentSale.apply_iva || quoteData?.applyIva ? "16%" : "Sin IVA"}</b>
                   </div>
-                  <div>
+                  <div className="sale-summary-metric">
                     <span className="muted small">Ítems</span>
-                    <b>
-                      {items} · {units} ud
-                    </b>
-                  </div>
-                  <div>
-                    <span className="muted small">Pago</span>
-                    <b>{payLabel}</b>
+                    <b>{items} · {units} ud</b>
                   </div>
                 </div>
 
@@ -275,12 +349,12 @@ export function SaleDetailSheet({
                     <ChevronRight size={18} aria-hidden />
                   </button>
                 ) : (
-                  <div className={`sale-visit-related${sale.visit_id ? " has-visit" : ""}`}>
+                  <div className={`sale-visit-related${currentSale.visit_id ? " has-visit" : ""}`}>
                     <ClipboardList size={16} aria-hidden />
                     <span>
                       <span className="muted small">Visita</span>
                       <strong>
-                        {fromVisit && sale.visit_id
+                        {fromVisit && currentSale.visit_id
                           ? "Registrada en esta visita"
                           : visitTitle}
                       </strong>
@@ -291,52 +365,70 @@ export function SaleDetailSheet({
             </div>
 
             <div className="visit-ficha-facts">
-              <article className="visit-ficha-fact">
-                <span className="muted small">Fecha</span>
-                <strong>{formatDateTime(sale.created_at)}</strong>
-              </article>
-              {!sale.is_credit ? (
+              {!currentSale.is_credit ? (
                 <article className="visit-ficha-fact visit-ficha-fact-wide sale-pay-account">
-                  <span className="muted small">Cuenta de cobro</span>
+                  <span className="muted small">Pago</span>
                   {shownAccount ? (
-                    <SalePayAccountFold account={shownAccount} />
-                  ) : (
-                    <div className="pay-share-head">
-                      <PayMark
-                        slugs={sale.payment_method.startsWith("cash") ? ["cash"] : []}
-                        label={payLabel}
-                        size="md"
-                      />
-                      <div className="pay-share-copy">
-                        <strong>
-                          {sale.bank_account_id && !payAccountReady
-                            ? "Cargando cuenta…"
-                            : sale.bank_account_id
-                              ? `Cuenta #${sale.bank_account_id}`
-                              : sale.payment_method.startsWith("cash")
-                                ? `Efectivo en caja ${saleCurrencyLabel(sale.currency)}`
-                                : payLabel}
-                        </strong>
-                        {payAccountReady && sale.bank_account_id ? (
-                          <span className="muted small">
-                            No se pudo cargar el detalle de la cuenta
-                          </span>
-                        ) : null}
+                    <>
+                      <SalePayAccountFold account={shownAccount} />
+                      <div className="sale-pay-meta-row">
+                        <div className="sale-pay-meta-head">
+                          <span className="muted small">Referencia</span>
+                        </div>
+                        <strong>{currentSale.payment_reference?.trim() || "Sin referencia"}</strong>
+                        <SalePaymentProofRow
+                          src={paymentProofSrc}
+                          count={paymentProofSrcs.length}
+                          loading={saleDetailLoading && hasPaymentProof}
+                          onOpen={() => setPaymentProofOpen(true)}
+                        />
                       </div>
-                    </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="pay-share-head">
+                        <PayMark
+                          slugs={currentSale.payment_method.startsWith("cash") ? ["cash"] : []}
+                          label={payLabel}
+                          size="md"
+                        />
+                        <div className="pay-share-copy">
+                          <strong>
+                            {currentSale.bank_account_id && !payAccountReady
+                              ? "Cargando cuenta…"
+                              : currentSale.bank_account_id
+                                ? `Cuenta #${currentSale.bank_account_id}`
+                                : currentSale.payment_method.startsWith("cash")
+                                  ? `Efectivo en caja ${saleCurrencyLabel(currentSale.currency)}`
+                                  : payLabel}
+                          </strong>
+                          {payAccountReady && currentSale.bank_account_id ? (
+                            <span className="muted small">
+                              No se pudo cargar el detalle de la cuenta
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="sale-pay-meta-row">
+                        <div className="sale-pay-meta-head">
+                          <span className="muted small">Referencia</span>
+                        </div>
+                        <strong>{currentSale.payment_reference?.trim() || "Sin referencia"}</strong>
+                        <SalePaymentProofRow
+                          src={paymentProofSrc}
+                          count={paymentProofSrcs.length}
+                          loading={saleDetailLoading && hasPaymentProof}
+                          onOpen={() => setPaymentProofOpen(true)}
+                        />
+                      </div>
+                    </>
                   )}
                 </article>
               ) : null}
-              {!sale.is_credit ? (
-                <article className="visit-ficha-fact visit-ficha-fact-wide">
-                  <span className="muted small">Referencia de pago</span>
-                  <strong>{sale.payment_reference?.trim() || "Sin referencia"}</strong>
-                </article>
-              ) : null}
-              {sale.notes ? (
+              {currentSale.notes ? (
                 <article className="visit-ficha-fact visit-ficha-fact-wide">
                   <span className="muted small">Nota</span>
-                  <strong>{sale.notes}</strong>
+                  <strong>{currentSale.notes}</strong>
                 </article>
               ) : null}
             </div>
@@ -352,27 +444,27 @@ export function SaleDetailSheet({
                   <span>Subtotal</span>
                 </div>
                 <ul>
-                  {(sale.items ?? []).map((line) => {
+                  {(currentSale.items ?? []).map((line) => {
                     const product = byId.get(line.product_id);
                     const unit = Number(line.unit_price);
                     const lineTotal = Number(line.line_total);
                     return (
-                      <li key={`${sale.id}-${line.product_id}`} className="sale-detail-line">
+                      <li key={`${currentSale.id}-${line.product_id}`} className="sale-detail-line">
                         <ProductThumb src={product?.image_url} alt="" />
                         <span className="sale-detail-line-product">
                           <strong>{product?.name ?? `Producto #${line.product_id}`}</strong>
                           <span className="muted small">
-                            {line.quantity} × {formatQuoteAmount(unit, sale.currency)}
+                            {line.quantity} × {formatQuoteAmount(unit, currentSale.currency)}
                             {product?.presentation ? ` · ${product.presentation}` : ""}
                             {product?.sku ? ` · ${product.sku}` : ""}
                           </span>
                         </span>
                         <span className="sale-detail-line-qty">{line.quantity}</span>
                         <span className="sale-detail-line-unit">
-                          {formatQuoteAmount(unit, sale.currency)}
+                          {formatQuoteAmount(unit, currentSale.currency)}
                         </span>
                         <span className="sale-detail-line-total">
-                          <strong>{formatQuoteAmount(lineTotal, sale.currency)}</strong>
+                          <strong>{formatQuoteAmount(lineTotal, currentSale.currency)}</strong>
                         </span>
                       </li>
                     );
@@ -387,8 +479,46 @@ export function SaleDetailSheet({
           <QuoteDocument data={quoteData} asImage />
         ) : null}
       </div>
+      <QuoteDocViewer
+        open={paymentProofOpen}
+        src={paymentProofSrc}
+        sources={paymentProofSrcs}
+        alt={`Comprobante ${saleOrderCode(currentSale)}`}
+        onClose={() => setPaymentProofOpen(false)}
+      />
     </Modal>
   );
+}
+
+function SalePaymentProofRow({
+  src,
+  count,
+  loading,
+  onOpen,
+}: {
+  src: string | null;
+  count: number;
+  loading: boolean;
+  onOpen: () => void;
+}) {
+  if (src) {
+    return (
+      <button type="button" className="sale-pay-proof-row" onClick={onOpen}>
+        <span className="sale-pay-proof-thumb">
+          <img src={src} alt="" />
+        </span>
+        <span>
+          <span className="muted small">Comprobante</span>
+          <strong>{count > 1 ? `Ver ${count} fotos` : "Ver imagen"}</strong>
+        </span>
+        <ChevronRight size={18} aria-hidden />
+      </button>
+    );
+  }
+  if (loading) {
+    return <p className="muted small">Cargando comprobante…</p>;
+  }
+  return null;
 }
 
 function payAccountTitle(account: BankAccount): string {

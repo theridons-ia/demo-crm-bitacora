@@ -2,6 +2,8 @@ import {
   Banknote,
   CircleDollarSign,
   Copy,
+  Eye,
+  EyeOff,
   Landmark,
   MessageCircle,
   Send,
@@ -10,11 +12,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { BankAccount, CurrencyCode, PaymentMethod } from "../lib/types";
+import { MAX_PAYMENT_EVIDENCE_PHOTOS, parsePaymentEvidence, serializePaymentEvidence } from "../lib/imageEvidence";
 import { payMarkSlugs } from "../lib/payMarks";
 import { copyText, payAccountShareText, whatsappShareUrl } from "../lib/sharePay";
 import { Button } from "./Button";
-import { PayMark } from "./PayMark";
 import { PhotoDrop } from "./PhotoDrop";
+import { SearchPickField } from "./SearchPickField";
 import { TextField } from "./TextField";
 
 export type PaymentCaptureValue = {
@@ -22,6 +25,7 @@ export type PaymentCaptureValue = {
   bank_account_id: number | null;
   payment_reference: string;
   payment_evidence: string | null;
+  payment_evidence_photos?: string[];
 };
 
 type Props = {
@@ -30,6 +34,7 @@ type Props = {
   accounts: BankAccount[];
   currency: CurrencyCode;
   disabled?: boolean;
+  onProcessingChange?: (busy: boolean) => void;
   /** Si true, no muestra métodos de crédito. */
   hideCredit?: boolean;
 };
@@ -74,6 +79,7 @@ export function PaymentCapture({
   accounts,
   currency,
   disabled,
+  onProcessingChange,
 }: Props) {
   const visibleMethods = useMemo(() => methodsForCurrency(currency), [currency]);
   const filteredAccounts = useMemo(() => {
@@ -86,6 +92,7 @@ export function PaymentCapture({
   }, [accounts, currency, value.payment_method]);
 
   const needsAccount = !METHOD_OPTIONS.find((m) => m.id === value.payment_method)?.cash;
+  const isCash = !needsAccount;
 
   useEffect(() => {
     const allowed = visibleMethods.some((m) => m.id === value.payment_method);
@@ -113,13 +120,44 @@ export function PaymentCapture({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync cuenta al cambiar método/moneda
   }, [needsAccount, value.payment_method, currency, filteredAccounts.length, value.bank_account_id]);
 
+  useEffect(() => {
+    if (isCash && value.payment_reference) {
+      onChange({ ...value, payment_reference: "" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- referencia no aplica para efectivo
+  }, [isCash, value.payment_method]);
+
   const selected = filteredAccounts.find((a) => a.id === value.bank_account_id);
   const shareText = selected && isShareableAccount(selected) ? payAccountShareText(selected) : null;
   const [copied, setCopied] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const evidencePhotos = useMemo(() => {
+    if (value.payment_evidence_photos?.length) return value.payment_evidence_photos;
+    return parsePaymentEvidence(value.payment_evidence);
+  }, [value.payment_evidence, value.payment_evidence_photos]);
   const emptyAccountHint =
     needsAccount && !filteredAccounts.length
       ? "No hay cuenta activa para este método. El supervisor la carga en Bancos, o elige otro medio."
       : null;
+
+  useEffect(() => {
+    setDetailsOpen(false);
+  }, [value.payment_method, value.bank_account_id]);
+
+  useEffect(() => {
+    onProcessingChange?.(photoBusy);
+  }, [onProcessingChange, photoBusy]);
+
+  const accountOptions = filteredAccounts.map((account) => ({
+    id: account.id,
+    title: account.bank_name?.trim() || account.name,
+    subtitle:
+      account.holder_name?.trim() ||
+      account.pay_hint?.trim() ||
+      account.name.trim(),
+    markSlug: payMarkSlugs(account)[0],
+  }));
 
   return (
     <div className="payment-capture">
@@ -146,37 +184,31 @@ export function PaymentCapture({
       </div>
 
       <div className="pay-block">
-        {needsAccount && filteredAccounts.length > 1 ? (
+        {needsAccount ? (
           <>
-            <p className="sale-cart-heading">Cuenta destino</p>
-            <div className="pay-accounts" role="listbox" aria-label="Cuenta destino">
-              {filteredAccounts.map((account) => {
-                const active = account.id === value.bank_account_id;
-                return (
-                  <button
-                    key={account.id}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    className={active ? "pay-account is-active" : "pay-account"}
-                    disabled={disabled}
-                    onClick={() => onChange({ ...value, bank_account_id: account.id })}
-                  >
-                    <PayMark
-                      slugs={payMarkSlugs(account)}
-                      label={account.bank_name || account.name}
-                      size="md"
-                    />
-                    <span className="sale-cart-copy">
-                      <strong>{account.name}</strong>
-                      {account.holder_name ? (
-                        <span className="muted small">{account.holder_name}</span>
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <p className="sale-cart-heading" id="pay-account-label">
+              Cuenta destino
+            </p>
+            <SearchPickField
+              id="pay-account"
+              labelledBy="pay-account-label"
+              placeholder="Selecciona una cuenta…"
+              valueId={value.bank_account_id}
+              disabled={disabled}
+              options={accountOptions}
+              emptyLabel="Sin cuentas disponibles"
+              onChange={(id) => onChange({ ...value, bank_account_id: id })}
+              auxAction={
+                selected
+                  ? {
+                      label: detailsOpen ? "Ocultar datos de cuenta" : "Ver datos de cuenta",
+                      icon: detailsOpen ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />,
+                      onClick: () => setDetailsOpen((prev) => !prev),
+                      pressed: detailsOpen,
+                    }
+                  : null
+              }
+            />
           </>
         ) : null}
 
@@ -186,63 +218,43 @@ export function PaymentCapture({
           </p>
         ) : null}
 
-        {shareText && selected ? (
-          <div className="pay-share-inline">
-            <div className="pay-share-head">
-              <PayMark
-                slugs={payMarkSlugs(selected)}
-                label={selected.bank_name || selected.name}
-                size="md"
-              />
-              <div className="pay-share-copy">
-                <p className="pay-share-holder">{selected.name}</p>
+        {selected && needsAccount ? (
+          <div className="pay-account-meta">
+            {detailsOpen ? (
+              <div className="pay-share-inline">
                 {selected.holder_name ? (
                   <p className="muted small">{selected.holder_name}</p>
                 ) : null}
                 {selected.pay_hint ? <p className="pay-share-hint">{selected.pay_hint}</p> : null}
+                {shareText ? (
+                  <div className="pay-share-actions">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={disabled}
+                      onClick={() => {
+                        void copyText(shareText).then((ok) => {
+                          setCopied(ok);
+                          if (ok) window.setTimeout(() => setCopied(false), 1800);
+                        });
+                      }}
+                    >
+                      <Copy size={16} />
+                      {copied ? "Copiado" : "Copiar"}
+                    </Button>
+                    <a
+                      className="btn btn-secondary"
+                      href={whatsappShareUrl(shareText)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <MessageCircle size={16} />
+                      WhatsApp
+                    </a>
+                  </div>
+                ) : null}
               </div>
-            </div>
-            <div className="pay-share-actions">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={disabled}
-                onClick={() => {
-                  void copyText(shareText).then((ok) => {
-                    setCopied(ok);
-                    if (ok) window.setTimeout(() => setCopied(false), 1800);
-                  });
-                }}
-              >
-                <Copy size={16} />
-                {copied ? "Copiado" : "Copiar"}
-              </Button>
-              <a
-                className="btn btn-secondary"
-                href={whatsappShareUrl(shareText)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <MessageCircle size={16} />
-                WhatsApp
-              </a>
-            </div>
-          </div>
-        ) : null}
-
-        {needsAccount && filteredAccounts.length === 1 && selected && !shareText ? (
-          <div className="pay-account is-static">
-            <PayMark
-              slugs={payMarkSlugs(selected)}
-              label={selected.bank_name || selected.name}
-              size="md"
-            />
-            <span className="sale-cart-copy">
-              <strong>{selected.name}</strong>
-              {selected.holder_name ? (
-                <span className="muted small">{selected.holder_name}</span>
-              ) : null}
-            </span>
+            ) : null}
           </div>
         ) : null}
 
@@ -258,22 +270,34 @@ export function PaymentCapture({
       </div>
 
       <div className="pay-details">
-        <TextField
-          id="pay-ref"
-          label="Referencia / código"
-          value={value.payment_reference}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...value, payment_reference: e.target.value })}
-          placeholder="Opcional · ej. 00123456"
-        />
+        {isCash ? null : (
+          <TextField
+            id="pay-ref"
+            label="REFERENCIA / CÓDIGO"
+            value={value.payment_reference}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...value, payment_reference: e.target.value })}
+            placeholder="Opcional · ej. 00123456"
+          />
+        )}
         <PhotoDrop
           id="pay-photo"
-          label="Comprobante"
-          hint="Opcional · JPG o PNG"
-          readyHint="Se adjunta al pedido"
-          value={value.payment_evidence}
+          label={isCash ? "Billetes" : "Comprobante"}
+          hint="Opcional · hasta 3 fotos JPG o PNG"
+          readyHint="Se adjuntan al pedido"
+          value={evidencePhotos}
           disabled={disabled}
-          onChange={(next) => onChange({ ...value, payment_evidence: next })}
+          onBusyChange={setPhotoBusy}
+          multiple
+          maxFiles={MAX_PAYMENT_EVIDENCE_PHOTOS}
+          onChange={(next) => {
+            const photos = next.filter(Boolean).slice(0, MAX_PAYMENT_EVIDENCE_PHOTOS);
+            onChange({
+              ...value,
+              payment_evidence_photos: photos,
+              payment_evidence: serializePaymentEvidence(photos),
+            });
+          }}
         />
       </div>
     </div>
@@ -292,5 +316,6 @@ export function emptyPaymentCapture(
     bank_account_id: null,
     payment_reference: "",
     payment_evidence: null,
+    payment_evidence_photos: [],
   };
 }

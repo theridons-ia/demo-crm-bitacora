@@ -300,7 +300,7 @@ class SaleIn(BaseModel):
     is_credit: bool = False
     bank_account_id: int | None = None
     payment_reference: str | None = Field(default=None, max_length=64)
-    payment_evidence: str | None = Field(default=None, max_length=600_000)
+    payment_evidence: str | None = Field(default=None, max_length=1_800_000)
     notes: str | None = None
     apply_iva: bool = False
     quote_snapshot: str | None = Field(default=None, max_length=200_000)
@@ -339,6 +339,8 @@ class SaleOut(ORMModel):
     payment_method: PaymentMethod
     bank_account_id: int | None = None
     payment_reference: str | None = None
+    payment_evidence: str | None = None
+    has_payment_evidence: bool = False
     total_amount: Decimal
     is_credit: bool
     apply_iva: bool = False
@@ -351,6 +353,18 @@ class SaleOut(ORMModel):
     client: ClientOut | None = None
     seller: UserOut | None = None
 
+    @model_validator(mode="after")
+    def infer_has_payment_evidence(self):
+        if not self.has_payment_evidence and self.payment_evidence:
+            self.has_payment_evidence = bool(self.payment_evidence.strip())
+        return self
+
+
+class SaleListOut(SaleOut):
+    """Listado ligero: no manda el blob del comprobante."""
+
+    payment_evidence: str | None = Field(default=None, exclude=True)
+
 
 class SalePaymentCreate(BaseModel):
     amount: Decimal = Field(gt=0)
@@ -358,7 +372,7 @@ class SalePaymentCreate(BaseModel):
     payment_method: PaymentMethod = PaymentMethod.cash_usd
     bank_account_id: int | None = None
     payment_reference: str | None = Field(default=None, max_length=64)
-    payment_evidence: str | None = Field(default=None, max_length=600_000)
+    payment_evidence: str | None = Field(default=None, max_length=1_800_000)
     notes: str | None = Field(default=None, max_length=255)
 
 

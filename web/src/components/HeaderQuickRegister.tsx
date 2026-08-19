@@ -11,7 +11,7 @@ const ACTIONS = [
   },
   {
     path: "/app/ventas",
-    label: "Registrar venta",
+    label: "Nuevo pedido",
     blurb: "Pedido / cobro al cliente",
     icon: ShoppingCart,
   },

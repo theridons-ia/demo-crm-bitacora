@@ -498,6 +498,10 @@ export function fetchSales(params?: { client_id?: number }): Promise<Sale[]> {
   return request<Sale[]>(`/api/sales${qs ? `?${qs}` : ""}`);
 }
 
+export function fetchSale(saleId: number): Promise<Sale> {
+  return request<Sale>(`/api/sales/${saleId}`);
+}
+
 export type SaleCreateInput = {
   client_id: number;
   origin: Exclude<SaleOrigin, "visita">;
