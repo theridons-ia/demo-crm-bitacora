@@ -3,6 +3,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal } from "./Modal";
 import { ApiError, fetchVisitGpsPoints } from "../lib/api";
+import type { GeoFix } from "../lib/gps";
 import { clientPdvIconFor, sellerNowIcon, trailIconForSource } from "../lib/mapMarkers";
 import type { Visit, VisitGpsPoint } from "../lib/types";
 
@@ -12,6 +13,8 @@ const SOURCE_LABEL: Record<string, string> = {
   end: "Cierre (vendedor)",
 };
 
+const FALLBACK: L.LatLngExpression = [10.0647, -69.334];
+
 type Props = {
   visit: Visit;
   open: boolean;
@@ -20,6 +23,9 @@ type Props = {
   blurb?: string;
   notice?: ReactNode;
   footer?: ReactNode;
+  /** Posición viva del vendedor (pregunta «¿Estás aquí?»). */
+  hereFix?: GeoFix | null;
+  hereFixLoading?: boolean;
 };
 
 function visitFallbackPoints(visit: Visit): VisitGpsPoint[] {
@@ -49,7 +55,29 @@ function visitFallbackPoints(visit: Visit): VisitGpsPoint[] {
   return points;
 }
 
-/** Mapa Leaflet: PDV (fucsia + nombre) + trail del vendedor. */
+function pdvLatLng(visit: Visit): L.LatLngExpression | null {
+  const client = visit.client;
+  if (client?.latitude == null || client?.longitude == null) return null;
+  const clat = Number(client.latitude);
+  const clng = Number(client.longitude);
+  if (!Number.isFinite(clat) || !Number.isFinite(clng)) return null;
+  return [clat, clng];
+}
+
+function visitNowLatLng(visit: Visit): L.LatLngExpression | null {
+  const lat = visit.latitude != null ? Number(visit.latitude) : NaN;
+  const lng = visit.longitude != null ? Number(visit.longitude) : NaN;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (visit.status !== "en_curso" && visit.status !== "programada") return null;
+  return [lat, lng];
+}
+
+function samePoint(aLat: number, aLng: number, b: L.LatLngExpression): boolean {
+  const pair = Array.isArray(b) ? b : [b.lat, b.lng];
+  return Math.abs(aLat - Number(pair[0])) < 1e-5 && Math.abs(aLng - Number(pair[1])) < 1e-5;
+}
+
+/** Mapa Leaflet: PDV (fucsia + nombre) + trail del vendedor + posición actual. */
 export function VisitMapSheet({
   visit,
   open,
@@ -58,9 +86,13 @@ export function VisitMapSheet({
   blurb,
   notice,
   footer,
+  hereFix = null,
+  hereFixLoading = false,
 }: Props) {
-  const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const overlaysRef = useRef<L.LayerGroup | null>(null);
+  const hereLayerRef = useRef<L.LayerGroup | null>(null);
+  const [canvasEl, setCanvasEl] = useState<HTMLDivElement | null>(null);
   const [points, setPoints] = useState<VisitGpsPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,51 +130,50 @@ export function VisitMapSheet({
   }, [open, visit]);
 
   useEffect(() => {
-    if (!open || !mapEl.current) return;
+    if (!open || !canvasEl) return;
 
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
-
-    const map = L.map(mapEl.current, { zoomControl: true, attributionControl: true });
+    const map = L.map(canvasEl, { zoomControl: true, attributionControl: true });
     mapRef.current = map;
-
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
     }).addTo(map);
+    overlaysRef.current = L.layerGroup().addTo(map);
+    hereLayerRef.current = L.layerGroup().addTo(map);
+    map.setView(FALLBACK, 12);
 
-    const bounds: L.LatLngExpression[] = [];
+    const t1 = window.setTimeout(() => map.invalidateSize(), 80);
+    const t2 = window.setTimeout(() => map.invalidateSize(), 360);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      map.remove();
+      mapRef.current = null;
+      overlaysRef.current = null;
+      hereLayerRef.current = null;
+    };
+  }, [open, canvasEl]);
 
-    const client = visit.client;
-    if (client?.latitude != null && client?.longitude != null) {
-      const clat = Number(client.latitude);
-      const clng = Number(client.longitude);
-      if (Number.isFinite(clat) && Number.isFinite(clng)) {
-        const ll: L.LatLngExpression = [clat, clng];
-        bounds.push(ll);
-        L.marker(ll, { icon: clientPdvIconFor(client.name) })
-          .addTo(map)
-          .bindPopup(
-            `<strong>${client.name}</strong>${
-              client.address ? `<br/><small>${client.address}</small>` : ""
-            }`,
-          );
-      }
+  useEffect(() => {
+    const map = mapRef.current;
+    const overlays = overlaysRef.current;
+    if (!open || !map || !overlays) return;
+
+    overlays.clearLayers();
+    const pdv = pdvLatLng(visit);
+    if (pdv) {
+      L.marker(pdv, { icon: clientPdvIconFor(visit.client?.name) })
+        .addTo(overlays)
+        .bindPopup(
+          `<strong>${visit.client?.name ?? "PDV"}</strong>${
+            visit.client?.address ? `<br/><small>${visit.client.address}</small>` : ""
+          }`,
+        );
     }
 
-    const nowLat = visit.latitude != null ? Number(visit.latitude) : NaN;
-    const nowLng = visit.longitude != null ? Number(visit.longitude) : NaN;
-    const showNow =
-      (visit.status === "en_curso" || visit.status === "programada") &&
-      Number.isFinite(nowLat) &&
-      Number.isFinite(nowLng);
-
-    function isCurrentFix(lat: number, lng: number): boolean {
-      if (!showNow) return false;
-      return Math.abs(lat - nowLat) < 1e-5 && Math.abs(lng - nowLng) < 1e-5;
-    }
+    const here = hereFix
+      ? ([hereFix.latitude, hereFix.longitude] as L.LatLngExpression)
+      : visitNowLatLng(visit);
 
     const latLngs: L.LatLngExpression[] = [];
     for (const p of points) {
@@ -151,54 +182,86 @@ export function VisitMapSheet({
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const ll: L.LatLngExpression = [lat, lng];
       latLngs.push(ll);
-      bounds.push(ll);
-      if (isCurrentFix(lat, lng) && p.source !== "start" && p.source !== "end") {
+      if (here && p.source !== "start" && p.source !== "end" && samePoint(lat, lng, here)) {
         continue;
       }
       const label = SOURCE_LABEL[p.source] ?? p.source;
       const acc = p.accuracy_m ? ` · ±${Number(p.accuracy_m).toFixed(0)} m` : "";
       L.marker(ll, { icon: trailIconForSource(p.source) })
-        .addTo(map)
+        .addTo(overlays)
         .bindPopup(`<strong>${label}</strong>${acc}<br/><small>${p.captured_at}</small>`);
     }
 
-    if (showNow) {
-      const acc = visit.gps_accuracy_m
-        ? ` · ±${Number(visit.gps_accuracy_m).toFixed(0)} m`
-        : "";
-      bounds.push([nowLat, nowLng]);
-      L.marker([nowLat, nowLng], { icon: sellerNowIcon, zIndexOffset: 1200 })
-        .addTo(map)
-        .bindPopup(`<strong>Posición actual</strong>${acc}`);
+    if (latLngs.length >= 2) {
+      L.polyline(latLngs, { color: "#f16b5f", weight: 3, opacity: 0.9 }).addTo(overlays);
+    }
+  }, [open, canvasEl, points, visit, hereFix]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const hereLayer = hereLayerRef.current;
+    if (!open || !map || !hereLayer) return;
+
+    hereLayer.clearLayers();
+    const here = hereFix
+      ? ({
+          lat: hereFix.latitude,
+          lng: hereFix.longitude,
+          acc: hereFix.accuracy_m,
+        } as const)
+      : (() => {
+          const ll = visitNowLatLng(visit);
+          if (!ll) return null;
+          const pair = ll as [number, number];
+          return {
+            lat: pair[0],
+            lng: pair[1],
+            acc: visit.gps_accuracy_m != null ? Number(visit.gps_accuracy_m) : null,
+          };
+        })();
+
+    if (here) {
+      const ll: L.LatLngExpression = [here.lat, here.lng];
+      if (here.acc != null && Number.isFinite(here.acc) && here.acc > 0) {
+        L.circle(ll, {
+          radius: Math.min(here.acc, 250),
+          color: "#0f766e",
+          weight: 1,
+          fillColor: "#0f766e",
+          fillOpacity: 0.12,
+        }).addTo(hereLayer);
+      }
+      const acc = here.acc != null && Number.isFinite(here.acc) ? ` · ±${Math.round(here.acc)} m` : "";
+      L.marker(ll, { icon: sellerNowIcon, zIndexOffset: 1400 })
+        .addTo(hereLayer)
+        .bindPopup(`<strong>Tu posición</strong>${acc}`);
     }
 
-    if (latLngs.length >= 2) {
-      L.polyline(latLngs, { color: "#f16b5f", weight: 3, opacity: 0.9 }).addTo(map);
+    const bounds: L.LatLngExpression[] = [];
+    const pdv = pdvLatLng(visit);
+    if (pdv) bounds.push(pdv);
+    if (here) bounds.push([here.lat, here.lng]);
+    for (const p of points) {
+      const lat = Number(p.latitude);
+      const lng = Number(p.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) bounds.push([lat, lng]);
     }
 
     if (bounds.length >= 2) {
-      map.fitBounds(L.latLngBounds(bounds), { padding: [36, 36] });
+      map.fitBounds(L.latLngBounds(bounds), { padding: [48, 48], maxZoom: 17 });
     } else if (bounds.length === 1) {
       map.setView(bounds[0], 16);
     } else {
-      map.setView([10.0647, -69.334], 12);
+      map.setView(FALLBACK, 12);
     }
-
-    const t = window.setTimeout(() => map.invalidateSize(), 80);
-    return () => {
-      window.clearTimeout(t);
-      map.remove();
-      mapRef.current = null;
-    };
-  }, [open, points, visit]);
+    window.setTimeout(() => map.invalidateSize(), 60);
+  }, [open, canvasEl, hereFix, visit, points]);
 
   if (!open) return null;
 
   const clientName = visit.client?.name ?? `Cliente #${visit.client_id}`;
-  const hasPdv =
-    visit.client?.latitude != null &&
-    visit.client?.longitude != null &&
-    Number.isFinite(Number(visit.client.latitude));
+  const hasPdv = pdvLatLng(visit) != null;
+  const hasHere = Boolean(hereFix) || visitNowLatLng(visit) != null;
 
   return (
     <Modal
@@ -220,6 +283,11 @@ export function VisitMapSheet({
       footer={footer}
     >
       {notice}
+      {hereFixLoading && !hasHere ? (
+        <p className="muted small" role="status">
+          Buscando tu posición…
+        </p>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
 
       <div className="map-legend" aria-hidden>
@@ -233,7 +301,7 @@ export function VisitMapSheet({
           <i className="map-marker-dot map-marker-dot-seller" /> Trail
         </span>
         <span>
-          <i className="map-marker-dot map-marker-dot-now" /> Ahora
+          <i className="map-marker-dot map-marker-dot-now" /> Tú
         </span>
         <span>
           <i className="map-marker-dot map-marker-dot-end" /> Cierre
@@ -241,7 +309,7 @@ export function VisitMapSheet({
       </div>
 
       <div className="map-stage">
-        <div ref={mapEl} className="map-stage-canvas is-sheet" />
+        <div ref={setCanvasEl} className="map-stage-canvas is-sheet" />
       </div>
     </Modal>
   );

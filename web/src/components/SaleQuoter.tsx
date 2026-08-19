@@ -1,9 +1,9 @@
-import { Plus, Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { Search, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { unitPriceForQuote } from "../lib/productPrices";
 import { formatQuoteAmount, IVA_RATE, quoteMoney, roundMoney } from "../lib/quoteMoney";
 import type { CurrencyCode, Product } from "../lib/types";
-import { SearchPickField } from "./SearchPickField";
+import { ProductThumb } from "./ProductThumb";
 
 export type QuoteLine = {
   key: string;
@@ -19,6 +19,7 @@ type Props = {
   applyIva: boolean;
   onApplyIvaChange: (value: boolean) => void;
   currency: CurrencyCode;
+  onCurrencyChange?: (currency: CurrencyCode) => void;
   fxRate?: number | null;
 };
 
@@ -33,7 +34,23 @@ export function newQuoteLine(partial?: Partial<QuoteLine>): QuoteLine {
   };
 }
 
-/** Cotizador: código, cant, precio unit., subtotal — en la moneda elegida. */
+function fold(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+function matchesQuery(product: Product, query: string): boolean {
+  if (!query) return true;
+  const hay = fold(
+    [product.name, product.sku, product.presentation].filter(Boolean).join(" "),
+  );
+  return query.split(/\s+/).every((part) => hay.includes(part));
+}
+
+/** Carrito de OV: buscar, fichas de producto, total. */
 export function SaleQuoter({
   products,
   lines,
@@ -42,45 +59,65 @@ export function SaleQuoter({
   applyIva,
   onApplyIvaChange,
   currency,
+  onCurrencyChange,
   fxRate,
 }: Props) {
+  const [query, setQuery] = useState("");
   const byId = useMemo(() => {
     const map = new Map<number, Product>();
     for (const p of products) map.set(p.id, p);
     return map;
   }, [products]);
 
-  const selectedIds = useMemo(() => {
-    const set = new Set<number>();
-    for (const line of lines) {
-      if (line.productId != null) set.add(line.productId);
-    }
-    return set;
-  }, [lines]);
+  const filled = useMemo(
+    () => lines.filter((line) => line.productId != null),
+    [lines],
+  );
 
+  const qtyByProduct = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const line of filled) {
+      if (line.productId == null) continue;
+      map.set(line.productId, (map.get(line.productId) ?? 0) + line.quantity);
+    }
+    return map;
+  }, [filled]);
+
+  const inStock = useMemo(() => products.filter((p) => p.stock > 0), [products]);
+
+  const matches = useMemo(() => {
+    const q = fold(query);
+    if (!q) return [];
+    return inStock.filter((p) => matchesQuery(p, q)).slice(0, 40);
+  }, [inStock, query]);
+
+  const searching = fold(query).length > 0;
   const fx = fxRate != null && fxRate > 0 ? fxRate : null;
   const subtotal = quoteLinesTotal(lines, products, currency);
   const money = quoteMoney(subtotal, applyIva);
+  const itemCount = filled.reduce((sum, line) => sum + line.quantity, 0);
 
   function updateLine(key: string, patch: Partial<QuoteLine>) {
     onChange(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
   }
 
   function removeLine(key: string) {
-    const next = lines.filter((line) => line.key !== key);
-    onChange(next.length ? next : [newQuoteLine()]);
+    onChange(lines.filter((line) => line.key !== key));
   }
 
-  function addLine() {
-    onChange([...lines, newQuoteLine()]);
-  }
-
-  function optionsFor(line: QuoteLine): Product[] {
-    return products.filter((p) => {
-      if (p.stock <= 0) return false;
-      if (p.id !== line.productId && selectedIds.has(p.id)) return false;
-      return true;
-    });
+  function addProduct(id: number) {
+    const product = byId.get(id);
+    if (!product || disabled) return;
+    const unit = unitPriceForQuote(product, currency);
+    if (unit == null) return;
+    const existing = lines.find((line) => line.productId === id);
+    if (existing) {
+      updateLine(existing.key, {
+        quantity: Math.min(product.stock, existing.quantity + 1),
+      });
+      return;
+    }
+    onChange([...filled, newQuoteLine({ productId: id, quantity: 1 })]);
   }
 
   function amount(n: number): string {
@@ -88,169 +125,191 @@ export function SaleQuoter({
   }
 
   return (
-    <div className="sale-quoter">
-      <div className="sale-quoter-head">
-        <span className="field-label">Productos</span>
-        <span className="muted small">
-          {lines.filter((l) => l.productId != null).length} línea(s)
-        </span>
+    <div className="sale-cart">
+      <div className="sale-cart-toolbar">
+        {onCurrencyChange ? (
+          <div className="choice-group" role="group" aria-label="Moneda">
+            <button
+              type="button"
+              className={currency === "USD" ? "chip active" : "chip"}
+              disabled={disabled}
+              onClick={() => onCurrencyChange("USD")}
+            >
+              USD
+            </button>
+            <button
+              type="button"
+              className={currency === "VES" ? "chip active" : "chip"}
+              disabled={disabled}
+              onClick={() => onCurrencyChange("VES")}
+            >
+              Bs
+            </button>
+          </div>
+        ) : null}
+        <label className="sale-cart-iva">
+          <input
+            type="checkbox"
+            checked={applyIva}
+            disabled={disabled}
+            onChange={(e) => onApplyIvaChange(e.target.checked)}
+          />
+          <span>IVA {(IVA_RATE * 100).toFixed(0)}%</span>
+        </label>
       </div>
 
-      <div className="sale-quoter-table">
-        <div className="sale-quoter-cols" aria-hidden>
-          <span>Código</span>
-          <span>Cant.</span>
-          <span>Precio unit.</span>
-          <span>Subtotal</span>
+      <div className="sale-cart-metrics">
+        <div className="sale-cart-metric">
+          <span>Productos</span>
+          <strong>{itemCount}</strong>
         </div>
+        <div className="sale-cart-metric">
+          <span>Total</span>
+          <strong>{amount(money.total)}</strong>
+        </div>
+      </div>
 
-        <ul className="sale-quoter-body">
-          {lines.map((line) => {
-            const product = line.productId != null ? byId.get(line.productId) : undefined;
-            const maxStock = product?.stock ?? 0;
-            const opts = optionsFor(line);
-            const unit = product ? unitPriceForQuote(product, currency) : null;
-            const lineTotal =
-              product && unit != null ? roundMoney(line.quantity * unit) : 0;
+      <label className="sale-cart-search">
+        <Search size={18} aria-hidden />
+        <input
+          className="input"
+          type="search"
+          inputMode="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="Buscar…"
+          aria-label="Buscar producto"
+          disabled={disabled}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
 
-            return (
-              <li key={line.key} className="sale-quoter-row">
-                <div className="sale-quoter-product">
-                  <SearchPickField
-                    id={`ql-prod-${line.key}`}
-                    aria-label="Producto"
-                    placeholder="Elegir producto…"
-                    valueId={line.productId}
-                    disabled={disabled}
-                    emptyLabel="Sin producto con stock"
-                    options={(product && !opts.some((p) => p.id === product.id)
-                      ? [product, ...opts]
-                      : opts
-                    ).map((p) => ({
-                      id: p.id,
-                      title: p.name,
-                      subtitle: [p.presentation, p.sku, `stock ${p.stock}`].filter(Boolean).join(" · "),
-                      imageUrl: p.image_url,
-                    }))}
-                    onChange={(id) => {
-                      const next = id != null ? byId.get(id) : undefined;
-                      updateLine(line.key, {
-                        productId: id,
-                        quantity: next
-                          ? Math.min(Math.max(1, line.quantity), next.stock)
-                          : 1,
-                      });
-                    }}
-                  />
+      {searching ? (
+        matches.length ? (
+          <ul className="sale-cart-list">
+            {matches.map((product) => {
+              const unit = unitPriceForQuote(product, currency);
+              const inCart = qtyByProduct.get(product.id) ?? 0;
+              const canAdd = unit != null && inCart < product.stock && !disabled;
+              return (
+                <li key={product.id}>
                   <button
                     type="button"
-                    className="sale-quoter-remove"
-                    disabled={disabled}
-                    aria-label="Quitar línea"
-                    onClick={() => removeLine(line.key)}
+                    className="sale-cart-pick"
+                    disabled={!canAdd}
+                    onClick={() => addProduct(product.id)}
                   >
-                    <Trash2 size={15} />
+                    <div className="sale-cart-copy">
+                      <strong>{product.name}</strong>
+                      <span className="muted small">
+                        {product.stock} disponibles
+                        {product.presentation ? ` · ${product.presentation}` : ""}
+                      </span>
+                      <span className="sale-cart-price">
+                        {unit != null ? amount(unit) : "Sin precio"}
+                      </span>
+                      {inCart > 0 ? (
+                        <span className="sale-cart-badge">En pedido · {inCart}</span>
+                      ) : null}
+                    </div>
+                    <ProductThumb src={product.image_url} alt="" size="lg" />
                   </button>
-                </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="sale-cart-empty muted">Sin coincidencias.</p>
+        )
+      ) : null}
 
-                <div className="sale-quoter-qty">
-                  <span className="sale-quoter-label">Cant.</span>
-                  <div className="qty-controls">
+      {!searching && filled.length === 0 ? (
+        <p className="sale-cart-empty muted">Busca un producto para armar el pedido.</p>
+      ) : null}
+
+      {filled.length ? (
+        <>
+          <p className="sale-cart-heading">Pedido</p>
+          <ul className="sale-cart-list">
+            {filled.map((line) => {
+              const product = line.productId != null ? byId.get(line.productId) : undefined;
+              if (!product) return null;
+              const maxStock = product.stock;
+              const unit = unitPriceForQuote(product, currency);
+              const lineTotal = unit != null ? roundMoney(line.quantity * unit) : 0;
+              return (
+                <li key={line.key} className="sale-cart-row">
+                  <div className="sale-cart-copy">
+                    <strong>{product.name}</strong>
+                    <span className="muted small">
+                      {product.stock} disponibles
+                      {[product.sku, product.presentation].filter(Boolean).length
+                        ? ` · ${[product.sku, product.presentation].filter(Boolean).join(" · ")}`
+                        : ""}
+                    </span>
+                    <span className="sale-cart-price">
+                      {unit != null ? `${amount(unit)} c/u` : "Sin precio"}
+                    </span>
+                  </div>
+                  <ProductThumb src={product.image_url} alt="" size="lg" />
+                  <div className="sale-cart-side">
+                    <div className="qty-controls">
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        disabled={disabled || line.quantity <= 1}
+                        aria-label="Menos"
+                        onClick={() =>
+                          updateLine(line.key, { quantity: Math.max(1, line.quantity - 1) })
+                        }
+                      >
+                        −
+                      </button>
+                      <span className="qty-value">{line.quantity}</span>
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        disabled={disabled || line.quantity >= maxStock}
+                        aria-label="Más"
+                        onClick={() =>
+                          updateLine(line.key, {
+                            quantity: Math.min(maxStock, line.quantity + 1),
+                          })
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                    <strong className="sale-cart-line">
+                      {unit != null ? amount(lineTotal) : "—"}
+                    </strong>
                     <button
                       type="button"
-                      className="qty-btn"
-                      disabled={disabled || !product || line.quantity <= 1}
-                      aria-label="Menos"
-                      onClick={() =>
-                        updateLine(line.key, {
-                          quantity: Math.max(1, line.quantity - 1),
-                        })
-                      }
+                      className="sale-quoter-remove"
+                      disabled={disabled}
+                      aria-label="Quitar"
+                      onClick={() => removeLine(line.key)}
                     >
-                      −
-                    </button>
-                    <span className="qty-value">{product ? line.quantity : 0}</span>
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      disabled={disabled || !product || line.quantity >= maxStock}
-                      aria-label="Más"
-                      onClick={() =>
-                        updateLine(line.key, {
-                          quantity: Math.min(maxStock, line.quantity + 1),
-                        })
-                      }
-                    >
-                      +
+                      <Trash2 size={15} />
                     </button>
                   </div>
-                </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
 
-                <div className="sale-quoter-meta is-num">
-                  <span className="sale-quoter-label">Precio unit.</span>
-                  <strong>{product && unit != null ? amount(unit) : "—"}</strong>
-                </div>
-
-                <div className="sale-quoter-meta is-num">
-                  <span className="sale-quoter-label">Subtotal</span>
-                  <strong>{product && unit != null ? amount(lineTotal) : "—"}</strong>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-
-        <button
-          type="button"
-          className="sale-quoter-add"
-          disabled={
-            disabled || products.every((p) => p.stock <= 0 || selectedIds.has(p.id))
-          }
-          onClick={addLine}
-        >
-          <Plus size={16} aria-hidden />
-          Agregar producto
-        </button>
-
-        <div className="sale-quoter-foot">
-          <label className="sale-quoter-iva">
-            <input
-              type="checkbox"
-              checked={applyIva}
-              disabled={disabled}
-              onChange={(e) => onApplyIvaChange(e.target.checked)}
-            />
-            <span>
-              Incluir IVA <strong>{(IVA_RATE * 100).toFixed(0)}%</strong>
-            </span>
-          </label>
-          <div className="sale-quoter-totals" aria-label="Totales">
-            <div>
-              <span>Subtotal</span>
-              <strong>{amount(money.subtotal)}</strong>
-            </div>
-            <div>
-              <span>IVA {(IVA_RATE * 100).toFixed(0)}%</span>
-              <strong>{applyIva ? amount(money.iva) : "—"}</strong>
-            </div>
-            <div className="is-total">
-              <span>Total</span>
-              <strong>{amount(money.total)}</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="sale-quoter-notes">
-        <p className="muted small">
-          {applyIva
-            ? "Precios de línea sin IVA. El total de la OV incluye el 16%."
-            : "Montos mostrados sin IVA."}
+      {itemCount > 0 && (applyIva || fx != null) ? (
+        <p className="sale-cart-iva-note muted small">
+          {applyIva ? `Subtotal ${amount(money.subtotal)} + IVA ${amount(money.iva)}` : null}
+          {applyIva && fx != null ? " · " : null}
+          {fx != null ? `Tasa ${fx.toFixed(2)} Bs/$` : null}
         </p>
-        {fx != null ? (
-          <p className="muted small">Tasa del día: {fx.toFixed(2)} Bs/$</p>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }

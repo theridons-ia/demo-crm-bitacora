@@ -726,7 +726,7 @@ function VisitForm({
       blurb={
         mode === "schedule"
           ? "Calendario + hora para dejarla en la ruta."
-          : "Si eliges Ahora, la visita queda en curso al confirmar."
+          : "Si eliges Ahora, primero confirmas si estás en el PDV y luego entra la visita en curso."
       }
       footer={
         <div className="side-sheet-actions">

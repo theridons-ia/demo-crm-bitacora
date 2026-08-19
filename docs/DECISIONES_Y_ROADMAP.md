@@ -54,7 +54,8 @@ No es ERP completo ni app de tiendas (Play/App Store) en esta etapa.
 
 Referencia visual: `demo-crm-bitacora-export/` (cream / verde oscuro / coral).  
 Homogeneización móvil: [`implementacion/FASE-4-UI-MOVIL.md`](implementacion/FASE-4-UI-MOVIL.md).  
-Ruta semanal (no mezclar con Fase 4): [`implementacion/FASE-5-RUTA-SEMANAL.md`](implementacion/FASE-5-RUTA-SEMANAL.md).
+Ruta semanal (no mezclar con Fase 4): [`implementacion/FASE-5-RUTA-SEMANAL.md`](implementacion/FASE-5-RUTA-SEMANAL.md).  
+Operación camión (después de Fase 5): [`implementacion/FASE-6-OPERACION-CAMION.md`](implementacion/FASE-6-OPERACION-CAMION.md).
 
 ### 2.1 Ruta semanal (cerrada 2026-08-13)
 
@@ -106,6 +107,39 @@ flowchart TB
   dia --> visita
   lock[Supervisor puede fijar día/hora] -.-> ruta
 ```
+
+### 2.2 Operación camión — pedido, entrega, autoventa (cerrada 2026-08-19)
+
+Hoy **pedido**, **entrega** y **KPI venta** comparten el objeto `Sale` y la etiqueta “OV”. Eso sirvió para el piloto; la evolución hacia DSD/PowerStreet exige separar capas.
+
+**Cuatro capas (no mezclar con §2.1):**
+
+| Capa | Qué es | Hoy en código |
+|------|--------|----------------|
+| **Visita** | ¿Fui al PDV? GPS, bitácora | `Visit` |
+| **Pedido** | Compromiso comercial (qué, cuánto, precio) | `Sale` / “OV” |
+| **Entrega** | Cumplimiento físico (total/parcial) | no existe |
+| **Venta (KPI)** | Métrica de efectividad / reportes | derivado de pedido |
+
+**Modos de campo**
+
+| Modo | Flujo |
+|------|--------|
+| **Autoventa** | Pedido + entrega en la misma visita (refrescos, autoventa clásica) |
+| **Preventa** | Solo pedido hoy; entrega en visita posterior o reparto |
+
+**UI (objetivo Fase 6)**
+
+- “Orden de venta / OV” → **Pedido**; menú **Ventas** → **Pedidos**.
+- Códigos nuevos: `PED-…` (compat `OV-` temporal).
+- Inventario vendedor: **Disponible** (bodega; + camión en SF-6.4).
+
+**Qué no es Fase 6**
+
+- Cobranza en campo, comisiones, facturación fiscal → **Fase 7**.
+- Renombrar tablas DB antes de UI estable (SF-6.0b primero).
+
+Detalle sub-fases SF-6.0–6.6: [`implementacion/FASE-6-OPERACION-CAMION.md`](implementacion/FASE-6-OPERACION-CAMION.md).
 
 ---
 
@@ -171,13 +205,17 @@ Opcional Fase 2: trail en mapa para el supervisor; geocerca más estricta config
 
 ## 4. Modelo de venta (alineación export ↔ API)
 
+**Nota Fase 6:** el objeto `Sale` evolucionará hacia **Pedido** (+ **Entrega** separada). Ver §2.2 y [`implementacion/FASE-6-OPERACION-CAMION.md`](implementacion/FASE-6-OPERACION-CAMION.md).
+
 ```
-OrdenVenta / Sale
+OrdenVenta / Sale  →  Pedido (Order)
   origen: visita | mostrador | online
+  modo: preventa | autoventa  (Fase 6)
   client_id: obligatorio
   visit_id: opcional (si origen=visita, recomendado/requerido)
   currency: USD | VES
   lines[], payments..., status...
+  delivery → entidad aparte (SF-6.3)
 ```
 
 - Visita puede cerrarse **con o sin** venta.
@@ -303,6 +341,18 @@ Detalle de componentes se documentará en `web/` cuando exista (`DESIGN.md` o St
 - [ ] Vendedor: ordenar y repartir días; extras de cartera
 - [ ] UI: tarjeta por vendedor; columnas L–S + Sin día; mapa = slice de hoy
 - Detalle: [`implementacion/FASE-5-RUTA-SEMANAL.md`](implementacion/FASE-5-RUTA-SEMANAL.md)
+
+### Fase 6 — Operación camión (después de Fase 5)
+
+- [x] Brújula + glosario pedido/entrega/autoventa (SF-6.0 docs)
+- [ ] UI Pedido (renombrar OV; códigos `PED-`) — SF-6.0b
+- [ ] Pedido ligado a visita (origen + picker) — SF-6.1
+- [ ] Modo preventa vs autoventa — SF-6.2
+- [ ] Entrega + estados + stock al entregar — SF-6.3
+- [ ] Inventario camión + carga — SF-6.4
+- [ ] Cierre diario — SF-6.6
+- [ ] Reparto (opcional) — SF-6.5
+- Detalle: [`implementacion/FASE-6-OPERACION-CAMION.md`](implementacion/FASE-6-OPERACION-CAMION.md)
 
 ---
 

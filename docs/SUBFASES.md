@@ -132,11 +132,40 @@ Siguiente: extras/mover paradas sin candado. Excel (SF-3.4) y Alembic (SF-3.5) a
 
 ---
 
+## Fase 6 — Operación camión (pedido · entrega · autoventa)
+
+Separar **pedido** de **entrega** y preparar **camión + cierre diario**. Lexicon PowerStreet/DSD sin ERP. Cobranza/comisiones → Fase 7.
+
+Detalle: [`implementacion/FASE-6-OPERACION-CAMION.md`](implementacion/FASE-6-OPERACION-CAMION.md)
+
+Esfuerzo **S/M/L** = sesiones agente + pruebas tuyas en teléfono (no semanas de dev manual).
+
+| ID | Objetivo | Entregable | Esfuerzo | Estado |
+|----|----------|------------|----------|--------|
+| **SF-6.0** | Brújula + glosario | Doc Fase 6 + §2.2 roadmap | S | hecho (docs) |
+| **SF-6.0b** | UI Pedido (no OV) | Copy, menú Pedidos, códigos `PED-` | S | pendiente |
+| **SF-6.1** | Pedido ↔ visita | Origen visita + picker; ficha visita | M | pendiente |
+| **SF-6.2** | Preventa / autoventa | Modo en visita/pedido; resultados visita | M | pendiente |
+| **SF-6.3** | Entrega + estados | `Delivery`, POD, stock al entregar | L | pendiente |
+| **SF-6.4** | Inventario camión | Carga, stock camión, autoventa desde camión | L | pendiente |
+| **SF-6.5** | Reparto (opcional) | Entregas de pedidos preventa | M–L | pendiente |
+| **SF-6.6** | Cierre diario | Cuadre ruta sin CxC profunda | M | pendiente |
+
+**Orden sugerido:** 6.0 → 6.0b → 6.1 → (cerrar carrito/pago UI) → 6.2 → 6.3 → 6.4 → 6.6; 6.5 si hay preventa+reparto.
+
+**Fase 7 (fuera):** cobranza campo, crédito avanzado, comisiones, fiscal.
+
+---
+
 ## SF actual
 
-**Listo para commit / tu push:** **SF-5.2** (semana del vendedor + avisos con fecha y asignador).
+**Documentación:** **SF-6.0** (brújula operación camión) — listo.
 
-**Siguiente:** extras / reordenar días sin candado. Excel (SF-3.4) y Alembic (SF-3.5) siguen aparte.
+**Código en curso (otra rama):** carrito OV paso 1–2 (`ov-carrito-paso1`); conviene mergear antes de **SF-6.0b**.
+
+**Siguiente implementación:** **SF-6.0b** (renombrar UI a Pedido).
+
+Excel (SF-3.4) y Alembic (SF-3.5) siguen aparte; no mezclar con Fase 6.
 
 ### Cómo verificar SF-5.1
 

@@ -1,7 +1,7 @@
 import { Package } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Size = "sm" | "md";
+type Size = "sm" | "md" | "lg";
 
 type Props = {
   src?: string | null;
@@ -24,7 +24,7 @@ export function ProductThumb({ src, alt = "", size = "sm" }: Props) {
   }
   return (
     <span className={`product-thumb is-${size} is-fallback`} aria-hidden>
-      <Package size={size === "md" ? 18 : 15} />
+      <Package size={size === "lg" ? 22 : size === "md" ? 18 : 15} />
     </span>
   );
 }

@@ -17,7 +17,6 @@ import {
 import { SaleDetailSheet } from "../components/SaleDetailSheet";
 import { VisitDetailSheet } from "../components/VisitDetailSheet";
 import {
-  newQuoteLine,
   quoteLinesToItems,
   quoteLinesTotal,
   quoteMissingVesPrice,
@@ -55,7 +54,7 @@ import {
   saveStandaloneSaleDraft,
 } from "../lib/saleWizardDraft";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
-import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
+import { formatQuoteAmount, IVA_RATE, quoteMoney } from "../lib/quoteMoney";
 import { unitPriceForQuote } from "../lib/productPrices";
 import { draftQuoteCode, buildQuoteLines, QuoteDocument } from "../components/QuoteDocument";
 import { useAuth } from "../auth/AuthContext";
@@ -95,7 +94,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [clientId, setClientId] = useState<number | "">("");
   const [origin, setOrigin] = useState<StandaloneOrigin>("mostrador");
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
-  const [lines, setLines] = useState<QuoteLine[]>(() => [newQuoteLine()]);
+  const [lines, setLines] = useState<QuoteLine[]>(() => []);
   const [notes, setNotes] = useState("");
   const [isCredit, setIsCredit] = useState(false);
   const [applyIva, setApplyIva] = useState(false);
@@ -192,7 +191,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       if (draft) {
         setClientId(draft.clientId);
         setOrigin(draft.origin);
-        setLines(draft.lines.length ? draft.lines : [newQuoteLine()]);
+        setLines(draft.lines.length ? draft.lines : []);
         setPayment(draft.payment);
         setIsCredit(draft.isCredit);
         setApplyIva(draft.applyIva);
@@ -204,7 +203,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
         setFormError(null);
         setQuoteCopied(false);
       } else {
-        setLines([newQuoteLine()]);
+        setLines([]);
         setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
         setIsCredit(false);
         setApplyIva(false);
@@ -373,7 +372,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   }
 
   function resetComposeForm() {
-    setLines([newQuoteLine()]);
+    setLines([]);
     setNotes("");
     setIsCredit(false);
     setApplyIva(false);
@@ -693,41 +692,6 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
             {wizardStep === 1 ? (
               <>
-                <div className="quote-currency-row">
-                  <div className="field">
-                    <span className="field-label">Moneda</span>
-                    <div className="choice-group" role="group" aria-label="Moneda">
-                      <button
-                        type="button"
-                        className={currency === "USD" ? "chip active" : "chip"}
-                        onClick={() => {
-                          setCurrency("USD");
-                          setPayment((prev) => ({
-                            ...prev,
-                            payment_method:
-                              prev.payment_method === "cash_ves" ? "cash_usd" : prev.payment_method,
-                          }));
-                        }}
-                      >
-                        USD
-                      </button>
-                      <button
-                        type="button"
-                        className={currency === "VES" ? "chip active" : "chip"}
-                        onClick={() => {
-                          setCurrency("VES");
-                          setPayment((prev) => ({
-                            ...prev,
-                            payment_method:
-                              prev.payment_method === "cash_usd" ? "cash_ves" : prev.payment_method,
-                          }));
-                        }}
-                      >
-                        Bs (VES)
-                      </button>
-                    </div>
-                  </div>
-                </div>
                 {loadingCatalog ? <p className="muted">Cargando productos…</p> : null}
                 {!loadingCatalog ? (
                   <SaleQuoter
@@ -738,6 +702,20 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                     applyIva={applyIva}
                     onApplyIvaChange={setApplyIva}
                     currency={currency}
+                    onCurrencyChange={(next) => {
+                      setCurrency(next);
+                      setPayment((prev) => ({
+                        ...prev,
+                        payment_method:
+                          next === "VES"
+                            ? prev.payment_method === "cash_usd"
+                              ? "cash_ves"
+                              : prev.payment_method
+                            : prev.payment_method === "cash_ves"
+                              ? "cash_usd"
+                              : prev.payment_method,
+                      }));
+                    }}
                     fxRate={fxRate}
                   />
                 ) : null}
@@ -746,20 +724,24 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
             {wizardStep === 2 ? (
               <>
-                <p className="sale-total">
-                  Total:{" "}
-                  <strong>{formatQuoteAmount(money.total, currency)}</strong>
-                  {applyIva ? (
-                    <span className="muted">
-                      {" "}
-                      · subtotal {formatQuoteAmount(money.subtotal, currency)} + IVA{" "}
-                      {formatQuoteAmount(money.iva, currency)}
-                    </span>
-                  ) : (
-                    <span className="muted"> · sin IVA</span>
-                  )}
-                  {fxHint ? <> · {fxHint}</> : null}
-                </p>
+              <div className="visit-sale-pay">
+                <div className="sale-cart-metrics sale-pay-metrics" role="status">
+                  <div className="sale-cart-metric">
+                    <span>Subtotal</span>
+                    <strong>{formatQuoteAmount(money.subtotal, currency)}</strong>
+                  </div>
+                  <div className="sale-cart-metric">
+                    <span>{applyIva ? `IVA ${(IVA_RATE * 100).toFixed(0)}%` : "IVA"}</span>
+                    <strong>
+                      {applyIva ? formatQuoteAmount(money.iva, currency) : "—"}
+                    </strong>
+                  </div>
+                  <div className="sale-cart-metric is-total">
+                    <span>Total</span>
+                    <strong>{formatQuoteAmount(money.total, currency)}</strong>
+                  </div>
+                </div>
+                {fxHint ? <p className="sale-cart-iva-note muted small">{fxHint}</p> : null}
                 {!isCredit ? (
                   <PaymentCapture
                     value={payment}
@@ -769,13 +751,16 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                     disabled={submitting}
                   />
                 ) : (
-                  <p className="muted">Venta a crédito — sin cobro ahora; va a cobranza.</p>
+                  <p className="pay-credit-note">
+                    Venta a crédito — sin cobro ahora; va a cobranza.
+                  </p>
                 )}
                 <TextField
                   id="sale-notes"
-                  label="Nota"
+                  label="Nota (opcional)"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ej. entrega parcial, horario…"
                 />
                 <div className="quote-copy-row">
                   <Button
@@ -792,7 +777,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                     </p>
                   ) : null}
                 </div>
-                <QuoteDocument data={quoteData} asImage />
+              </div>
+              <QuoteDocument data={quoteData} asImage />
               </>
             ) : null}
 
