@@ -2535,6 +2535,51 @@ a {
   color: var(--muted-foreground);
 }
 
+.sale-compose-step {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.sale-compose-intro,
+.sale-compose-credit-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.sale-compose-intro strong,
+.sale-compose-credit-head strong {
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.sale-compose-credit-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sale-compose-credit-card .credit-check {
+  padding: 0.8rem 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.sale-compose-credit-card .credit-check:has(input:checked) {
+  border-color: var(--border);
+  background: transparent;
+}
+
+.sale-compose-help {
+  margin: 0.4rem 0 0;
+}
+
 .receivable-list {
   list-style: none;
   margin: 0.85rem 0 0;

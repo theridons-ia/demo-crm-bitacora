@@ -19,7 +19,8 @@ export type VisitSaleDraft = {
 
 export type StandaloneSaleDraft = {
   clientId: number | "";
-  origin: "mostrador" | "online";
+  origin: "mostrador" | "online" | "visita";
+  visitId?: number | null;
   wizardStep: number;
   lines: QuoteLine[];
   currency: CurrencyCode;

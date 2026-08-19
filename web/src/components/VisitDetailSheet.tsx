@@ -831,7 +831,7 @@ export function VisitDetailSheet({
                 }}
               >
                 <ShoppingCart size={16} />
-                Registrar venta
+                Tomar pedido
               </Button>
             ) : null}
             {current.status === "en_curso" ? (

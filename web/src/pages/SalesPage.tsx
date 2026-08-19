@@ -31,12 +31,14 @@ import { WorkspacePage } from "../layout/WorkspacePage";
 import {
   ApiError,
   createSale,
+  createVisitSale,
   fetchBankAccounts,
   fetchClients,
   fetchFxToday,
   fetchProducts,
   fetchSales,
   fetchSellers,
+  fetchVisits,
   type SaleCreateInput,
 } from "../lib/api";
 import { newLocalUuid } from "../lib/offlineDb";
@@ -73,7 +75,7 @@ type SalesPageProps = {
   teamView?: boolean;
 };
 
-type StandaloneOrigin = Exclude<SaleOrigin, "visita">;
+type NonVisitOrigin = Exclude<SaleOrigin, "visita">;
 
 /** Pedidos: lista + alta sin visita (mostrador / online) en Modal. */
 export function SalesPage({ teamView = false }: SalesPageProps) {
@@ -92,7 +94,10 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [clientId, setClientId] = useState<number | "">("");
-  const [origin, setOrigin] = useState<StandaloneOrigin>("mostrador");
+  const [origin, setOrigin] = useState<SaleOrigin>("mostrador");
+  const [visitId, setVisitId] = useState<number | null>(null);
+  const [visitCandidates, setVisitCandidates] = useState<Visit[]>([]);
+  const [visitsLoading, setVisitsLoading] = useState(false);
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [lines, setLines] = useState<QuoteLine[]>(() => []);
   const [notes, setNotes] = useState("");
@@ -139,7 +144,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
         await saveSalesCache(next).catch(() => undefined);
       } catch (err) {
         if (!cached.length) {
-          setError(err instanceof ApiError ? err.message : "Error al cargar ventas");
+          setError(err instanceof ApiError ? err.message : "Error al cargar pedidos");
         }
       } finally {
         setLoading(false);
@@ -157,6 +162,48 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       .then(setSellers)
       .catch(() => setSellers([]));
   }, [teamView]);
+
+  // SF-6.1: cuando el origen sea “Visita”, buscamos visitas recientes del mismo cliente
+  // (idealmente “en_curso”) para permitir ligar el pedido a un `visit_id`.
+  useEffect(() => {
+    if (origin !== "visita") {
+      setVisitCandidates([]);
+      setVisitId(null);
+      setVisitsLoading(false);
+      return;
+    }
+    if (!user || clientId === "") return;
+
+    let cancelled = false;
+    setVisitsLoading(true);
+    void (async () => {
+      try {
+        const all = await fetchVisits({ seller_id: user.id });
+        if (cancelled) return;
+        const filtered = all
+          .filter((v) => v.client_id === clientId && v.status === "en_curso")
+          .sort(
+            (a, b) =>
+              new Date((b.visited_at ?? b.created_at) as string).getTime() -
+              new Date((a.visited_at ?? a.created_at) as string).getTime(),
+          );
+
+        const sliced = filtered.slice(0, 12);
+        setVisitCandidates(sliced);
+
+        const preferred = sliced[0]?.id ?? null;
+        setVisitId((prev) => (prev != null && sliced.some((v) => v.id === prev) ? prev : preferred));
+      } catch {
+        if (!cancelled) setVisitCandidates([]);
+      } finally {
+        if (!cancelled) setVisitsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [origin, clientId, user?.id]);
 
   const sellerNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -193,6 +240,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       if (draft) {
         setClientId(draft.clientId);
         setOrigin(draft.origin);
+        setVisitId(draft.visitId ?? null);
         setLines(draft.lines.length ? draft.lines : []);
         setPayment(draft.payment);
         setIsCredit(draft.isCredit);
@@ -206,6 +254,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
         setQuoteCopied(false);
       } else {
         setLines([]);
+        setOrigin("mostrador");
+        setVisitId(null);
         setPayment(emptyPaymentCapture(currency === "VES" ? "cash_ves" : "cash_usd"));
         setIsCredit(false);
         setApplyIva(false);
@@ -277,6 +327,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     saveStandaloneSaleDraft({
       clientId,
       origin,
+      visitId,
       wizardStep,
       lines,
       currency,
@@ -291,6 +342,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     composing,
     clientId,
     origin,
+    visitId,
     wizardStep,
     lines,
     currency,
@@ -345,6 +397,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
   function canAdvanceFrom(step: number): string | null {
     if (step === 0) {
       if (clientId === "") return "Selecciona un cliente";
+      if (origin === "visita" && visitId == null) return "Selecciona una visita en curso";
       return null;
     }
     if (step === 1) {
@@ -379,6 +432,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
     setIsCredit(false);
     setApplyIva(false);
     setOrigin("mostrador");
+    setVisitId(null);
     setCurrency("USD");
     setPayment(emptyPaymentCapture());
     setWizardStep(0);
@@ -441,6 +495,16 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       return;
     }
 
+    if (origin === "visita" && visitId == null) {
+      setFormError("Selecciona una visita en curso");
+      return;
+    }
+
+    if (origin === "visita" && !navigator.onLine) {
+      setFormError("Necesitas conexión para registrar el pedido en una visita");
+      return;
+    }
+
     const quote_snapshot = serializeQuoteSnapshot({
       ...quoteData,
       issuedAt,
@@ -448,7 +512,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
     const payload: SaleCreateInput = {
       client_id: clientId,
-      origin,
+      origin: origin as NonVisitOrigin,
       currency,
       is_credit: isCredit,
       payment_method: isCredit ? "credit" : payment.payment_method,
@@ -465,6 +529,29 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
 
     setSubmitting(true);
     try {
+      if (origin === "visita") {
+        const created = await createVisitSale(visitId!, {
+          currency,
+          is_credit: isCredit,
+          payment_method: isCredit ? "credit" : payment.payment_method,
+          bank_account_id: isCredit ? null : payment.bank_account_id,
+          payment_reference: isCredit ? null : payment.payment_reference.trim() || null,
+          payment_evidence: isCredit ? null : payment.payment_evidence,
+          notes: notes.trim() || null,
+          apply_iva: applyIva,
+          quote_snapshot,
+          items,
+          local_uuid: newLocalUuid("sale"),
+          created_offline: false,
+        });
+        setSales((prev) => [created, ...prev]);
+        resetComposeForm();
+        setComposing(false);
+        setError(null);
+        setFormError(null);
+        return;
+      }
+
       if (!navigator.onLine) {
         await enqueueCreateSale(payload);
         resetComposeForm();
@@ -478,7 +565,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
       resetComposeForm();
       setComposing(false);
     } catch (err) {
-      if (!navigator.onLine || err instanceof TypeError) {
+      if (origin !== "visita" && (!navigator.onLine || err instanceof TypeError)) {
         try {
           await enqueueCreateSale(payload);
           setComposing(false);
@@ -488,7 +575,9 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           /* fall through */
         }
       }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo crear la venta");
+      setFormError(
+        err instanceof ApiError ? err.message : "No se pudo crear el pedido"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -569,7 +658,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
           <p className="muted">
             {sales.length
               ? "Sin coincidencias."
-              : "Aún no hay ventas. Registra una en visita o crea mostrador/online."}
+              : "Aún no hay pedidos. Toma uno en visita o crea uno por mostrador/online."}
           </p>
         ) : null}
 
@@ -615,8 +704,8 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
               setComposing(false);
             }}
           size="wide"
-          eyebrow="Nueva orden"
-          title="Venta sin visita"
+          eyebrow="Nuevo pedido"
+          title={origin === "visita" ? "Pedido ligado a visita" : "Pedido sin visita"}
           footer={
             <WizardFooter
               step={wizardStep}
@@ -640,7 +729,7 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
             <WizardSteps steps={[...SALE_STEPS]} current={wizardStep} />
 
             {wizardStep === 0 ? (
-              <>
+              <div className="sale-compose-step">
                 <div className="field">
                   <span className="field-label" id="sale-client-label">
                     Cliente
@@ -662,34 +751,105 @@ export function SalesPage({ teamView = false }: SalesPageProps) {
                 </div>
 
                 <div className="field">
-                  <span className="field-label">Origen</span>
+                  <span className="field-label">Canal</span>
                   <div className="choice-group" role="group" aria-label="Origen">
                     <button
                       type="button"
                       className={origin === "mostrador" ? "chip active" : "chip"}
-                      onClick={() => setOrigin("mostrador")}
+                      onClick={() => {
+                        setOrigin("mostrador");
+                        setVisitId(null);
+                      }}
                     >
                       Mostrador
                     </button>
                     <button
                       type="button"
                       className={origin === "online" ? "chip active" : "chip"}
-                      onClick={() => setOrigin("online")}
+                      onClick={() => {
+                        setOrigin("online");
+                        setVisitId(null);
+                      }}
                     >
                       Online
                     </button>
+                    {user?.role === "vendedor" ? (
+                      <button
+                        type="button"
+                        className={origin === "visita" ? "chip active" : "chip"}
+                        onClick={() => {
+                          setOrigin("visita");
+                          setVisitId(null);
+                        }}
+                      >
+                        Visita
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
-                <label className="credit-check">
-                  <input
-                    type="checkbox"
-                    checked={isCredit}
-                    onChange={(e) => setIsCredit(e.target.checked)}
-                  />
-                  <span>Venta a crédito (queda en cobranza del supervisor)</span>
-                </label>
-              </>
+                <section className="sale-compose-intro">
+                  <p className="eyebrow">Tipo de pedido</p>
+                  <strong>
+                    {origin === "visita"
+                      ? "Pedido tomado dentro de una visita en curso"
+                      : origin === "online"
+                        ? "Pedido fuera de visita · canal online"
+                        : "Pedido fuera de visita · mostrador"}
+                  </strong>
+                  <span className="muted small">
+                    {origin === "visita"
+                      ? "Se ligará a una visita activa del cliente para dejar trazabilidad."
+                      : "Úsalo para pedidos que no nacen de una visita de campo."}
+                  </span>
+                </section>
+
+                {origin === "visita" ? (
+                  <div className="field">
+                    <span className="field-label" id="sale-visit-label">
+                      Visita activa
+                    </span>
+                    <SearchPickField
+                      id="sale-visit"
+                      labelledBy="sale-visit-label"
+                      placeholder={visitsLoading ? "Cargando…" : "Selecciona una visita…"}
+                      valueId={visitId}
+                      disabled={visitsLoading || loadingCatalog}
+                      emptyLabel="Sin visitas disponibles"
+                      options={visitCandidates.map((v) => ({
+                        id: v.id,
+                        title: `Visita #${v.id}`,
+                        subtitle: selectedClient?.name ?? v.status,
+                      }))}
+                      onChange={(id) => setVisitId(id)}
+                    />
+                    {!visitsLoading && visitCandidates.length === 0 ? (
+                      <p className="muted small sale-compose-help">
+                        No hay visitas en curso para este cliente. Inicia una visita desde la ficha del
+                        PDV y luego toma el pedido.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <section className="sale-compose-credit-card">
+                  <div className="sale-compose-credit-head">
+                    <p className="eyebrow">Condición de pago</p>
+                    <strong>{isCredit ? "Crédito" : "Contado"}</strong>
+                  </div>
+                  <label className="credit-check">
+                    <input
+                      type="checkbox"
+                      checked={isCredit}
+                      onChange={(e) => setIsCredit(e.target.checked)}
+                    />
+                    <span>
+                      Registrar a crédito
+                      <small>Sin cobro ahora; el saldo queda en cobranza del supervisor.</small>
+                    </span>
+                  </label>
+                </section>
+              </div>
             ) : null}
 
             {wizardStep === 1 ? (
