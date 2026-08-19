@@ -8,6 +8,18 @@ export const GPS_FAR_M = 250;
 export const GPS_PROOF_OK_M = 40;
 /** Peor punto 40–100 m → parcial; > 100 m o GPS incompleto → deficiente. */
 export const GPS_PROOF_PARTIAL_M = 100;
+/** «¿Estás aquí?»: más de 100 m del PDV pide confirmación para seguir. */
+export const GPS_HERE_WARN_M = GPS_PROOF_PARTIAL_M;
+
+/** Distancia para el mapa «lejos del PDV»: metros cerca, km si ya es un tramo. */
+export function formatGapDistance(meters: number): string {
+  if (!(meters >= 0) || !Number.isFinite(meters)) return "—";
+  if (meters < 1000) return `${Math.round(meters)}\u00a0m`;
+  return `${(meters / 1000).toLocaleString("es-VE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}\u00a0km`;
+}
 
 export function parseCoord(value: string | null | undefined): number | null {
   if (value == null || value === "") return null;

@@ -23,7 +23,6 @@ import {
   type QuoteDocumentData,
 } from "./QuoteDocument";
 import {
-  newQuoteLine,
   quoteLinesToItems,
   quoteLinesTotal,
   quoteMissingVesPrice,
@@ -33,7 +32,7 @@ import {
 import { TextField } from "./TextField";
 import { WizardFooter } from "./WizardFooter";
 import { WizardSteps } from "./WizardSteps";
-import { formatQuoteAmount, quoteMoney } from "../lib/quoteMoney";
+import { formatQuoteAmount, IVA_RATE, quoteMoney } from "../lib/quoteMoney";
 import { serializeQuoteSnapshot } from "../lib/quoteSnapshot";
 import { shouldIgnoreOverlayClose } from "../lib/overlayGuard";
 import {
@@ -64,7 +63,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
   const [step, setStep] = useState(0);
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [lines, setLines] = useState<QuoteLine[]>(() => [newQuoteLine()]);
+  const [lines, setLines] = useState<QuoteLine[]>(() => []);
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [isCredit, setIsCredit] = useState(false);
   const [applyIva, setApplyIva] = useState(false);
@@ -91,7 +90,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
       const draft = loadVisitSaleDraft(visit.id);
       if (draft) {
         setStep(draft.step);
-        setLines(draft.lines.length ? draft.lines : [newQuoteLine()]);
+        setLines(draft.lines.length ? draft.lines : []);
         setCurrency(draft.currency);
         setIsCredit(draft.isCredit);
         setApplyIva(draft.applyIva);
@@ -101,7 +100,7 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
         setError(null);
       } else {
         setStep(0);
-        setLines([newQuoteLine()]);
+        setLines([]);
         setCurrency("USD");
         setIsCredit(false);
         setApplyIva(false);
@@ -312,34 +311,6 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
 
         {step === 0 ? (
           <>
-            <div className="quote-currency-row">
-              <div className="field">
-                <span className="field-label">Moneda</span>
-                <div className="choice-group" role="group" aria-label="Moneda">
-                  <button
-                    type="button"
-                    className={currency === "USD" ? "chip active" : "chip"}
-                    onClick={() => {
-                      setCurrency("USD");
-                      setPayment(emptyPaymentCapture("cash_usd"));
-                    }}
-                  >
-                    USD
-                  </button>
-                  <button
-                    type="button"
-                    className={currency === "VES" ? "chip active" : "chip"}
-                    onClick={() => {
-                      setCurrency("VES");
-                      setPayment(emptyPaymentCapture("cash_ves"));
-                    }}
-                  >
-                    Bs (VES)
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {loading ? <p className="muted">Cargando productos…</p> : null}
             {!loading ? (
               <SaleQuoter
@@ -350,6 +321,10 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
                 applyIva={applyIva}
                 onApplyIvaChange={setApplyIva}
                 currency={currency}
+                onCurrencyChange={(next) => {
+                  setCurrency(next);
+                  setPayment(emptyPaymentCapture(next === "VES" ? "cash_ves" : "cash_usd"));
+                }}
                 fxRate={fxRate}
               />
             ) : null}
@@ -358,22 +333,25 @@ export function VisitSaleWizard({ visit, open, onClose, onSold }: Props) {
 
         {step === 1 ? (
           <div className="visit-sale-pay">
-            <div className="visit-sale-quote-summary" role="status">
-              <div>
-                <span className="muted small">Subtotal</span>
+            <div className="sale-cart-metrics sale-pay-metrics" role="status">
+              <div className="sale-cart-metric">
+                <span>Subtotal</span>
                 <strong>{formatQuoteAmount(money.subtotal, currency)}</strong>
               </div>
-              <div>
-                <span className="muted small">{applyIva ? "IVA 16%" : "IVA"}</span>
+              <div className="sale-cart-metric">
+                <span>{applyIva ? `IVA ${(IVA_RATE * 100).toFixed(0)}%` : "IVA"}</span>
                 <strong>
-                  {applyIva ? formatQuoteAmount(money.iva, currency) : "Sin IVA"}
+                  {applyIva ? formatQuoteAmount(money.iva, currency) : "—"}
                 </strong>
               </div>
-              <div className="is-total">
-                <span className="muted small">Total</span>
+              <div className="sale-cart-metric is-total">
+                <span>Total</span>
                 <strong>{formatQuoteAmount(money.total, currency)}</strong>
               </div>
             </div>
+            {fxRate != null && fxRate > 0 ? (
+              <p className="sale-cart-iva-note muted small">Tasa {fxRate.toFixed(2)} Bs/$</p>
+            ) : null}
 
             <label className="credit-check">
               <input

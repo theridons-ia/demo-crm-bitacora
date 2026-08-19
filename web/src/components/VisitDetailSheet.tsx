@@ -5,6 +5,7 @@ import { Button } from "./Button";
 import { ClientDetailSheet } from "./ClientDetailSheet";
 import { CloseVisitSheet } from "./CloseVisitSheet";
 import { GpsProofPin } from "./GpsProofLegend";
+import { HerePdvGapMap } from "./HerePdvGapMap";
 import { LiveLed } from "./LiveLed";
 import { Modal } from "./Modal";
 import { SaleDetailSheet } from "./SaleDetailSheet";
@@ -29,11 +30,13 @@ import {
 } from "../lib/visitFieldLog";
 import { isVisitOverdue } from "../lib/visitOrder";
 import { ApiError, cancelVisit, patchVisitNotes, pinVisitGps, startVisit } from "../lib/api";
-import { coordsFromClient, distanceMeters, getCurrentPosition, isMockGpsEnabled } from "../lib/gps";
+import { coordsFromClient, distanceMeters, getCurrentPosition, isMockGpsEnabled, type GeoFix } from "../lib/gps";
 import {
   GPS_FAR_M,
+  GPS_HERE_WARN_M,
   GPS_PROOF_OK_M,
   GPS_PROOF_PARTIAL_M,
+  formatGapDistance,
   parseCoord,
   visitGpsProof,
   visitGpsProofDetail,
@@ -129,17 +132,53 @@ function distTone(meters: number | null, completed: boolean): string {
   return "is-bad";
 }
 
+function metersToPdv(
+  visit: Visit,
+  lat?: number | null,
+  lng?: number | null,
+): number | null {
+  const pdv = coordsFromClient(visit.client);
+  const a = lat ?? parseCoord(visit.latitude);
+  const b = lng ?? parseCoord(visit.longitude);
+  if (a == null || b == null || !pdv) return null;
+  return distanceMeters(a, b, pdv.latitude, pdv.longitude);
+}
+
+function farFromPdvM(
+  visit: Visit,
+  lat?: number | null,
+  lng?: number | null,
+): number | null {
+  const dist = metersToPdv(visit, lat, lng);
+  if (dist == null || dist <= GPS_HERE_WARN_M) return null;
+  return Math.round(dist);
+}
+
 function gpsConfirmMessage(visit: Visit, failReason: string | null): string | null {
   if (failReason) {
     return `${failReason}. Mala señal o sin conexión. Puedes continuar sin GPS (temporal) y actualizar después.`;
   }
-  const pdv = coordsFromClient(visit.client);
+  const dist = farFromPdvM(visit);
+  if (dist == null) return null;
+  return `Estás a ~${dist} m del PDV. Debes estar en el local.`;
+}
+
+function seedFixFromVisit(visit: Visit): GeoFix | null {
   const lat = parseCoord(visit.latitude);
   const lng = parseCoord(visit.longitude);
-  if (lat == null || lng == null || !pdv) return null;
-  const dist = distanceMeters(lat, lng, pdv.latitude, pdv.longitude);
-  if (dist <= GPS_FAR_M) return null;
-  return `La marca está a ~${Math.round(dist)} m del PDV. Si no es el local, actualiza el GPS.`;
+  if (lat == null || lng == null) return null;
+  const acc = visit.gps_accuracy_m != null ? Number(visit.gps_accuracy_m) : null;
+  return {
+    latitude: lat,
+    longitude: lng,
+    accuracy_m: acc != null && Number.isFinite(acc) ? acc : null,
+    captured_at: visit.gps_captured_at ?? new Date().toISOString(),
+  };
+}
+
+function fixIsFresh(fix: GeoFix, maxAgeMs = 60_000): boolean {
+  const t = Date.parse(fix.captured_at);
+  return Number.isFinite(t) && Date.now() - t < maxAgeMs;
 }
 
 function VisitGpsEvidence({
@@ -336,6 +375,9 @@ export function VisitDetailSheet({
     () => Boolean(confirmHereOnOpen && visit.status === "en_curso"),
   );
   const [gpsConfirmNote, setGpsConfirmNote] = useState<string | null>(null);
+  const [farWarnM, setFarWarnM] = useState<number | null>(null);
+  const [hereFix, setHereFix] = useState<GeoFix | null>(null);
+  const [hereFixBusy, setHereFixBusy] = useState(false);
   const [showClient, setShowClient] = useState(false);
   const [fieldLog, setFieldLog] = useState(() =>
     resolveVisitLog(visit.id, visit.field_notes, visit.local_uuid),
@@ -344,6 +386,7 @@ export function VisitDetailSheet({
   const currentRef = useRef(visit);
   const logTimer = useRef<number | null>(null);
   const hereAcked = useRef(false);
+  const pendingFix = useRef<GeoFix | null>(null);
 
   useEffect(() => {
     currentRef.current = current;
@@ -368,7 +411,11 @@ export function VisitDetailSheet({
   useLayoutEffect(() => {
     if (!open) {
       hereAcked.current = false;
+      pendingFix.current = null;
       setGpsConfirm(false);
+      setFarWarnM(null);
+      setHereFix(null);
+      setHereFixBusy(false);
       setShowClient(false);
       return;
     }
@@ -387,9 +434,15 @@ export function VisitDetailSheet({
     const shouldConfirm =
       confirmHereOnOpen && visit.status === "en_curso" && !hereAcked.current;
     setGpsConfirm(shouldConfirm);
-    setGpsConfirmNote(
-      shouldConfirm ? gpsConfirmMessage(visit, confirmHereFailReason ?? null) : null,
-    );
+    const seeded = shouldConfirm ? seedFixFromVisit(visit) : null;
+    pendingFix.current = seeded;
+    setHereFix(seeded);
+    setHereFixBusy(shouldConfirm && !seeded);
+    const hereNote = shouldConfirm
+      ? gpsConfirmMessage(visit, confirmHereFailReason ?? null)
+      : null;
+    setGpsConfirmNote(hereNote);
+    setFarWarnM(null);
     setViewSaleDoc(false);
     setConfirmCancel(false);
     setSaleJustConfirmed(false);
@@ -430,6 +483,36 @@ export function VisitDetailSheet({
     };
   }, [open, visit.id]);
 
+  useEffect(() => {
+    if (!open || !gpsConfirm) return;
+    let cancelled = false;
+    const near = coordsFromClient(currentRef.current.client);
+    if (!pendingFix.current) setHereFixBusy(true);
+
+    void getCurrentPosition(15_000, near, { maximumAge: 0 }).then((geo) => {
+      if (cancelled) return;
+      setHereFixBusy(false);
+      if (!geo.ok) {
+        if (!pendingFix.current) {
+          setGpsConfirmNote(
+            `${geo.reason}. Mala señal o sin conexión. Puedes continuar sin GPS (temporal) y actualizar después.`,
+          );
+        }
+        return;
+      }
+      pendingFix.current = geo.fix;
+      setHereFix(geo.fix);
+      const far = farFromPdvM(currentRef.current, geo.fix.latitude, geo.fix.longitude);
+      setGpsConfirmNote(
+        far != null ? `Estás a ~${far} m del PDV. Debes estar en el local.` : null,
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, gpsConfirm, current.id]);
+
   const clientName = current.client?.name ?? `Cliente #${current.client_id}`;
   const clientId =
     current.client?.rif ?? (current.client?.ci ? `CI ${current.client.ci}` : null);
@@ -461,24 +544,69 @@ export function VisitDetailSheet({
   function onAskHere() {
     setError(null);
     setGpsConfirmNote(null);
+    setFarWarnM(null);
+    pendingFix.current = seedFixFromVisit(current);
+    setHereFix(pendingFix.current);
     setGpsConfirm(true);
   }
 
   function dismissHerePrompt() {
     hereAcked.current = true;
+    pendingFix.current = null;
+    setFarWarnM(null);
+    setHereFix(null);
+    setHereFixBusy(false);
     setGpsConfirm(false);
   }
 
-  async function onStart(opts?: { skipGps?: boolean }) {
+  function applyFarWarn(visitRow: Visit, fix?: GeoFix) {
+    const far = farFromPdvM(visitRow, fix?.latitude, fix?.longitude);
+    if (far == null) {
+      setFarWarnM(null);
+      setGpsConfirmNote(null);
+      return false;
+    }
+    setFarWarnM(far);
+    setGpsConfirmNote(`Estás a ~${far} m del PDV. Debes estar en el local.`);
+    return true;
+  }
+
+  async function onStart(opts?: { skipGps?: boolean; acceptFar?: boolean }) {
     setBusy(true);
     setError(null);
-    setGpsConfirmNote(null);
+    if (!opts?.acceptFar) setGpsConfirmNote(null);
     try {
-      const geo = opts?.skipGps
-        ? ({ ok: false, skipped: true, reason: "Sin GPS" } as const)
-        : await getCurrentPosition(15_000, coordsFromClient(current.client), {
-            maximumAge: 0,
-          });
+      let geo: Awaited<ReturnType<typeof getCurrentPosition>> = {
+        ok: false,
+        skipped: true,
+        reason: "Sin GPS",
+      };
+      if (opts?.acceptFar && pendingFix.current) {
+        geo = { ok: true, fix: pendingFix.current };
+      } else if (!opts?.skipGps && pendingFix.current && fixIsFresh(pendingFix.current)) {
+        geo = { ok: true, fix: pendingFix.current };
+      } else if (!opts?.skipGps) {
+        geo = await getCurrentPosition(15_000, coordsFromClient(current.client), {
+          maximumAge: 0,
+        });
+      }
+
+      if (geo.ok && !opts?.acceptFar && !opts?.skipGps) {
+        const fix = geo.fix;
+        pendingFix.current = fix;
+        setCurrent((prev) => ({
+          ...prev,
+          latitude: String(fix.latitude),
+          longitude: String(fix.longitude),
+          gps_accuracy_m:
+            fix.accuracy_m != null ? String(fix.accuracy_m) : prev.gps_accuracy_m,
+          gps_offline: Boolean(fix.mocked),
+        }));
+        if (applyFarWarn(current, fix)) {
+          return;
+        }
+      }
+
       const updated = await startVisit(current.id, {
         latitude: geo.ok ? geo.fix.latitude : null,
         longitude: geo.ok ? geo.fix.longitude : null,
@@ -494,6 +622,8 @@ export function VisitDetailSheet({
         clientName: updated.client?.name ?? visit.client?.name ?? "",
       });
       hereAcked.current = true;
+      pendingFix.current = null;
+      setFarWarnM(null);
       setGpsConfirm(false);
       if (!geo.ok) {
         setGpsOk(
@@ -501,15 +631,31 @@ export function VisitDetailSheet({
             ? "Visita iniciada sin GPS. Puedes actualizarlo en la ficha."
             : `${geo.reason}. Visita iniciada sin GPS (temporal).`,
         );
-      } else {
-        const warn = gpsConfirmMessage(updated, null);
-        if (warn) setGpsOk(warn);
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar la visita");
     } finally {
       setBusy(false);
     }
+  }
+
+  function onHereYes() {
+    const far = farFromPdvM(current, hereFix?.latitude, hereFix?.longitude);
+    if (far != null) {
+      setFarWarnM(far);
+      setGpsConfirmNote(`Estás a ~${far} m del PDV. Debes estar en el local.`);
+      return;
+    }
+    dismissHerePrompt();
+  }
+
+  function continueDespiteFar() {
+    setFarWarnM(null);
+    if (current.status === "programada") {
+      void onStart({ acceptFar: true });
+      return;
+    }
+    dismissHerePrompt();
   }
 
   async function onPinGps() {
@@ -536,12 +682,15 @@ export function VisitDetailSheet({
       });
       setCurrent(updated);
       onUpdated(updated);
+      pendingFix.current = geo.fix;
+      setHereFix(geo.fix);
       const acc =
         geo.fix.accuracy_m != null ? ` · ±${Math.round(geo.fix.accuracy_m)} m` : "";
       setGpsOk(
         `${geo.fix.mocked ? "GPS de prueba" : "Posición de inicio"} actualizada${acc}`,
       );
-      setGpsConfirmNote(gpsConfirmMessage(updated, null));
+      if (gpsConfirm) applyFarWarn(updated);
+      else setGpsConfirmNote(gpsConfirmMessage(updated, null));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar el GPS");
     } finally {
@@ -623,6 +772,14 @@ export function VisitDetailSheet({
   const routeNote = rewriteCloseNote(current.description, sale);
   const logLines = visitLogLines(fieldLog);
   const showLiveLog = current.status === "en_curso";
+  const pdvHere = coordsFromClient(current.client);
+  const youHere = hereFix
+    ? { latitude: hereFix.latitude, longitude: hereFix.longitude }
+    : (() => {
+        const lat = parseCoord(current.latitude);
+        const lng = parseCoord(current.longitude);
+        return lat != null && lng != null ? { latitude: lat, longitude: lng } : null;
+      })();
 
   return (
     <>
@@ -941,6 +1098,8 @@ export function VisitDetailSheet({
         <VisitMapSheet
           visit={current}
           open
+          hereFix={gpsConfirm ? hereFix : null}
+          hereFixLoading={gpsConfirm && hereFixBusy}
           eyebrow={gpsConfirm ? "Confirmar posición" : undefined}
           blurb={gpsConfirm ? `¿Estás en ${clientName}?` : undefined}
           notice={
@@ -977,7 +1136,7 @@ export function VisitDetailSheet({
                     type="button"
                     variant={hasGps ? "accent" : "ghost"}
                     disabled={gpsBusy}
-                    onClick={dismissHerePrompt}
+                    onClick={onHereYes}
                   >
                     {hasGps ? "Sí, estoy aquí" : "Continuar sin GPS"}
                   </Button>
@@ -999,12 +1158,56 @@ export function VisitDetailSheet({
           onClose={() => {
             setShowMap(false);
             if (gpsConfirm && current.status === "en_curso") {
+              const far = farFromPdvM(current);
+              if (far != null) {
+                setFarWarnM(far);
+                setGpsConfirmNote(`Estás a ~${far} m del PDV. Debes estar en el local.`);
+                setGpsConfirm(true);
+                return;
+              }
               dismissHerePrompt();
             } else {
               setGpsConfirm(false);
+              setFarWarnM(null);
+              pendingFix.current = null;
             }
           }}
         />
+      ) : null}
+
+      {farWarnM != null && gpsConfirm ? (
+        <Modal
+          open
+          eyebrow="Posición"
+          title="Estás lejos del PDV"
+          blurb={`A ~${formatGapDistance(farWarnM)} del local. Debes estar en el punto de venta.`}
+          onClose={() => setFarWarnM(null)}
+          footer={
+            <div className="side-sheet-actions">
+              <Button type="button" variant="ghost" onClick={() => setFarWarnM(null)}>
+                Volver
+              </Button>
+              <Button
+                type="button"
+                variant="accent"
+                disabled={busy}
+                onClick={continueDespiteFar}
+              >
+                {busy ? "Iniciando…" : "Seguir"}
+              </Button>
+            </div>
+          }
+        >
+          {pdvHere && youHere ? (
+            <HerePdvGapMap
+              pdv={pdvHere}
+              here={youHere}
+              meters={farWarnM}
+              pdvName={current.client?.name}
+            />
+          ) : null}
+          <p className="muted">¿Continuar aunque no estés en el lugar?</p>
+        </Modal>
       ) : null}
     </>
   );

@@ -12,9 +12,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { BankAccount, CurrencyCode, PaymentMethod } from "../lib/types";
 import { payMarkSlugs } from "../lib/payMarks";
 import { copyText, payAccountShareText, whatsappShareUrl } from "../lib/sharePay";
+import { Button } from "./Button";
 import { PayMark } from "./PayMark";
 import { PhotoDrop } from "./PhotoDrop";
-import { SelectField, TextField } from "./TextField";
+import { TextField } from "./TextField";
 
 export type PaymentCaptureValue = {
   payment_method: PaymentMethod;
@@ -113,7 +114,6 @@ export function PaymentCapture({
   }, [needsAccount, value.payment_method, currency, filteredAccounts.length, value.bank_account_id]);
 
   const selected = filteredAccounts.find((a) => a.id === value.bank_account_id);
-  const accountHint = distinctPayHint(selected);
   const shareText = selected && isShareableAccount(selected) ? payAccountShareText(selected) : null;
   const [copied, setCopied] = useState(false);
   const emptyAccountHint =
@@ -123,8 +123,8 @@ export function PaymentCapture({
 
   return (
     <div className="payment-capture">
-      <div className="field">
-        <span className="field-label">Forma de pago</span>
+      <div className="pay-block">
+        <p className="sale-cart-heading">Forma de pago</p>
         <div className="pay-methods" role="group" aria-label="Forma de pago">
           {visibleMethods.map((opt) => {
             const Icon = opt.icon;
@@ -137,7 +137,7 @@ export function PaymentCapture({
                 disabled={disabled}
                 onClick={() => onChange({ ...value, payment_method: opt.id })}
               >
-                <Icon size={16} aria-hidden />
+                <Icon size={22} aria-hidden />
                 {opt.label}
               </button>
             );
@@ -145,122 +145,143 @@ export function PaymentCapture({
         </div>
       </div>
 
-      {needsAccount && filteredAccounts.length ? (
-        <SelectField
-          id="pay-account"
-          label="Cuenta destino"
-          disabled={disabled}
-          value={value.bank_account_id ?? ""}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              bank_account_id: e.target.value ? Number(e.target.value) : null,
-            })
-          }
-          hint={accountHint}
-        >
-          {filteredAccounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </SelectField>
-      ) : null}
-      {needsAccount && emptyAccountHint ? (
-        <p className="muted small pay-hint" role="status">
-          {emptyAccountHint}
-        </p>
-      ) : null}
-      {shareText ? (
-        <div className="pay-share-inline">
-          <div className="pay-share-head">
-            {selected ? (
+      <div className="pay-block">
+        {needsAccount && filteredAccounts.length > 1 ? (
+          <>
+            <p className="sale-cart-heading">Cuenta destino</p>
+            <div className="pay-accounts" role="listbox" aria-label="Cuenta destino">
+              {filteredAccounts.map((account) => {
+                const active = account.id === value.bank_account_id;
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className={active ? "pay-account is-active" : "pay-account"}
+                    disabled={disabled}
+                    onClick={() => onChange({ ...value, bank_account_id: account.id })}
+                  >
+                    <PayMark
+                      slugs={payMarkSlugs(account)}
+                      label={account.bank_name || account.name}
+                      size="md"
+                    />
+                    <span className="sale-cart-copy">
+                      <strong>{account.name}</strong>
+                      {account.holder_name ? (
+                        <span className="muted small">{account.holder_name}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+
+        {emptyAccountHint ? (
+          <p className="muted small pay-hint" role="status">
+            {emptyAccountHint}
+          </p>
+        ) : null}
+
+        {shareText && selected ? (
+          <div className="pay-share-inline">
+            <div className="pay-share-head">
               <PayMark
                 slugs={payMarkSlugs(selected)}
                 label={selected.bank_name || selected.name}
                 size="md"
               />
-            ) : null}
-            <div className="pay-share-copy">
-              {selected?.holder_name || selected?.account_type === "zelle" ? (
-                <p className="pay-share-holder">
-                  Nombre: {selected.holder_name?.trim() || selected.name}
-                </p>
-              ) : null}
-              <p className="pay-share-hint">{selected?.pay_hint}</p>
+              <div className="pay-share-copy">
+                <p className="pay-share-holder">{selected.name}</p>
+                {selected.holder_name ? (
+                  <p className="muted small">{selected.holder_name}</p>
+                ) : null}
+                {selected.pay_hint ? <p className="pay-share-hint">{selected.pay_hint}</p> : null}
+              </div>
+            </div>
+            <div className="pay-share-actions">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => {
+                  void copyText(shareText).then((ok) => {
+                    setCopied(ok);
+                    if (ok) window.setTimeout(() => setCopied(false), 1800);
+                  });
+                }}
+              >
+                <Copy size={16} />
+                {copied ? "Copiado" : "Copiar"}
+              </Button>
+              <a
+                className="btn btn-secondary"
+                href={whatsappShareUrl(shareText)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle size={16} />
+                WhatsApp
+              </a>
             </div>
           </div>
-          <div className="pay-share-actions">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={disabled}
-              onClick={() => {
-                void copyText(shareText).then((ok) => {
-                  setCopied(ok);
-                  if (ok) window.setTimeout(() => setCopied(false), 1800);
-                });
-              }}
-            >
-              <Copy size={16} />
-              {copied ? "Copiado" : "Copiar datos"}
-            </button>
-            <a
-              className="btn btn-secondary"
-              href={whatsappShareUrl(shareText)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <MessageCircle size={16} />
-              WhatsApp
-            </a>
+        ) : null}
+
+        {needsAccount && filteredAccounts.length === 1 && selected && !shareText ? (
+          <div className="pay-account is-static">
+            <PayMark
+              slugs={payMarkSlugs(selected)}
+              label={selected.bank_name || selected.name}
+              size="md"
+            />
+            <span className="sale-cart-copy">
+              <strong>{selected.name}</strong>
+              {selected.holder_name ? (
+                <span className="muted small">{selected.holder_name}</span>
+              ) : null}
+            </span>
           </div>
-        </div>
-      ) : null}
-      {!needsAccount ? (
-        <p className="muted small pay-hint">El efectivo se registra en caja {currency}.</p>
-      ) : null}
+        ) : null}
 
-      <TextField
-        id="pay-ref"
-        label="Referencia / código (opcional)"
-        value={value.payment_reference}
-        disabled={disabled}
-        onChange={(e) => onChange({ ...value, payment_reference: e.target.value })}
-        placeholder="Ej. 00123456"
-      />
+        {!needsAccount ? (
+          <div className="pay-cash-note">
+            <Banknote size={22} aria-hidden />
+            <div>
+              <strong>Efectivo {currency}</strong>
+              <span className="muted small">Se registra en caja. No hace falta cuenta.</span>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
-      <PhotoDrop
-        id="pay-photo"
-        label="Comprobante"
-        hint="Opcional · JPG o PNG"
-        readyHint="Se adjunta a la OV"
-        value={value.payment_evidence}
-        disabled={disabled}
-        onChange={(next) => onChange({ ...value, payment_evidence: next })}
-      />
+      <div className="pay-details">
+        <TextField
+          id="pay-ref"
+          label="Referencia / código"
+          value={value.payment_reference}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...value, payment_reference: e.target.value })}
+          placeholder="Opcional · ej. 00123456"
+        />
+        <PhotoDrop
+          id="pay-photo"
+          label="Comprobante"
+          hint="Opcional · JPG o PNG"
+          readyHint="Se adjunta a la OV"
+          value={value.payment_evidence}
+          disabled={disabled}
+          onChange={(next) => onChange({ ...value, payment_evidence: next })}
+        />
+      </div>
     </div>
   );
 }
 
 function isShareableAccount(account: BankAccount): boolean {
   return account.account_type !== "cash" && Boolean(account.pay_hint || account.holder_name);
-}
-
-function distinctPayHint(account: BankAccount | undefined): string | undefined {
-  const hint = account?.pay_hint?.trim();
-  if (!hint) return undefined;
-  const name = account?.name.trim() ?? "";
-  if (foldText(hint) === foldText(name)) return undefined;
-  if (foldText(name).includes(foldText(hint))) return undefined;
-  return hint;
-}
-
-function foldText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase();
 }
 
 export function emptyPaymentCapture(
